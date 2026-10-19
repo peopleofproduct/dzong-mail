@@ -155,8 +155,11 @@ export function IconRail({ pending, children }: { pending: number; children: Rea
           title="Drag to resize · double-click to reset"
           onPointerDown={startDrag}
           onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
-          className="absolute inset-y-0 right-0 z-10 hidden w-1.5 cursor-col-resize transition-colors hover:bg-indigo-300/70 active:bg-indigo-400 md:block"
-        />
+          className="group absolute inset-y-0 right-0 z-10 hidden w-3 cursor-col-resize items-center justify-center hover:bg-indigo-200/50 active:bg-indigo-300/50 md:flex dark:hover:bg-indigo-800/50 dark:active:bg-indigo-700/50"
+        >
+          {/* Always-visible grip so the handle is discoverable. */}
+          <span className="h-8 w-1 rounded-full bg-zinc-300 transition-colors group-hover:bg-indigo-500 group-active:bg-indigo-600 dark:bg-zinc-600" />
+        </div>
       </div>
       <label
         htmlFor="nav-toggle"
