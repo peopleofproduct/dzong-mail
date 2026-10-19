@@ -3,7 +3,8 @@ import { Paperclip } from "lucide-react";
 import { getThread } from "@/lib/queries";
 import { prisma } from "@/lib/db";
 import { cleanEmailHtml } from "@/lib/email-html";
-import { draftAiReplyNow, markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/actions";
+import { markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/actions";
+import { AiDraftButton } from "./ai-draft-button";
 import { MarkReadOnMount } from "./mark-read-on-mount";
 import { MessageBody } from "./message-body";
 import { SenderAvatar } from "./sender-avatar";
@@ -258,14 +259,10 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
           ↪ Forward
         </Link>
         {!last.isDraft && (
-          <form action={draftAiReplyNow.bind(null, last.id)}>
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-300 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-            >
-              ✦ Draft reply with AI
-            </button>
-          </form>
+          <AiDraftButton
+            messageId={last.id}
+            className="inline-flex items-center gap-2 rounded-lg border border-indigo-300 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+          />
         )}
       </div>
     </div>

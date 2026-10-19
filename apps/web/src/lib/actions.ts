@@ -14,7 +14,9 @@ import {
   dispatchScheduledDraft,
   draftAiReply,
   encryptSecret,
+  generateReplyVariants,
   generateRuleFromPrompt,
+  saveReplyDraft,
   sendEmail,
   summarizeThread,
   syncAccount,
@@ -362,6 +364,23 @@ export async function draftAiReplyNow(messageId: string) {
   const result = await draftAiReply(messageId);
   revalidatePath("/");
   safeRedirect("/", result.ok ? { notice: "Draft ready in Drafts" } : { error: result.reason! });
+}
+
+/** Generate reply variants for the picker — returns bodies, persists nothing. */
+export async function generateReplyVariantsNow(
+  messageId: string,
+): Promise<{ ok: boolean; variants?: { key: string; body: string }[]; reason?: string }> {
+  return generateReplyVariants(messageId);
+}
+
+/** Persist the variant the user picked as a thread draft. */
+export async function saveReplyDraftNow(
+  messageId: string,
+  body: string,
+): Promise<{ ok: boolean; reason?: string }> {
+  const result = await saveReplyDraft(messageId, body);
+  revalidatePath("/");
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason ?? "Could not save draft" };
 }
 
 export async function summarizeThreadNow(threadId: string) {

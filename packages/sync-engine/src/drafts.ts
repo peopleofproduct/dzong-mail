@@ -93,12 +93,57 @@ export async function draftAiReply(
   messageId: string,
   db: PrismaClient = prisma,
 ): Promise<DraftResult> {
+  const ctx = await replyContext(messageId, db);
+  if ("reason" in ctx) return { ok: false, reason: ctx.reason };
+
+  const response = await ctx.ai.provider.complete({
+    messages: [
+      { role: "system", content: `${ctx.systemBase} Be concise.` },
+      { role: "user", content: ctx.userPrompt },
+    ],
+    maxTokens: 800,
+    temperature: 0.4,
+  });
+
+  return saveReplyDraft(
+    messageId,
+    fixSignoffPlaceholders(response.text.trim(), ctx.name),
+    db,
+  );
+}
+
+/** Style nudge + sampling temperature per generated variant. */
+const REPLY_VARIANT_STYLES = [
+  { key: "Concise", hint: "Keep it very short — two to four sentences.", temperature: 0.3 },
+  { key: "Warm", hint: "Warm, friendly and personable in tone.", temperature: 0.6 },
+  { key: "Detailed", hint: "Thorough — address every point the sender raised.", temperature: 0.45 },
+] as const;
+
+export interface ReplyVariant {
+  key: string;
+  body: string;
+}
+
+/** Shared prompt plumbing for reply drafting: message, thread, AI, name. */
+async function replyContext(
+  messageId: string,
+  db: PrismaClient,
+): Promise<
+  | { reason: string }
+  | {
+      message: Message & { emailAccount: EmailAccount };
+      ai: NonNullable<Awaited<ReturnType<typeof resolveAIForAccount>>>;
+      name: string;
+      systemBase: string;
+      userPrompt: string;
+    }
+> {
   const message = await db.message.findUniqueOrThrow({
     where: { id: messageId },
     include: { emailAccount: true },
   });
   const ai = await resolveAIForAccount(message.emailAccountId, db);
-  if (!ai) return { ok: false, reason: "AI unavailable — enable AI in settings" };
+  if (!ai) return { reason: "AI unavailable — enable AI in settings" };
 
   const thread = message.threadId
     ? await db.message.findMany({
@@ -108,34 +153,73 @@ export async function draftAiReply(
     : [message];
 
   const name = await senderName(message.emailAccount, db);
-  const response = await ai.provider.complete({
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are an email assistant drafting a reply on behalf of " +
-          `${name} <${message.emailAccount.emailAddress}>. Write only the reply body — ` +
-          "no subject line, no preamble like 'Here is a reply'. " +
-          `If you sign off, sign off as ${name} — never use placeholders ` +
-          "like '[Your Name]'. Match the sender's language, length, and " +
-          "tone. Be concise.",
-      },
-      {
-        role: "user",
-        content: `Conversation so far:\n${threadContext(thread)}\n\nDraft a reply to the latest message.`,
-      },
-    ],
-    maxTokens: 800,
-    temperature: 0.4,
-  });
+  return {
+    message,
+    ai,
+    name,
+    systemBase:
+      "You are an email assistant drafting a reply on behalf of " +
+      `${name} <${message.emailAccount.emailAddress}>. Write only the reply body — ` +
+      "no subject line, no preamble like 'Here is a reply'. " +
+      `If you sign off, sign off as ${name} — never use placeholders ` +
+      "like '[Your Name]'. Match the sender's language and length.",
+    userPrompt: `Conversation so far:\n${threadContext(thread)}\n\nDraft a reply to the latest message.`,
+  };
+}
 
+/**
+ * Generate several reply variants for the user to choose from — nothing is
+ * persisted. Variants differ by style nudge and temperature; identical
+ * bodies are deduped since small models sometimes repeat themselves.
+ */
+export async function generateReplyVariants(
+  messageId: string,
+  db: PrismaClient = prisma,
+): Promise<{ ok: boolean; variants?: ReplyVariant[]; reason?: string }> {
+  const ctx = await replyContext(messageId, db);
+  if ("reason" in ctx) return { ok: false, reason: ctx.reason };
+
+  const results = await Promise.all(
+    REPLY_VARIANT_STYLES.map(async (style) => {
+      const r = await ctx.ai.provider.complete({
+        messages: [
+          { role: "system", content: `${ctx.systemBase} ${style.hint}` },
+          { role: "user", content: ctx.userPrompt },
+        ],
+        maxTokens: 800,
+        temperature: style.temperature,
+      });
+      return { key: style.key, body: fixSignoffPlaceholders(r.text.trim(), ctx.name) };
+    }),
+  );
+
+  const seen = new Set<string>();
+  const variants = results.filter((v) => {
+    if (v.body.length === 0 || seen.has(v.body)) return false;
+    seen.add(v.body);
+    return true;
+  });
+  if (variants.length === 0) return { ok: false, reason: "AI returned empty drafts" };
+  return { ok: true, variants };
+}
+
+/** Persist the chosen reply body as a draft row inside the thread. */
+export async function saveReplyDraft(
+  messageId: string,
+  body: string,
+  db: PrismaClient = prisma,
+): Promise<DraftResult> {
+  const message = await db.message.findUniqueOrThrow({
+    where: { id: messageId },
+    include: { emailAccount: true },
+  });
   const draft = await createDraftRow(db, {
     emailAccountId: message.emailAccountId,
     threadId: message.threadId,
     subject: `Re: ${(message.subject ?? "").replace(/^Re:\s*/i, "")}`,
     fromAddress: message.emailAccount.emailAddress,
     toAddresses: [message.fromAddress],
-    bodyText: fixSignoffPlaceholders(response.text.trim(), name),
+    bodyText: body,
     aiGenerated: true,
   });
   return { ok: true, draftId: draft.id };

@@ -39,10 +39,12 @@ export {
   composeWithAI,
   createDraftRow,
   draftAiReply,
+  generateReplyVariants,
   generateRuleFromPrompt,
+  saveReplyDraft,
   summarizeThread,
 } from "./drafts";
-export type { DraftResult, GeneratedRule } from "./drafts";
+export type { DraftResult, GeneratedRule, ReplyVariant } from "./drafts";
 export {
   buildGoogleAuthorizationUrl,
   exchangeGoogleCode,

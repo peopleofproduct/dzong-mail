@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CheckCheck, ExternalLink, Pencil, Send, Sparkles, X } from "lucide-react";
 import { getReplyQueue } from "@/lib/queries";
-import { archiveThreadNow, draftAiReplyNow, sendDraftNow } from "@/lib/actions";
+import { archiveThreadNow, sendDraftNow } from "@/lib/actions";
+import { AiDraftButton } from "./ai-draft-button";
 import { SenderAvatar } from "./sender-avatar";
 
 const cardBtn =
@@ -89,14 +90,10 @@ export async function ReplyQueuePanel() {
                 </div>
               ) : (
                 <div className="mt-3">
-                  <form action={draftAiReplyNow.bind(null, m.id)}>
-                    <button
-                      type="submit"
-                      className={`${cardBtn} border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40`}
-                    >
-                      <Sparkles size={11} /> Draft a reply with AI
-                    </button>
-                  </form>
+                  <AiDraftButton
+                    messageId={m.id}
+                    className={`${cardBtn} border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40`}
+                  />
                 </div>
               )}
 
