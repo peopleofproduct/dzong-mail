@@ -230,7 +230,7 @@ function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: 
   return (
     <div className={shell} onClick={expanded ? close : undefined}>
       <div
-        className={`flex w-full flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-zinc-200 sm:rounded-t-xl dark:bg-zinc-950 dark:ring-zinc-800 ${
+        className={`anim-rise flex w-full flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-zinc-200 sm:rounded-t-xl dark:bg-zinc-950 dark:ring-zinc-800 ${
           expanded ? "h-full max-h-[calc(100vh-4rem)] max-w-3xl sm:rounded-xl" : "max-h-[70vh] sm:h-[32rem]"
         }`}
         onClick={(e) => e.stopPropagation()}

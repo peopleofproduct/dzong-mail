@@ -406,7 +406,7 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
         </Suspense>
       </ResizableListPane>
       <section
-        className={`${paneOpen ? "flex" : "hidden md:flex"} fixed inset-0 z-30 min-h-0 min-w-0 flex-1 flex-col bg-white md:static md:z-auto md:bg-zinc-50/40 dark:bg-zinc-950 md:dark:bg-black/20`}
+        className={`${paneOpen ? "flex" : "hidden md:flex"} anim-pane fixed inset-0 z-30 min-h-0 min-w-0 flex-1 flex-col bg-white md:static md:z-auto md:bg-zinc-50/40 dark:bg-zinc-950 md:dark:bg-black/20`}
       >
         <Suspense
           fallback={

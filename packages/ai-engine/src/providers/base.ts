@@ -11,6 +11,10 @@ import type {
 export interface AIProvider {
   readonly type: AIProviderType;
   complete(request: CompletionRequest): Promise<CompletionResponse>;
+  stream?(
+    request: CompletionRequest,
+    onToken: (token: string) => void,
+  ): Promise<CompletionResponse>;
   embed(request: EmbeddingRequest): Promise<EmbeddingResponse>;
   classify(text: string, candidateLabels: string[]): Promise<ClassificationResult>;
   healthCheck(): Promise<boolean>;
@@ -24,6 +28,19 @@ export abstract class BaseProvider implements AIProvider {
   abstract complete(request: CompletionRequest): Promise<CompletionResponse>;
   abstract embed(request: EmbeddingRequest): Promise<EmbeddingResponse>;
   abstract healthCheck(): Promise<boolean>;
+
+  /**
+   * Streaming completion. Providers override with a real token stream;
+   * the default emits the whole response at once so every provider works.
+   */
+  async stream(
+    request: CompletionRequest,
+    onToken: (token: string) => void,
+  ): Promise<CompletionResponse> {
+    const res = await this.complete(request);
+    onToken(res.text);
+    return res;
+  }
 
   // Default classification strategy: prompt the model, parse the label list.
   async classify(text: string, candidateLabels: string[]): Promise<ClassificationResult> {

@@ -77,6 +77,74 @@ export class AnthropicProvider extends BaseProvider {
     };
   }
 
+  async stream(
+    request: CompletionRequest,
+    onToken: (token: string) => void,
+  ): Promise<CompletionResponse> {
+    const model = request.model ?? this.config.model ?? ANTHROPIC_DEFAULT_MODEL;
+    const system = request.messages
+      .filter((m) => m.role === "system")
+      .map((m) => m.content)
+      .join("\n\n");
+    const messages: AnthropicMessage[] = request.messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+    const res = await fetch(`${this.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({
+        model,
+        max_tokens: request.maxTokens ?? 1024,
+        stream: true,
+        ...(system ? { system } : {}),
+        messages,
+        ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+      }),
+    });
+    if (!res.ok || !res.body) {
+      throw new Error(`Anthropic stream failed: ${res.status} ${await res.text()}`);
+    }
+    // SSE: event types message_start / content_block_delta / message_delta.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let text = "";
+    const usage = { promptTokens: 0, completionTokens: 0 };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith("data:")) continue;
+        try {
+          const evt = JSON.parse(t.slice(5).trim()) as {
+            type?: string;
+            delta?: { type?: string; text?: string };
+            usage?: { input_tokens?: number; output_tokens?: number };
+            message?: { usage?: { input_tokens?: number } };
+          };
+          if (evt.type === "content_block_delta" && evt.delta?.text) {
+            text += evt.delta.text;
+            onToken(evt.delta.text);
+          }
+          if (evt.type === "message_start" && evt.message?.usage) {
+            usage.promptTokens = evt.message.usage.input_tokens ?? 0;
+          }
+          if (evt.type === "message_delta" && evt.usage) {
+            usage.completionTokens = evt.usage.output_tokens ?? 0;
+          }
+        } catch {
+          // partial JSON across chunk boundaries
+        }
+      }
+    }
+    return { text, model, provider: this.type, usage };
+  }
+
   // Anthropic has no embeddings API — callers should pair this provider with
   // Ollama/OpenAI for embeddings (AISettings.embeddingModel + embedding base).
   embed(_request: EmbeddingRequest): Promise<EmbeddingResponse> {

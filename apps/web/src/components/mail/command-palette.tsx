@@ -48,7 +48,7 @@ export function CommandPalette({ showDemo }: { showDemo: boolean }) {
       className="fixed inset-0 z-50"
     >
       <div className="flex items-start justify-center pt-[15vh]">
-        <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-800">
+        <div className="anim-rise w-full max-w-lg rounded-xl bg-white shadow-2xl ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-800">
           <Command.Input
             placeholder="Type a command or search…"
             className="w-full border-b border-zinc-200 bg-transparent px-4 py-3 text-sm placeholder-zinc-400 outline-none dark:border-zinc-800"

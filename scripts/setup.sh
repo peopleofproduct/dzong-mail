@@ -62,6 +62,21 @@ psql -d postgres -tc "SELECT 1 FROM pg_roles WHERE rolname='postgres'" \
   | grep -q 1 || psql -d postgres -c "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD 'postgres'" >/dev/null
 echo "   postgres + unwalled_mail ✓"
 
+# Optional: pgvector accelerates semantic search at large mailbox sizes.
+# Everything works without it (in-process cosine fallback); failures here
+# are informational, never fatal.
+if have brew && ! brew list pgvector >/dev/null 2>&1; then
+  brew install pgvector >/dev/null 2>&1 \
+    && echo "   pgvector installed" \
+    || say "   pgvector not installed - semantic search uses the JS fallback (fine)"
+elif have apt-get && ! dpkg -l | grep -q postgresql-.*-pgvector; then
+  sudo apt-get install -y "$(apt-cache search '^postgresql-[0-9]+-pgvector$' | head -1 | cut -d' ' -f1)" >/dev/null 2>&1 \
+    || true
+fi
+psql -d unwalled_mail -c "CREATE EXTENSION IF NOT EXISTS vector" >/dev/null 2>&1 \
+  && echo "   pgvector extension enabled (fast semantic index)" \
+  || true
+
 # ─── 3. Environment files ─────────────────────────────────────────────────────
 say "Configuring environment…"
 if [ ! -f packages/database/.env ]; then

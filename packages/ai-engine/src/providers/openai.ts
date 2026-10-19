@@ -63,6 +63,67 @@ export class OpenAIProvider extends BaseProvider {
     };
   }
 
+  async stream(
+    request: CompletionRequest,
+    onToken: (token: string) => void,
+  ): Promise<CompletionResponse> {
+    const model = request.model ?? this.config.model ?? OPENAI_DEFAULT_MODEL;
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({
+        model,
+        messages: request.messages,
+        temperature: request.temperature,
+        max_tokens: request.maxTokens,
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+    });
+    if (!res.ok || !res.body) {
+      throw new Error(`OpenAI stream failed: ${res.status} ${await res.text()}`);
+    }
+    // Server-sent events: "data: {json}" lines, "data: [DONE]" terminator.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let text = "";
+    let usage = { promptTokens: 0, completionTokens: 0 };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith("data:")) continue;
+        const payload = t.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        try {
+          const chunk = JSON.parse(payload) as {
+            choices?: { delta?: { content?: string | null } }[];
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
+          };
+          const piece = chunk.choices?.[0]?.delta?.content ?? "";
+          if (piece) {
+            text += piece;
+            onToken(piece);
+          }
+          if (chunk.usage) {
+            usage = {
+              promptTokens: chunk.usage.prompt_tokens ?? 0,
+              completionTokens: chunk.usage.completion_tokens ?? 0,
+            };
+          }
+        } catch {
+          // partial JSON across chunk boundaries
+        }
+      }
+    }
+    return { text, model, provider: this.type, usage };
+  }
+
   async embed(request: EmbeddingRequest): Promise<EmbeddingResponse> {
     const model = request.model ?? this.config.embeddingModel ?? OPENAI_DEFAULT_EMBEDDING_MODEL;
     const res = await fetch(`${this.baseUrl}/embeddings`, {

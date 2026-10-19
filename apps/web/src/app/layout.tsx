@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PwaRegistrar } from "@/components/mail/pwa-registrar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,6 +16,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Unwalled Mail",
   description: "Open-source, local-first AI email client. Your data stays on your machine.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
 };
 
 const themeInit = `
@@ -46,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           into <body> before hydration - suppress the resulting warning. */}
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
         {children}
+        <PwaRegistrar />
       </body>
     </html>
   );

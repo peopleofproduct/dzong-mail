@@ -76,3 +76,5 @@ export { importMailFiles, getOrCreateImportAccount } from "./import-mail";
 export type { ImportResult } from "./import-mail";
 export { verifyAccount, verifyAllAccounts } from "./verify";
 export type { VerifyOutcome } from "./verify";
+export { vectorIndexReady, indexEmbedding, searchIndex } from "./vector-index";
+export type { IndexedHit } from "./vector-index";

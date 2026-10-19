@@ -1,6 +1,7 @@
 import { prisma } from "@unwalled/database";
 import type { Message, PrismaClient } from "@unwalled/database";
 import { resolveAIForAccount, resolveAIForUser } from "./ai";
+import { indexEmbedding, searchIndex, vectorIndexReady } from "./vector-index";
 
 const EMBED_SOURCE_CHARS = 4000;
 const ASK_TOP_K = 8;
@@ -82,6 +83,8 @@ export async function embedAccountMessages(
         where: { id: message.id },
         data: { embedding: vector, embeddingModel: model },
       });
+      // Best-effort: also index in pgvector when the extension is available.
+      await indexEmbedding(message.id, model ?? "unknown", vector, db);
       embedded++;
     } catch (err) {
       return {
@@ -95,9 +98,10 @@ export async function embedAccountMessages(
 }
 
 /**
- * Semantic search across the user's embedded messages — brute-force cosine.
- * Fine at local scale (thousands of messages); swap for pgvector later if a
- * power user outgrows it.
+ * Semantic search across the user's embedded messages. Uses the pgvector
+ * side-index when the extension is installed; otherwise falls back to a
+ * brute-force cosine scan over Message.embedding (same ranking, slower at
+ * very large mailboxes).
  */
 export async function semanticSearchMessages(
   userId: string,
@@ -109,9 +113,11 @@ export async function semanticSearchMessages(
   if (!ai) return { ok: false, hits: [], reason: "AI disabled or unreachable" };
 
   let queryVec: number[];
+  let model = "unknown";
   try {
-    const { embeddings } = await ai.provider.embed({ input: query });
-    queryVec = embeddings[0] ?? [];
+    const res = await ai.provider.embed({ input: query });
+    queryVec = res.embeddings[0] ?? [];
+    model = res.model ?? model;
   } catch (err) {
     return {
       ok: false,
@@ -121,11 +127,42 @@ export async function semanticSearchMessages(
   }
   if (queryVec.length === 0) return { ok: false, hits: [], reason: "empty query embedding" };
 
+  const limit = options.limit ?? 20;
+
+  // Fast path: pgvector ANN index.
+  if (await vectorIndexReady(db)) {
+    const accounts = await db.emailAccount.findMany({
+      where: { userId, ...(options.accountId ? { id: options.accountId } : {}) },
+      select: { id: true },
+    });
+    const ranked = await searchIndex(
+      queryVec,
+      model,
+      accounts.map((a) => a.id),
+      limit,
+      db,
+    );
+    const messages = await db.message.findMany({
+      where: { id: { in: ranked.map((r) => r.messageId) } },
+      include: { emailAccount: { select: { emailAddress: true } } },
+    });
+    const byId = new Map(messages.map((m) => [m.id, m]));
+    const hits = ranked
+      .map((r) => ({ message: byId.get(r.messageId)!, score: r.score }))
+      .filter((h) => h.message && h.score > 0.3);
+    return { ok: true, hits };
+  }
+
+  // Fallback: brute-force cosine over the stored embeddings.
   const candidates = await db.message.findMany({
     where: {
       emailAccount: { userId, ...(options.accountId ? { id: options.accountId } : {}) },
       embedding: { isEmpty: false },
       isDraft: false,
+      // Only compare like-for-like vectors; mixed dims score 0 anyway.
+      // Legacy rows may predate embeddingModel - nulls are kept and lose
+      // on dimension mismatch inside cosineSimilarity.
+      OR: [{ embeddingModel: model }, { embeddingModel: null }],
     },
     include: { emailAccount: { select: { emailAddress: true } } },
   });
@@ -134,7 +171,7 @@ export async function semanticSearchMessages(
     .map((message) => ({ message, score: cosineSimilarity(queryVec, message.embedding) }))
     .filter((h) => h.score > 0.3)
     .sort((a, b) => b.score - a.score)
-    .slice(0, options.limit ?? 20);
+    .slice(0, limit);
 
   return { ok: true, hits };
 }
@@ -213,6 +250,7 @@ export async function askInbox(
   userId: string,
   question: string,
   db: PrismaClient = prisma,
+  options: { onToken?: (token: string) => void } = {},
 ): Promise<AskResult> {
   const ai = await resolveAIForUser(userId, db);
   if (!ai) return { ok: false, reason: "AI disabled or unreachable" };
@@ -238,21 +276,26 @@ export async function askInbox(
     )
     .join("\n\n---\n\n");
 
-  const completion = await ai.provider.complete({
+  const askRequest = {
     messages: [
       {
-        role: "system",
+        role: "system" as const,
         content:
           "You answer questions about the user's email inbox using only the emails provided below. " +
           "Be concise and concrete. When you use information from an email, cite it as [email N]. " +
           "If the emails don't contain the answer, say so plainly.\n\n" +
           context,
       },
-      { role: "user", content: question },
+      { role: "user" as const, content: question },
     ],
     temperature: 0.2,
     maxTokens: 800,
-  });
+  };
+  // Stream tokens to the caller when supported; otherwise one-shot.
+  const completion =
+    options.onToken && ai.provider.stream
+      ? await ai.provider.stream(askRequest, options.onToken)
+      : await ai.provider.complete(askRequest);
 
   return { ok: true, answer: completion.text, sources: search.hits };
 }
