@@ -76,25 +76,40 @@ export async function connectImapAccount(formData: FormData) {
   const imapPort = Number.parseInt(get("imapPort"), 10);
   const smtpPort = Number.parseInt(get("smtpPort"), 10);
   const password = get("password");
+  const emailAddress = get("emailAddress");
 
-  await prisma.emailAccount.create({
-    data: {
+  const connection = {
+    provider: "IMAP_SMTP" as const,
+    displayName: get("displayName") || null,
+    imapHost: get("imapHost") || null,
+    imapPort: Number.isFinite(imapPort) ? imapPort : 993,
+    imapSecurity: (get("imapSecurity") || "SSL_TLS") as "SSL_TLS" | "STARTTLS" | "NONE",
+    smtpHost: get("smtpHost") || null,
+    smtpPort: Number.isFinite(smtpPort) ? smtpPort : null,
+    smtpSecurity: (get("smtpSecurity") || null) as "SSL_TLS" | "STARTTLS" | "NONE" | null,
+    username: get("username") || emailAddress,
+  };
+
+  // Re-connecting an address the user already added updates its credentials
+  // (rotated app password etc.) rather than crashing on the unique key.
+  const existing = await prisma.emailAccount.findUnique({
+    where: { userId_emailAddress: { userId: user.id, emailAddress } },
+    select: { id: true },
+  });
+  await prisma.emailAccount.upsert({
+    where: { userId_emailAddress: { userId: user.id, emailAddress } },
+    update: { ...connection, ...(password ? { passwordEncrypted: encryptSecret(password) } : {}) },
+    create: {
       userId: user.id,
-      provider: "IMAP_SMTP",
-      emailAddress: get("emailAddress"),
-      displayName: get("displayName") || null,
-      imapHost: get("imapHost") || null,
-      imapPort: Number.isFinite(imapPort) ? imapPort : 993,
-      imapSecurity: (get("imapSecurity") || "SSL_TLS") as "SSL_TLS" | "STARTTLS" | "NONE",
-      smtpHost: get("smtpHost") || null,
-      smtpPort: Number.isFinite(smtpPort) ? smtpPort : null,
-      smtpSecurity: (get("smtpSecurity") || null) as "SSL_TLS" | "STARTTLS" | "NONE" | null,
-      username: get("username") || get("emailAddress"),
+      emailAddress,
+      ...connection,
       passwordEncrypted: password ? encryptSecret(password) : null,
     },
   });
   revalidatePath("/settings");
-  safeRedirect("/settings", { notice: "Account connected" });
+  safeRedirect("/settings", {
+    notice: existing ? "Account credentials updated" : "Account connected",
+  });
 }
 
 export async function connectOAuthAccount(formData: FormData) {
