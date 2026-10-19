@@ -18,6 +18,7 @@ export {
   embedAccountMessages,
   generateDigest,
   semanticSearchMessages,
+  lexicalSearchMessages,
   cosineSimilarity,
 } from "./semantic";
 export type { AskResult, EmbedOutcome, SemanticHit } from "./semantic";

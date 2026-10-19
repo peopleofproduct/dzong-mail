@@ -1,6 +1,9 @@
 import { prisma } from "@unwalled/database";
 import type { Message, PrismaClient } from "@unwalled/database";
 import { resolveAIForAccount, resolveAIForUser } from "./ai";
+import type { ResolvedAI } from "./ai";
+import { OllamaProvider, OLLAMA_DEFAULT_BASE_URL } from "@unwalled/ai-engine";
+import type { AIProvider } from "@unwalled/ai-engine";
 import { indexEmbedding, searchIndex, vectorIndexReady } from "./vector-index";
 
 const EMBED_SOURCE_CHARS = 4000;
@@ -22,7 +25,25 @@ export interface AskResult {
   ok: boolean;
   answer?: string;
   sources?: SemanticHit[];
+  /** "semantic" = embedding-ranked; "lexical" = keyword fallback. */
+  retrieval?: "semantic" | "lexical";
   reason?: string;
+}
+
+/**
+ * The provider used for embeddings. The chat provider normally does both;
+ * Anthropic has no embeddings API, so pair it with a local Ollama
+ * embedding model (privacy stays intact - mail never leaves the machine
+ * for embeddings). Returns null when nothing can embed.
+ */
+async function resolveEmbedder(ai: ResolvedAI): Promise<AIProvider | null> {
+  if (ai.provider.type !== "ANTHROPIC") return ai.provider;
+  const embedder = new OllamaProvider({
+    provider: "OLLAMA",
+    model: ai.settings.embeddingModel ?? undefined,
+    baseUrl: OLLAMA_DEFAULT_BASE_URL,
+  });
+  return (await embedder.healthCheck()) ? embedder : null;
 }
 
 function embeddingText(m: Message): string {
@@ -65,6 +86,10 @@ export async function embedAccountMessages(
   if (!ai) {
     return { accountId, embedded: 0, reason: "AI disabled or unreachable" };
   }
+  const embedder = await resolveEmbedder(ai);
+  if (!embedder) {
+    return { accountId, embedded: 0, reason: "no embedding provider reachable" };
+  }
 
   const pending = await db.message.findMany({
     where: { emailAccountId: accountId, embedding: { isEmpty: true }, isDraft: false },
@@ -76,7 +101,7 @@ export async function embedAccountMessages(
   let embedded = 0;
   for (const message of pending) {
     try {
-      const { embeddings, model } = await ai.provider.embed({ input: embeddingText(message) });
+      const { embeddings, model } = await embedder.embed({ input: embeddingText(message) });
       const vector = embeddings[0];
       if (!vector?.length) continue;
       await db.message.update({
@@ -111,11 +136,13 @@ export async function semanticSearchMessages(
 ): Promise<{ ok: boolean; hits: SemanticHit[]; reason?: string }> {
   const ai = await resolveAIForUser(userId, db);
   if (!ai) return { ok: false, hits: [], reason: "AI disabled or unreachable" };
+  const embedder = await resolveEmbedder(ai);
+  if (!embedder) return { ok: false, hits: [], reason: "no embedding provider reachable" };
 
   let queryVec: number[];
   let model = "unknown";
   try {
-    const res = await ai.provider.embed({ input: query });
+    const res = await embedder.embed({ input: query });
     queryVec = res.embeddings[0] ?? [];
     model = res.model ?? model;
   } catch (err) {
@@ -148,8 +175,10 @@ export async function semanticSearchMessages(
     });
     const byId = new Map(messages.map((m) => [m.id, m]));
     const hits = ranked
-      .map((r) => ({ message: byId.get(r.messageId)!, score: r.score }))
-      .filter((h) => h.message && h.score > 0.3);
+      .flatMap((r) => {
+        const message = byId.get(r.messageId);
+        return message && r.score > 0.3 ? [{ message, score: r.score }] : [];
+      });
     return { ok: true, hits };
   }
 
@@ -174,6 +203,37 @@ export async function semanticSearchMessages(
     .slice(0, limit);
 
   return { ok: true, hits };
+}
+
+/**
+ * Keyword retrieval for when no embedding provider is reachable (e.g. an
+ * Anthropic-only setup without local Ollama). Crude but honest: OR-match
+ * the query terms across subject/sender/snippet, newest first.
+ */
+export async function lexicalSearchMessages(
+  userId: string,
+  query: string,
+  db: PrismaClient = prisma,
+  options: { limit?: number; accountId?: string } = {},
+): Promise<SemanticHit[]> {
+  const terms = [...new Set(query.toLowerCase().match(/[a-z0-9@.]{3,}/g) ?? [])].slice(0, 8);
+  if (terms.length === 0) return [];
+  const messages = await db.message.findMany({
+    where: {
+      emailAccount: { userId, ...(options.accountId ? { id: options.accountId } : {}) },
+      isDraft: false,
+      OR: terms.flatMap((t) => [
+        { subject: { contains: t, mode: "insensitive" as const } },
+        { fromAddress: { contains: t, mode: "insensitive" as const } },
+        { fromName: { contains: t, mode: "insensitive" as const } },
+        { snippet: { contains: t, mode: "insensitive" as const } },
+      ]),
+    },
+    orderBy: { receivedAt: "desc" },
+    take: options.limit ?? 20,
+    include: { emailAccount: { select: { emailAddress: true } } },
+  });
+  return messages.map((message) => ({ message, score: 0 }));
 }
 
 /**
@@ -250,21 +310,34 @@ export async function askInbox(
   userId: string,
   question: string,
   db: PrismaClient = prisma,
-  options: { onToken?: (token: string) => void } = {},
+  options: {
+    onToken?: (token: string) => void;
+    /** Fired as soon as retrieval finishes, before the answer generates. */
+    onSources?: (hits: SemanticHit[]) => void;
+  } = {},
 ): Promise<AskResult> {
   const ai = await resolveAIForUser(userId, db);
   if (!ai) return { ok: false, reason: "AI disabled or unreachable" };
 
+  // Retrieve: semantic first, keyword fallback when nothing can embed.
   const search = await semanticSearchMessages(userId, question, db, { limit: ASK_TOP_K });
-  if (!search.ok) return { ok: false, reason: search.reason };
-  if (search.hits.length === 0) {
+  const retrieval = search.ok && search.hits.length > 0 ? "semantic" : "lexical";
+  const hits =
+    retrieval === "semantic"
+      ? search.hits
+      : await lexicalSearchMessages(userId, question, db, { limit: ASK_TOP_K });
+  if (hits.length === 0) {
     return {
       ok: false,
-      reason: "No relevant messages found — the inbox may not be embedded yet",
+      reason:
+        retrieval === "semantic"
+          ? "No relevant messages found - the inbox may not be embedded yet"
+          : "No matching messages found",
     };
   }
+  options.onSources?.(hits);
 
-  const context = search.hits
+  const context = hits
     .map((hit, i) =>
       [
         `[email ${i + 1}]`,
@@ -283,7 +356,11 @@ export async function askInbox(
         content:
           "You answer questions about the user's email inbox using only the emails provided below. " +
           "Be concise and concrete. When you use information from an email, cite it as [email N]. " +
-          "If the emails don't contain the answer, say so plainly.\n\n" +
+          "If the emails don't contain the answer, say so plainly." +
+          (retrieval === "lexical"
+            ? " Note: these emails were matched by keyword, not meaning - they may be loosely related."
+            : "") +
+          "\n\n" +
           context,
       },
       { role: "user" as const, content: question },
@@ -297,5 +374,5 @@ export async function askInbox(
       ? await ai.provider.stream(askRequest, options.onToken)
       : await ai.provider.complete(askRequest);
 
-  return { ok: true, answer: completion.text, sources: search.hits };
+  return { ok: true, answer: completion.text, sources: hits, retrieval };
 }

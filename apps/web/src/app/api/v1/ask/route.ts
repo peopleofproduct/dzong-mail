@@ -24,9 +24,10 @@ function serializeHit(hit: SemanticHit) {
  *   { "question": "what did Alice say about the launch?" }
  *
  * With { "stream": true }, responds with newline-delimited JSON events:
- *   {"type":"token","text":"..."}*  then  {"type":"done","answer","sources"}
- *   or {"type":"error","reason":"..."}
- * which lets the UI render the answer as it is generated.
+ *   {"type":"status","stage":"retrieving"}
+ *   {"type":"sources","sources":[...]}      (as soon as retrieval finishes)
+ *   {"type":"token","text":"..."}*         (the answer, as generated)
+ *   {"type":"done","answer","retrieval"}   or {"type":"error","reason"}
  */
 export async function POST(request: NextRequest) {
   const denied = apiGuard(request);
@@ -49,7 +50,9 @@ export async function POST(request: NextRequest) {
         const send = (obj: unknown) =>
           controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
         try {
+          send({ type: "status", stage: "retrieving" });
           const result = await askInbox(user.id, question, undefined, {
+            onSources: (hits) => send({ type: "sources", sources: hits.map(serializeHit) }),
             onToken: (text) => send({ type: "token", text }),
           });
           if (!result.ok) send({ type: "error", reason: result.reason ?? "failed" });
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
             send({
               type: "done",
               answer: result.answer,
+              retrieval: result.retrieval ?? "semantic",
               sources: (result.sources ?? []).map(serializeHit),
             });
         } catch (err) {

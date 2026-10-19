@@ -53,6 +53,7 @@ export function AssistantStream({ question }: { question: string }) {
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [retrieval, setRetrieval] = useState<"semantic" | "lexical">("semantic");
   const answerRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
@@ -87,15 +88,21 @@ export function AssistantStream({ question }: { question: string }) {
             if (!line.trim()) continue;
             try {
               const evt = JSON.parse(line) as
+                | { type: "status"; stage: string }
+                | { type: "sources"; sources: Source[] }
                 | { type: "token"; text: string }
-                | { type: "done"; answer: string; sources: Source[] }
+                | { type: "done"; answer: string; sources: Source[]; retrieval: string }
                 | { type: "error"; reason: string };
               if (cancelled) return;
-              if (evt.type === "token") {
+              if (evt.type === "sources") {
+                // Findings render while the answer is still generating.
+                setSources(evt.sources);
+              } else if (evt.type === "token") {
                 setAnswer((a) => a + evt.text);
                 setPhase("streaming");
               } else if (evt.type === "done") {
                 setSources(evt.sources);
+                setRetrieval(evt.retrieval === "lexical" ? "lexical" : "semantic");
                 setPhase("done");
               } else if (evt.type === "error") {
                 setError(evt.reason);
@@ -164,6 +171,11 @@ export function AssistantStream({ question }: { question: string }) {
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">
               Findings
+              {retrieval === "lexical" && (
+                <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700 normal-case dark:bg-amber-950 dark:text-amber-300">
+                  keyword matches
+                </span>
+              )}
             </p>
             <span className="flex gap-1.5">
               {unread.length > 0 && (

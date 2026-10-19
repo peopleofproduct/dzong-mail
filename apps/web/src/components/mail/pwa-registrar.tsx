@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Download, X } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { Download, Share, X } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -17,6 +17,17 @@ interface BeforeInstallPromptEvent extends Event {
 export function PwaRegistrar() {
   const [installEvt, setInstallEvt] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // beforeinstallprompt never fires on iOS Safari; the hint below is the
+  // substitute. Snapshot read (not an effect) so SSR renders false.
+  const iosEligible = useSyncExternalStore(
+    () => () => {},
+    () =>
+      /iPhone|iPad|iPod/.test(navigator.userAgent) &&
+      !window.matchMedia("(display-mode: standalone)").matches &&
+      localStorage.getItem("unwalled-install-dismissed") !== "1",
+    () => false,
+  );
+  const iosHint = iosEligible && !dismissed;
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -31,6 +42,30 @@ export function PwaRegistrar() {
     window.addEventListener("beforeinstallprompt", onPrompt);
     return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);
+
+  const dismiss = () => {
+    localStorage.setItem("unwalled-install-dismissed", "1");
+    setDismissed(true);
+  };
+
+  if (iosHint && !dismissed) {
+    return (
+      <div className="anim-rise fixed bottom-4 left-4 z-40 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-3.5 py-2.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+        <Share size={15} className="text-indigo-500" />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">
+          Install: Share → &quot;Add to Home Screen&quot;
+        </span>
+        <button
+          type="button"
+          title="Got it"
+          className="rounded p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          onClick={dismiss}
+        >
+          <X size={13} />
+        </button>
+      </div>
+    );
+  }
 
   if (!installEvt || dismissed) return null;
 
@@ -56,10 +91,7 @@ export function PwaRegistrar() {
         type="button"
         title="Not now"
         className="rounded p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-        onClick={() => {
-          localStorage.setItem("unwalled-install-dismissed", "1");
-          setDismissed(true);
-        }}
+        onClick={dismiss}
       >
         <X size={13} />
       </button>
