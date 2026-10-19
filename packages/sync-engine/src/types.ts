@@ -13,6 +13,8 @@ export interface RawMessage {
   ccAddresses: string[];
   bccAddresses: string[];
   headers?: Record<string, string>;
+  bodyText?: string;
+  bodyHtml?: string;
   sizeBytes?: number;
   receivedAt: Date;
   isRead: boolean;

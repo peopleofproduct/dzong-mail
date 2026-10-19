@@ -92,16 +92,22 @@ model Message {
   headers    Json?
   sizeBytes  Int?
 
-  // Message bodies stay on local disk; this points at the stored file.
+  bodyText   String?
+  bodyHtml   String?
+  // Message bodies/mime sources may also live on local disk; this points at the stored file.
   localBodyPath String?
 
-  receivedAt DateTime
-  isRead     Boolean @default(false)
-  isStarred  Boolean @default(false)
-  isDraft    Boolean @default(false)
+  receivedAt   DateTime
+  isRead       Boolean    @default(false)
+  isStarred    Boolean    @default(false)
+  isDraft      Boolean    @default(false)
+  isArchived   Boolean    @default(false)
+  snoozedUntil DateTime?
+  scheduledAt  DateTime? // send-later for drafts
 
   providerLabels String[] @default([])
   aiLabels       String[] @default([])
+  labels         String[] @default([]) // user- and rule-applied labels
   aiSummary      String?
 
   createdAt DateTime @default(now())
@@ -127,6 +133,10 @@ model AISettings {
   embeddingModel  String?
   temperature     Float    @default(0.2)
   enabled         Boolean  @default(true)
+
+  // User-defined classification categories, e.g.
+  // [{ "name": "RECEIPTS", "prompt": "Invoices, receipts, or bills" }]
+  customLabels Json @default("[]")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

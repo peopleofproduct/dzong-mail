@@ -32,6 +32,14 @@ const SNIPPETS = [
   "Agenda attached. Please review the metrics before the meeting.",
 ];
 
+const BODIES = [
+  "Hey there,\n\nYour weekly digest is here with the stories you bookmarked and a few we think you'll like. This week: local-first software, the state of email protocols, and why inboxes broke.\n\n— The Digest Team\n\nUnsubscribe: https://digest.example.com/u/abc123",
+  "Hi,\n\nThis confirms your payment of $49.00 for invoice #1042. A PDF receipt is attached for your records.\n\nThanks,\nVercel Billing\n\nUnsubscribe from receipts: https://billing.example.com/unsub",
+  "A new commit was pushed to unwalled-mail:\n\n  Add sync-engine package and wire end-to-end mail sync\n\nView it here: https://github.com/unwalled/mail/pull/12",
+  "Hey! The weather's looking great for Saturday. Still good for the 7am start at the usual trailhead? I'll bring coffee.\n\n— Alice",
+  "Team —\n\nAgenda for Thursday's sprint review:\n  1. Sync engine demo\n  2. AI labeling roadmap\n  3. Open floor\n\nPlease skim the metrics doc before we meet.\n\n— PM",
+];
+
 /**
  * Deterministic local provider for development and demos. Each sync appends
  * a small batch of generated messages; syncToken is just a message counter.
@@ -59,7 +67,14 @@ export class MockSyncProvider implements MailSyncProvider {
         headers: {
           "Message-ID": `<mock-${i}@unwalled.local>`,
           "X-Mailer": "Unwalled Mock Provider",
+          ...(i % 4 === 0
+            ? {
+                "List-Unsubscribe": `<https://unwalled.local/unsub/${i}>`,
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+              }
+            : {}),
         },
+        bodyText: BODIES[i % BODIES.length],
         sizeBytes: 2048 + i * 37,
         receivedAt: new Date(Date.now() - i * 3 * 60 * 60 * 1000),
         isRead: i % 3 === 0,

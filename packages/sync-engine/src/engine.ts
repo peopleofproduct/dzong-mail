@@ -1,6 +1,7 @@
 import { prisma } from "@unwalled/database";
 import type { EmailAccount, PrismaClient } from "@unwalled/database";
 import { decryptIfPresent } from "./crypto";
+import { applyAutomationRules } from "./rules";
 import { GmailSyncProvider } from "./providers/gmail";
 import { GraphSyncProvider } from "./providers/graph";
 import { ImapSyncProvider } from "./providers/imap";
@@ -46,6 +47,8 @@ function toCreateInput(accountId: string, msg: RawMessage) {
     ccAddresses: msg.ccAddresses,
     bccAddresses: msg.bccAddresses,
     headers: msg.headers,
+    bodyText: msg.bodyText,
+    bodyHtml: msg.bodyHtml,
     sizeBytes: msg.sizeBytes,
     receivedAt: msg.receivedAt,
     isRead: msg.isRead,
@@ -83,6 +86,24 @@ export async function syncAccount(
     data: fresh.map((m) => toCreateInput(account.id, m)),
     skipDuplicates: true,
   });
+
+  // Apply automation rules to the newly inserted batch only.
+  if (fresh.length > 0) {
+    const inserted = await db.message.findMany({
+      where: {
+        emailAccountId: account.id,
+        providerMessageId: { in: fresh.map((m) => m.providerMessageId) },
+      },
+      select: { id: true },
+    });
+    try {
+      await applyAutomationRules(account.id, db, {
+        messageIds: inserted.map((m) => m.id),
+      });
+    } catch (err) {
+      console.error(`[sync] rule evaluation failed for ${account.id}:`, err);
+    }
+  }
 
   if (stale.length > 0) {
     await db.$transaction(

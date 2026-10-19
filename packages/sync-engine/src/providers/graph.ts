@@ -15,6 +15,7 @@ const SELECT = [
   "isDraft",
   "internetMessageId",
   "parentFolderId",
+  "body",
 ].join(",");
 
 interface GraphRecipient {
@@ -33,6 +34,7 @@ interface GraphMessage {
   isRead?: boolean;
   isDraft?: boolean;
   parentFolderId?: string;
+  body?: { contentType?: string; content?: string };
 }
 
 interface GraphDeltaPage {
@@ -81,6 +83,8 @@ export class GraphSyncProvider implements MailSyncProvider {
           toAddresses: recipients(msg.toRecipients),
           ccAddresses: recipients(msg.ccRecipients),
           bccAddresses: [],
+          bodyHtml: msg.body?.contentType === "html" ? msg.body.content : undefined,
+          bodyText: msg.body?.contentType === "text" ? msg.body.content : msg.bodyPreview,
           receivedAt: msg.receivedDateTime ? new Date(msg.receivedDateTime) : new Date(),
           isRead: msg.isRead ?? false,
           isStarred: false,

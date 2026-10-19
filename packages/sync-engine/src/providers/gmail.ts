@@ -9,6 +9,12 @@ interface GmailHeader {
   value: string;
 }
 
+interface GmailBodyPart {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: GmailBodyPart[];
+}
+
 interface GmailMessage {
   id: string;
   threadId: string;
@@ -16,7 +22,32 @@ interface GmailMessage {
   snippet?: string;
   internalDate?: string;
   sizeEstimate?: number;
-  payload?: { headers?: GmailHeader[] };
+  payload?: { headers?: GmailHeader[] } & GmailBodyPart;
+}
+
+function decodeBody(data: string | undefined): string | undefined {
+  if (!data) return undefined;
+  try {
+    return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function extractBodies(part: GmailBodyPart | undefined): {
+  text?: string;
+  html?: string;
+} {
+  if (!part) return {};
+  if (part.mimeType === "text/plain") return { text: decodeBody(part.body?.data) };
+  if (part.mimeType === "text/html") return { html: decodeBody(part.body?.data) };
+  const out: { text?: string; html?: string } = {};
+  for (const child of part.parts ?? []) {
+    const found = extractBodies(child);
+    out.text ??= found.text;
+    out.html ??= found.html;
+  }
+  return out;
 }
 
 interface GmailHistoryEntry {
@@ -121,12 +152,14 @@ export class GmailSyncProvider implements MailSyncProvider {
   ): Promise<ProviderSyncResult> {
     const messages: RawMessage[] = [];
     for (const id of ids.slice(0, MAX_MESSAGES)) {
-      const params = new URLSearchParams({ format: "metadata" });
-      for (const h of METADATA_HEADERS) params.append("metadataHeaders", h);
+      const params = new URLSearchParams({ format: "full" });
       const res = await get(`/messages/${id}?${params}`);
       if (!res.ok) continue;
       const msg = (await res.json()) as GmailMessage;
-      const headers = msg.payload?.headers;
+      const headers = msg.payload?.headers?.filter((h) =>
+        METADATA_HEADERS.some((w) => w.toLowerCase() === h.name.toLowerCase()),
+      );
+      const bodies = extractBodies(msg.payload);
       const from = parseAddressHeader(headerValue(headers, "From"));
       const labels = msg.labelIds ?? [];
 
@@ -142,6 +175,8 @@ export class GmailSyncProvider implements MailSyncProvider {
         ccAddresses: parseAddressList(headerValue(headers, "Cc")),
         bccAddresses: [],
         headers: Object.fromEntries((headers ?? []).map((h) => [h.name, h.value])),
+        bodyText: bodies.text,
+        bodyHtml: bodies.html,
         sizeBytes: msg.sizeEstimate,
         receivedAt: msg.internalDate ? new Date(Number(msg.internalDate)) : new Date(),
         isRead: !labels.includes("UNREAD"),

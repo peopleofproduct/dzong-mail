@@ -18,9 +18,24 @@ npm workspaces orchestrated by Turborepo:
 - `packages/sync-engine` — `@unwalled/sync-engine`. `MailSyncProvider`
   strategies (IMAP via imapflow/mailparser, Gmail history API, Graph delta,
   deterministic Mock), OAuth helpers for Google/Microsoft BYOK flows,
-  AES-256-GCM secret encryption, and the `syncAccount`/`syncAllAccounts`
-  orchestrator that upserts `Message` rows and advances each account's
-  `syncToken`.
+  AES-256-GCM secret encryption, `syncAccount`/`syncAllAccounts` orchestrator
+  (upserts `Message` rows + bodies, advances `syncToken`), `sendEmail`
+  per-provider dispatch, `applyAutomationRules` post-sync evaluator,
+  `classifyAccountMessages` AI labelling, and unsubscribe helpers.
+
+## Web app structure
+
+- `apps/web/src/app/page.tsx` — 3-pane mail shell; every async data section
+  calls `await connection()` inside a `<Suspense>` boundary (required by
+  `cacheComponents`). State is URL-driven: `?view=`, `?thread=`, `?q=`,
+  `?compose=`, `?notice=`.
+- `src/components/mail/` — sidebar, topbar, message-list (client, keyboard
+  nav), thread-panel, composer, command-palette (cmdk).
+- `src/components/settings/` + `src/app/settings/` — accounts, automation
+  rules manager, AI settings.
+- `src/lib/queries.ts` — all reads; `src/lib/actions.ts` — all server actions.
+- Mail views: inbox, starred, sent, drafts, archive, snoozed, newsletters,
+  needs-reply, awaiting (per `MailView` in `components/mail/types.ts`).
 
 ## Commands
 
@@ -64,3 +79,5 @@ encrypted tokens on the `EmailAccount` row.
 `apps/web` runs Next 16 with breaking changes vs. earlier versions (async
 request APIs, Turbopack default, `cacheComponents`). Version-matched docs live
 in `node_modules/next/dist/docs/` — consult them before editing app code.
+With `cacheComponents`, `new Date()` and DB reads inside Suspense still need
+`await connection()` first to render at request time.

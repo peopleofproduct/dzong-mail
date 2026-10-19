@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { getAccounts } from "@/lib/queries";
 import {
   connectImapAccount,
@@ -18,6 +19,7 @@ const inputClass =
   "w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-black placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
 
 export async function AccountsSection() {
+  await connection();
   const accounts = await getAccounts();
 
   return (

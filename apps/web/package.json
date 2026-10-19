@@ -13,6 +13,8 @@
     "@unwalled/ai-engine": "*",
     "@unwalled/database": "*",
     "@unwalled/sync-engine": "*",
+    "cmdk": "^1.1.1",
+    "lucide-react": "^1.59.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"

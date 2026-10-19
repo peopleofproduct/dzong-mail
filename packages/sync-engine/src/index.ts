@@ -8,6 +8,20 @@ export type {
 } from "./types";
 export { encryptSecret, decryptSecret, decryptIfPresent } from "./crypto";
 export { syncAccount, syncAllAccounts } from "./engine";
+export { sendEmail } from "./send";
+export type { SendInput, SendResult } from "./send";
+export {
+  applyAutomationRules,
+  matchesCondition,
+  matchesRule,
+  parseActions,
+  parseConditions,
+} from "./rules";
+export type { RuleAction, RuleActionType, RuleCondition, RuleEvalResult } from "./rules";
+export { classifyAccountMessages, DEFAULT_AI_LABELS } from "./classify";
+export type { ClassifyOutcome } from "./classify";
+export { unsubscribeMessage } from "./unsubscribe";
+export type { UnsubscribeResult } from "./unsubscribe";
 export {
   buildGoogleAuthorizationUrl,
   exchangeGoogleCode,

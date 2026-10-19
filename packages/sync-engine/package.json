@@ -14,14 +14,17 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@unwalled/ai-engine": "*",
     "@unwalled/database": "*",
     "imapflow": "^1.0.180",
-    "mailparser": "^3.7.2"
+    "mailparser": "^3.7.2",
+    "nodemailer": "^6.9.16"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@types/mailparser": "^3.9.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^6.4.17",
     "eslint": "^9.15.0",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.15.0"

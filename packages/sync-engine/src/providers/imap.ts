@@ -82,6 +82,8 @@ export class ImapSyncProvider implements MailSyncProvider {
                 Array.isArray(parsed.cc) ? parsed.cc.flatMap((g) => g.value) : parsed.cc?.value,
               ),
               bccAddresses: [],
+              bodyText: parsed.text ?? undefined,
+              bodyHtml: parsed.html || undefined,
               sizeBytes: msg.size ?? msg.source.length,
               receivedAt:
                 parsed.date ?? (msg.internalDate ? new Date(msg.internalDate) : new Date()),
