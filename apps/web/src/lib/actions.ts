@@ -1,5 +1,6 @@
 "use server";
 
+import { join } from "node:path";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -153,7 +154,23 @@ export async function syncAllNow() {
 }
 
 export async function removeAccount(accountId: string) {
+  // Collect messages with attachment dirs before the cascade delete so the
+  // files on disk are removed too — otherwise they orphan forever.
+  const attachmentDirs = (
+    await prisma.message.findMany({
+      where: { emailAccountId: accountId, hasAttachment: true },
+      select: { id: true },
+    })
+  ).map((m) => m.id);
+
   await prisma.emailAccount.delete({ where: { id: accountId } });
+
+  const { rm } = await import("node:fs/promises");
+  const { attachmentsDir } = await import("@unwalled/sync-engine");
+  await Promise.allSettled(
+    attachmentDirs.map((id) => rm(join(attachmentsDir(), id), { recursive: true, force: true })),
+  );
+
   revalidatePath("/settings");
   safeRedirect("/settings", { notice: "Account removed" });
 }

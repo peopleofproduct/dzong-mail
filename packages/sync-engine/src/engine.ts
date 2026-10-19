@@ -1,7 +1,9 @@
 import { prisma } from "@unwalled/database";
 import type { EmailAccount, PrismaClient } from "@unwalled/database";
 import { persistAttachments } from "./attachments";
-import { decryptIfPresent } from "./crypto";
+import { decryptIfPresent, decryptSecret, encryptSecret } from "./crypto";
+import { refreshGoogleAccessToken } from "./oauth/google";
+import { refreshMicrosoftAccessToken } from "./oauth/microsoft";
 import { applyAutomationRules } from "./rules";
 import { GmailSyncProvider } from "./providers/gmail";
 import { GraphSyncProvider } from "./providers/graph";
@@ -26,12 +28,63 @@ function providerFor(account: EmailAccount): MailSyncProvider {
   }
 }
 
-function secretsFor(account: EmailAccount): AccountSecrets {
-  return {
+const REFRESH_MARGIN_MS = 60_000;
+
+/**
+ * Decrypted secrets for sync, with proactive OAuth refresh: access tokens
+ * die after ~1h on both Google and Microsoft, so when the stored token is
+ * within a minute of expiry we refresh it first and persist the result —
+ * keeping the connected session alive without any user interaction.
+ */
+async function secretsFor(account: EmailAccount, db: PrismaClient): Promise<AccountSecrets> {
+  const secrets: AccountSecrets = {
     password: decryptIfPresent(account.passwordEncrypted),
     oauthAccessToken: decryptIfPresent(account.oauthAccessToken),
     oauthRefreshToken: decryptIfPresent(account.oauthRefreshToken),
   };
+
+  const refresh =
+    account.provider === "GOOGLE"
+      ? refreshGoogleAccessToken
+      : account.provider === "MICROSOFT"
+        ? refreshMicrosoftAccessToken
+        : null;
+  const { oauthClientId, oauthClientSecret, oauthTokenExpiresAt } = account;
+  const { oauthRefreshToken } = secrets;
+
+  const expiring =
+    refresh !== null &&
+    oauthRefreshToken !== undefined &&
+    oauthClientId !== null &&
+    oauthClientSecret !== null &&
+    oauthTokenExpiresAt !== null &&
+    oauthTokenExpiresAt.getTime() < Date.now() + REFRESH_MARGIN_MS;
+
+  if (!expiring) return secrets;
+
+  try {
+    const tokens = await refresh(
+      { clientId: oauthClientId, clientSecret: decryptSecret(oauthClientSecret) },
+      oauthRefreshToken,
+    );
+    await db.emailAccount.update({
+      where: { id: account.id },
+      data: {
+        oauthAccessToken: encryptSecret(tokens.accessToken),
+        oauthRefreshToken: tokens.refreshToken
+          ? encryptSecret(tokens.refreshToken)
+          : account.oauthRefreshToken,
+        oauthTokenExpiresAt: tokens.expiresAt,
+      },
+    });
+    secrets.oauthAccessToken = tokens.accessToken;
+    if (tokens.refreshToken) secrets.oauthRefreshToken = tokens.refreshToken;
+  } catch (err) {
+    // Fall through with the old token — the provider call will surface the
+    // auth error, and the next sync retries the refresh.
+    console.error(`[sync] OAuth refresh failed for account ${account.id}:`, err);
+  }
+  return secrets;
 }
 
 function toCreateInput(accountId: string, msg: RawMessage) {
@@ -69,7 +122,7 @@ export async function syncAccount(
 ): Promise<SyncOutcome> {
   const account = await db.emailAccount.findUniqueOrThrow({ where: { id: accountId } });
   const provider = providerFor(account);
-  const result = await provider.sync({ account, secrets: secretsFor(account) });
+  const result = await provider.sync({ account, secrets: await secretsFor(account, db) });
 
   const incoming = result.messages;
   const existing = await db.message.findMany({

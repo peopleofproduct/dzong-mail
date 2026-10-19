@@ -4,9 +4,9 @@ import {
   connectImapAccount,
   connectMockAccount,
   connectOAuthAccount,
-  removeAccount,
   syncAccountNow,
 } from "@/lib/actions";
+import { DisconnectButton } from "@/components/disconnect-button";
 
 const PROVIDER_LABEL: Record<string, string> = {
   GOOGLE: "Gmail",
@@ -60,14 +60,11 @@ export async function AccountsSection() {
                   Sync now
                 </button>
               </form>
-              <form action={removeAccount.bind(null, account.id)}>
-                <button
-                  type="submit"
-                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  Remove
-                </button>
-              </form>
+              <DisconnectButton
+                accountId={account.id}
+                emailAddress={account.emailAddress}
+                messageCount={account._count.messages}
+              />
             </li>
           ))}
         </ul>

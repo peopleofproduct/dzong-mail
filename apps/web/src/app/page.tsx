@@ -15,6 +15,7 @@ import {
   splitInboxGroups,
 } from "@/lib/queries";
 import { AskPanel } from "@/components/mail/ask-panel";
+import { AutoSync } from "@/components/mail/auto-sync";
 import { DigestList } from "@/components/mail/digest-list";
 import { DigestPanel } from "@/components/mail/digest-panel";
 import { serializeMessage } from "@/components/mail/types";
@@ -251,6 +252,9 @@ export default function Home(props: PageProps<"/">) {
       </Suspense>
       <Suspense fallback={null}>
         <KeyboardShortcuts />
+      </Suspense>
+      <Suspense fallback={null}>
+        <AutoSync />
       </Suspense>
     </div>
   );
