@@ -82,6 +82,7 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
         startsAt: true,
         endsAt: true,
         status: true,
+        attendees: true,
         messageId: true,
         message: { select: { threadId: true } },
       },
@@ -163,6 +164,52 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
   const dayEvents = eventsByDay.get(selectedDay) ?? [];
   const selectedTasks = tasks.filter((t) => t.dueAt && t.dueAt.getDate() === selectedDay);
   const openTasks = tasks.filter((t) => !t.dueAt && !t.doneAt);
+
+  // Meeting briefs: for each attendee of today's invites, pull the last
+  // exchange, unread mail, and open reply loops - the dossier in miniature.
+  const ownAddresses = new Set(
+    (await prisma.emailAccount.findMany({ select: { emailAddress: true } })).map((a) =>
+      a.emailAddress.toLowerCase(),
+    ),
+  );
+  const dayInvites = invites.filter(
+    (e) =>
+      e.status !== "CANCELLED" &&
+      e.startsAt.getDate() === selectedDay &&
+      e.attendees.length > 0,
+  );
+  const attendeeAddrs = [
+    ...new Set(dayInvites.flatMap((e) => e.attendees.map((a) => a.toLowerCase()))),
+  ]
+    .filter((a) => a.includes("@") && !ownAddresses.has(a))
+    .slice(0, 8);
+  const briefs = await Promise.all(
+    attendeeAddrs.map(async (addr) => {
+      const [last, unread, replyDebt] = await Promise.all([
+        prisma.message.findFirst({
+          where: { fromAddress: { equals: addr, mode: "insensitive" } },
+          orderBy: { receivedAt: "desc" },
+          select: { subject: true, receivedAt: true, threadId: true },
+        }),
+        prisma.message.count({
+          where: {
+            fromAddress: { equals: addr, mode: "insensitive" },
+            isRead: false,
+            isArchived: false,
+          },
+        }),
+        prisma.message.count({
+          where: {
+            fromAddress: { equals: addr, mode: "insensitive" },
+            aiLabels: { has: "NEEDS_REPLY" },
+            isRead: false,
+          },
+        }),
+      ]);
+      return { addr, last, unread, replyDebt };
+    }),
+  );
+  const briefByAddr = new Map(briefs.map((b) => [b.addr, b]));
 
   // Grid: weeks of 7 cells starting Sunday, leading/trailing blanks.
   const firstWeekday = monthStart.getDay();
@@ -313,6 +360,79 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
               </ul>
             )}
           </div>
+
+          {dayInvites.length > 0 && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+              <h3 className="text-xs font-semibold tracking-wide text-violet-700 uppercase dark:text-violet-300">
+                Meeting brief
+              </h3>
+              <div className="mt-2 flex flex-col gap-3">
+                {dayInvites.map((e) => {
+                  const people = e.attendees
+                    .map((a) => a.toLowerCase())
+                    .filter((a) => briefByAddr.has(a))
+                    .slice(0, 5);
+                  return (
+                    <div key={e.id}>
+                      <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+                        {e.startsAt.toLocaleTimeString(undefined, {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}{" "}
+                        - {e.summary ?? "(untitled invite)"}
+                      </p>
+                      <ul className="mt-1 flex flex-col gap-1">
+                        {people.map((addr) => {
+                          const b = briefByAddr.get(addr);
+                          if (!b) return null;
+                          return (
+                            <li key={addr} className="text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <Link
+                                  href={`/senders/${encodeURIComponent(addr)}`}
+                                  className="min-w-0 flex-1 truncate font-medium text-violet-700 hover:underline dark:text-violet-300"
+                                >
+                                  {addr}
+                                </Link>
+                                {b.unread > 0 && (
+                                  <span className="rounded bg-indigo-100 px-1 py-0.5 text-[9px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                    {b.unread} unread
+                                  </span>
+                                )}
+                                {b.replyDebt > 0 && (
+                                  <span className="rounded bg-rose-100 px-1 py-0.5 text-[9px] font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                                    {b.replyDebt} awaits your reply
+                                  </span>
+                                )}
+                                {!b.last && (
+                                  <span className="text-[10px] text-zinc-400">new contact</span>
+                                )}
+                              </div>
+                              {b.last && (
+                                <Link
+                                  href={`/?thread=${b.last.threadId ?? ""}`}
+                                  className="mt-0.5 block truncate text-[11px] text-zinc-500 hover:text-indigo-600 dark:text-zinc-400"
+                                >
+                                  last: {b.last.subject ?? "(no subject)"} -{" "}
+                                  {b.last.receivedAt.toLocaleDateString(undefined, {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </Link>
+                              )}
+                            </li>
+                          );
+                        })}
+                        {people.length === 0 && (
+                          <li className="text-[11px] text-zinc-400">Only you on this one.</li>
+                        )}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <h3 className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">To-dos</h3>

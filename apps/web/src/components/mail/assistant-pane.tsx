@@ -2,8 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Archive, ArrowRight, CheckCheck, Loader2, Sparkles } from "lucide-react";
-import { archiveMessages, markMessagesRead } from "@/lib/actions";
+import { useRouter } from "next/navigation";
+import {
+  Archive,
+  ArrowRight,
+  Check,
+  CheckCheck,
+  Loader2,
+  Sparkles,
+  Undo2,
+  X,
+} from "lucide-react";
+import { archiveMessages, markMessagesRead, undoAuditEntry } from "@/lib/actions";
 
 interface Source {
   messageId: string;
@@ -18,6 +28,17 @@ interface Source {
 }
 
 type Phase = "thinking" | "streaming" | "done" | "error";
+
+/** A confirm-gated mutation the assistant proposed over its findings. */
+interface ProposedAction {
+  kind: string;
+  label: string;
+  messageIds: string[];
+  preview: { messageId: string; subject: string | null; from: string }[];
+  truncated: boolean;
+}
+
+type ActionState = "pending" | "running" | "done" | "dismissed" | "undone" | "failed";
 
 /** Turn a lexical-retrieval reason into concrete next-step guidance. */
 function guidanceFor(reason: string | undefined) {
@@ -82,7 +103,11 @@ export function AssistantStream({ question }: { question: string }) {
   const [retrieval, setRetrieval] = useState<"semantic" | "lexical">("semantic");
   const [retrievalReason, setRetrievalReason] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
+  const [actions, setActions] = useState<ProposedAction[]>([]);
+  const [actionStates, setActionStates] = useState<Record<number, ActionState>>({});
+  const [auditIds, setAuditIds] = useState<Record<number, string>>({});
   const answerRef = useRef<HTMLParagraphElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,6 +150,7 @@ export function AssistantStream({ question }: { question: string }) {
                     sources: Source[];
                     retrieval: string;
                     retrievalReason?: string;
+                    actions?: ProposedAction[];
                   }
                 | { type: "error"; reason: string };
               if (cancelled) return;
@@ -138,6 +164,7 @@ export function AssistantStream({ question }: { question: string }) {
                 setSources(evt.sources);
                 setRetrieval(evt.retrieval === "lexical" ? "lexical" : "semantic");
                 setRetrievalReason(evt.retrievalReason);
+                setActions(evt.actions ?? []);
                 setPhase("done");
               } else if (evt.type === "error") {
                 setError(evt.reason);
@@ -170,6 +197,41 @@ export function AssistantStream({ question }: { question: string }) {
   const archivable = sources.filter((s) => !s.isArchived).map((s) => s.messageId);
   const recs = recommendations(sources);
   const guide = phase === "done" ? guidanceFor(retrievalReason) : null;
+
+  /** Run a proposed action after the user explicitly confirms it. */
+  async function runAction(index: number) {
+    const action = actions[index];
+    if (!action) return;
+    setActionStates((m) => ({ ...m, [index]: "running" }));
+    try {
+      const res = await fetch("/api/v1/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: action.kind, messageIds: action.messageIds }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        auditId?: string;
+      };
+      if (!res.ok || !data.ok) throw new Error("execute failed");
+      if (data.auditId) setAuditIds((m) => ({ ...m, [index]: data.auditId! }));
+      setActionStates((m) => ({ ...m, [index]: "done" }));
+      router.refresh();
+    } catch {
+      setActionStates((m) => ({ ...m, [index]: "failed" }));
+    }
+  }
+
+  /** Reverse an executed action through the shared audit trail. */
+  async function undoAction(index: number) {
+    const auditId = auditIds[index];
+    if (!auditId) return;
+    const result = await undoAuditEntry(auditId);
+    if (result.ok) {
+      setActionStates((m) => ({ ...m, [index]: "undone" }));
+      router.refresh();
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -261,6 +323,91 @@ export function AssistantStream({ question }: { question: string }) {
           </div>
         </div>
       )}
+
+      {phase === "done" &&
+        actions.map((action, i) => {
+          const state = actionStates[i] ?? "pending";
+          if (state === "dismissed") return null;
+          return (
+            <div
+              key={`${action.kind}-${i}`}
+              className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/50 dark:bg-violet-950/30"
+            >
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-800 dark:text-violet-200">
+                <Sparkles size={13} />
+                {state === "done" || state === "undone" ? "Done" : "Proposed action"}
+              </p>
+              <p className="mt-1 text-sm text-zinc-800 dark:text-zinc-100">
+                {action.label}
+                {action.truncated && (
+                  <span className="text-zinc-400"> (first {action.messageIds.length} shown)</span>
+                )}
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {action.preview.map((p) => (
+                  <li
+                    key={p.messageId}
+                    className="truncate text-xs text-zinc-500 dark:text-zinc-400"
+                  >
+                    {p.subject ?? "(no subject)"} - {p.from}
+                  </li>
+                ))}
+                {action.messageIds.length > action.preview.length && (
+                  <li className="text-[11px] text-zinc-400">
+                    +{action.messageIds.length - action.preview.length} more
+                  </li>
+                )}
+              </ul>
+              <div className="mt-2.5 flex items-center gap-2">
+                {state === "pending" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void runAction(i)}
+                      className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-500"
+                    >
+                      <Check size={12} /> Confirm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActionStates((m) => ({ ...m, [i]: "dismissed" }))}
+                      className="inline-flex items-center gap-1 rounded-md border border-violet-200 px-2.5 py-1 text-xs text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-900/40"
+                    >
+                      <X size={12} /> Dismiss
+                    </button>
+                  </>
+                )}
+                {state === "running" && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-300">
+                    <Loader2 size={12} className="animate-spin" /> Applying…
+                  </span>
+                )}
+                {state === "done" && (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      <Check size={12} /> Applied
+                    </span>
+                    {auditIds[i] && (
+                      <button
+                        type="button"
+                        onClick={() => void undoAction(i)}
+                        className="inline-flex items-center gap-1 text-xs text-zinc-500 underline underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-300"
+                      >
+                        <Undo2 size={11} /> Undo
+                      </button>
+                    )}
+                  </>
+                )}
+                {state === "undone" && (
+                  <span className="text-xs text-zinc-500">Undone - nothing changed.</span>
+                )}
+                {state === "failed" && (
+                  <span className="text-xs text-red-500">Couldn&apos;t apply that action.</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
 
       {guide && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">

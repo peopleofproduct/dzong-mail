@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { askInbox } from "@unwalled/sync-engine";
+import { askInbox, proposeActions } from "@unwalled/sync-engine";
 import type { SemanticHit } from "@unwalled/sync-engine";
 import { getLocalUser } from "@/lib/queries";
 import { apiGuard, badRequest } from "../_lib";
@@ -17,6 +17,12 @@ function serializeHit(hit: SemanticHit) {
     aiLabels: hit.message.aiLabels,
     score: hit.score,
   };
+}
+
+/** Action proposals ride the `done` event - confirm-gated mutations over
+ *  exactly the messages the answer cited. */
+function serializeActions(question: string, sources: SemanticHit[] | undefined) {
+  return proposeActions(question, sources ?? []);
 }
 
 /**
@@ -63,6 +69,7 @@ export async function POST(request: NextRequest) {
               retrieval: result.retrieval ?? "semantic",
               retrievalReason: result.retrievalReason,
               sources: (result.sources ?? []).map(serializeHit),
+              actions: serializeActions(question, result.sources),
             });
         } catch (err) {
           send({
@@ -88,5 +95,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     answer: result.answer,
     sources: (result.sources ?? []).map(serializeHit),
+    actions: serializeActions(question, result.sources),
   });
 }

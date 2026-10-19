@@ -21,7 +21,9 @@ export {
   lexicalSearchMessages,
   cosineSimilarity,
 } from "./semantic";
-export type { AskResult, EmbedOutcome, SemanticHit } from "./semantic";
+export type { EmbedOutcome, SemanticHit, AskResult } from "./semantic";
+export { proposeActions } from "./agent";
+export type { AgentActionKind, ProposedAction } from "./agent";
 export {
   applyAutomationRules,
   matchesCondition,
