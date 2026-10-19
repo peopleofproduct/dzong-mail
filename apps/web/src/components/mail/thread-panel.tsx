@@ -6,6 +6,7 @@ import { draftAiReplyNow, markMessagesRead, sendDraftNow, summarizeThreadNow } f
 import { MarkReadOnMount } from "./mark-read-on-mount";
 import { MessageBody } from "./message-body";
 import { SenderAvatar } from "./sender-avatar";
+import { CollapsibleMessage } from "./collapsible-message";
 
 interface ThreadPanelProps {
   threadId: string;
@@ -134,70 +135,109 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
       </div>
 
       <div className="flex flex-1 flex-col divide-y divide-zinc-100 dark:divide-zinc-800/60">
-        {messages.map((m) => (
-          <article key={m.id} className="px-5 py-4" id={m.id}>
-            <header className="mb-2 flex items-center gap-2">
-              <SenderAvatar email={m.fromAddress} name={m.fromName} size={36} />
-              <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                {m.fromName ?? m.fromAddress}
-              </span>
-              <span className="text-xs text-zinc-400">&lt;{m.fromAddress}&gt;</span>
-              {m.isDraft && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                  {m.providerLabels.includes("AI_DRAFT") ? "AI draft" : "Draft"}
+        {messages.map((m, i) => (
+          <CollapsibleMessage
+            key={m.id}
+            id={m.id}
+            defaultOpen={i === messages.length - 1}
+            summary={
+              <span className="flex w-full min-w-0 items-center gap-2 px-5 py-3">
+                <SenderAvatar email={m.fromAddress} name={m.fromName} size={24} />
+                <span className="shrink-0 truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                  {m.fromName ?? m.fromAddress}
                 </span>
-              )}
-              <span className="ml-auto text-xs text-zinc-400">{m.receivedAt.toLocaleString()}</span>
-            </header>
-            <p className="mb-3 text-xs text-zinc-400">to {m.toAddresses.join(", ") || "me"}</p>
-            <MessageBody
-              html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml, cidMapFor(m.attachments)) : null}
-              text={m.bodyText}
-              fallback={m.snippet ?? "No content synced."}
-            />
-            {m.attachments.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {m.attachments.map((a) => (
-                  <a
-                    key={a.id}
-                    href={a.storagePath ? `/api/attachments/${a.id}` : undefined}
-                    title={
-                      a.storagePath ? `Download ${a.filename}` : `${a.filename} (not downloaded)`
-                    }
-                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs ${
-                      a.storagePath
-                        ? "border-zinc-300 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-                        : "cursor-default border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-700"
-                    }`}
-                  >
-                    <Paperclip size={12} />
-                    <span className="max-w-48 truncate">{a.filename}</span>
-                    {a.sizeBytes !== null && a.sizeBytes !== undefined && (
-                      <span className="text-zinc-400">{formatBytes(a.sizeBytes)}</span>
-                    )}
-                  </a>
-                ))}
+                {m.isDraft && (
+                  <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    {m.providerLabels.includes("AI_DRAFT") ? "AI draft" : "Draft"}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1 truncate text-xs text-zinc-400 dark:text-zinc-500">
+                  {m.snippet}
+                </span>
+                <span className="ml-auto shrink-0 text-xs text-zinc-400">
+                  {m.receivedAt.toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+              </span>
+            }
+            header={
+              <span className="flex w-full items-center gap-2 px-5 pt-4 pb-2">
+                <SenderAvatar email={m.fromAddress} name={m.fromName} size={36} />
+                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  {m.fromName ?? m.fromAddress}
+                </span>
+                <span className="hidden text-xs text-zinc-400 sm:inline">
+                  &lt;{m.fromAddress}&gt;
+                </span>
+                {m.isDraft && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    {m.providerLabels.includes("AI_DRAFT") ? "AI draft" : "Draft"}
+                  </span>
+                )}
+                <span className="ml-auto shrink-0 text-xs text-zinc-400">
+                  {m.receivedAt.toLocaleString()}
+                </span>
+              </span>
+            }
+            body={
+              <div className="px-5 pb-4">
+                <p className="mb-3 text-xs text-zinc-400">
+                  to {m.toAddresses.join(", ") || "me"}
+                </p>
+                <MessageBody
+                  html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml, cidMapFor(m.attachments)) : null}
+                  text={m.bodyText}
+                  fallback={m.snippet ?? "No content synced."}
+                />
+                {m.attachments.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {m.attachments.map((a) => (
+                      <a
+                        key={a.id}
+                        href={a.storagePath ? `/api/attachments/${a.id}` : undefined}
+                        title={
+                          a.storagePath
+                            ? `Download ${a.filename}`
+                            : `${a.filename} (not downloaded)`
+                        }
+                        className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs ${
+                          a.storagePath
+                            ? "border-zinc-300 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                            : "cursor-default border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-700"
+                        }`}
+                      >
+                        <Paperclip size={12} />
+                        <span className="max-w-48 truncate">{a.filename}</span>
+                        {a.sizeBytes !== null && a.sizeBytes !== undefined && (
+                          <span className="text-zinc-400">{formatBytes(a.sizeBytes)}</span>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {m.isDraft && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <a
+                      href={`/?${draftParams(m, baseParams)}`}
+                      className="inline-block rounded-md border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                    >
+                      Edit &amp; send draft →
+                    </a>
+                    <form action={sendDraftNow.bind(null, m.id)}>
+                      <button
+                        type="submit"
+                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
+                      >
+                        Send now
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
-            )}
-            {m.isDraft && (
-              <div className="mt-3 flex items-center gap-2">
-                <a
-                  href={`/?${draftParams(m, baseParams)}`}
-                  className="inline-block rounded-md border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
-                >
-                  Edit &amp; send draft →
-                </a>
-                <form action={sendDraftNow.bind(null, m.id)}>
-                  <button
-                    type="submit"
-                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
-                  >
-                    Send now
-                  </button>
-                </form>
-              </div>
-            )}
-          </article>
+            }
+          />
         ))}
       </div>
 
