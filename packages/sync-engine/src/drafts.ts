@@ -31,6 +31,8 @@ export async function createDraftRow(
     fromAddress: string;
     toAddresses: string[];
     bodyText: string;
+    /** Tag the draft AI_DRAFT when a model wrote it (vs. a static template). */
+    aiGenerated?: boolean;
   },
 ): Promise<Message> {
   return db.message.create({
@@ -47,7 +49,7 @@ export async function createDraftRow(
       receivedAt: new Date(),
       isRead: true,
       isDraft: true,
-      providerLabels: ["DRAFT", "AI_DRAFT"],
+      providerLabels: input.aiGenerated ? ["DRAFT", "AI_DRAFT"] : ["DRAFT"],
     },
   });
 }
@@ -107,6 +109,7 @@ export async function draftAiReply(
     fromAddress: message.emailAccount.emailAddress,
     toAddresses: [message.fromAddress],
     bodyText: response.text.trim(),
+    aiGenerated: true,
   });
   return { ok: true, draftId: draft.id };
 }
