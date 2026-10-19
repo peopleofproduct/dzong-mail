@@ -3,6 +3,13 @@ import sanitizeHtml from "sanitize-html";
 const TRANSPARENT_PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 
+/** Sender CSS that marks an element as intentionally hidden: preheader
+ *  preview text, tracking stubs, mso-hide blocks. Since display/visibility
+ *  are stripped from inline styles anyway, these elements would otherwise
+ *  surface as stray text - remove them outright. */
+const HIDDEN_STYLE =
+  /display\s*:\s*none|visibility\s*:\s*(hidden|collapse)|mso-hide\s*:\s*all/i;
+
 /**
  * Sanitize synced email HTML for in-app display. Strips scripts, forms,
  * iframes and dangerous attributes; keeps formatting, tables and images so
@@ -69,7 +76,11 @@ export function cleanEmailHtml(html: string, cidMap?: Map<string, string>): stri
         "line-height": [/^.*$/],
         width: [/^.*$/],
         "max-width": [/^.*$/],
+        "max-height": [/^.*$/],
         height: [/^.*$/],
+        display: [/^.*$/],
+        overflow: [/^(?!.*(javascript|vbscript|expression)).*$/i],
+        visibility: [/^.*$/],
         padding: [/^(?!.*-).*$/],
         "padding-top": [/^(?!.*-).*$/],
         "padding-right": [/^(?!.*-).*$/],
@@ -86,6 +97,10 @@ export function cleanEmailHtml(html: string, cidMap?: Map<string, string>): stri
       },
     },
     allowedSchemes: ["http", "https", "data", "mailto"],
+    // Drop elements the sender meant to hide (preheader text etc.) so they
+    // don't render once their hiding styles are sanitised away.
+    exclusiveFilter: (frame) =>
+      !!frame.attribs?.style && HIDDEN_STYLE.test(frame.attribs.style),
     transformTags: {
       a: (tagName, attribs) => ({
         tagName,
