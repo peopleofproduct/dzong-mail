@@ -4,6 +4,7 @@ import { getThread } from "@/lib/queries";
 import { prisma } from "@/lib/db";
 import { cleanEmailHtml } from "@/lib/email-html";
 import { markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/actions";
+import { AiDecisionCard } from "./ai-decision-card";
 import { AiDraftButton } from "./ai-draft-button";
 import { MarkReadOnMount } from "./mark-read-on-mount";
 import { MessageBody } from "./message-body";
@@ -85,6 +86,7 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
         include: {
           emailAccount: { select: { emailAddress: true } },
           attachments: { orderBy: { createdAt: "asc" } },
+          aiDecisions: { orderBy: { createdAt: "desc" }, take: 3 },
         },
       })
     : await getThread(threadId);
@@ -120,6 +122,46 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
       `Date: ${last.receivedAt.toLocaleString()}\nSubject: ${last.subject ?? ""}\n\n` +
       (last.bodyText ?? last.snippet ?? ""),
   );
+
+  // Calendar-aware planning: upcoming events involving any sender on this
+  // thread - "you meet them Tuesday" context while replying.
+  const senderSet = [...new Set(messages.map((m) => m.fromAddress.toLowerCase()))];
+  const upcoming = await prisma.calendarEvent.findMany({
+    where: {
+      startsAt: { gt: new Date() },
+      status: { not: "CANCELLED" },
+      OR: [
+        { organizer: { in: senderSet, mode: "insensitive" } },
+        { attendees: { hasSome: senderSet } },
+      ],
+    },
+    orderBy: { startsAt: "asc" },
+    take: 20,
+  });
+  const nextEventFor = (addr: string) =>
+    upcoming.find(
+      (e) =>
+        e.organizer?.toLowerCase() === addr ||
+        e.attendees.some((a) => a.toLowerCase() === addr),
+    );
+
+  // Attachment dedupe: how many times each file's bytes appear anywhere
+  // in the local store.
+  const hashes = messages
+    .flatMap((m) => m.attachments)
+    .map((a) => a.contentHash)
+    .filter((h): h is string => Boolean(h));
+  const dupCounts = new Map<string, number>();
+  if (hashes.length > 0) {
+    const grouped = await prisma.attachment.groupBy({
+      by: ["contentHash"],
+      where: { contentHash: { in: hashes } },
+      _count: true,
+    });
+    for (const g of grouped) {
+      if (g.contentHash) dupCounts.set(g.contentHash, g._count);
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -190,12 +232,37 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
             header={
               <span className="flex w-full items-center gap-2 px-5 pt-4 pb-2">
                 <SenderAvatar email={m.fromAddress} name={m.fromName} size={36} />
-                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                <a
+                  href={`/senders/${encodeURIComponent(m.fromAddress)}`}
+                  title="Relationship history"
+                  className="text-sm font-medium text-zinc-900 hover:text-indigo-600 hover:underline dark:text-zinc-100 dark:hover:text-indigo-300"
+                >
                   {m.fromName ?? m.fromAddress}
-                </span>
+                </a>
                 <span className="hidden text-xs text-zinc-400 sm:inline">
                   &lt;{m.fromAddress}&gt;
                 </span>
+                {(() => {
+                  const ev = nextEventFor(m.fromAddress.toLowerCase());
+                  return (
+                    ev && (
+                      <a
+                        href="/calendar"
+                        title={`${ev.summary ?? "Event"}${ev.location ? ` - ${ev.location}` : ""}`}
+                        className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 hover:bg-violet-200 dark:bg-violet-950/60 dark:text-violet-300 dark:hover:bg-violet-900"
+                      >
+                        Meets{" "}
+                        {ev.startsAt.toLocaleDateString("en-US", {
+                          weekday: "short",
+                        })}{" "}
+                        {ev.startsAt.toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </a>
+                    )
+                  );
+                })()}
                 {m.isDraft && (
                   <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                     {m.providerLabels.includes("AI_DRAFT") ? "AI draft" : "Draft"}
@@ -229,6 +296,9 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
                     />
                   );
                 })()}
+                {m.aiDecisions.map((d) => (
+                  <AiDecisionCard key={d.id} decision={d} />
+                ))}
                 <MessageBody
                   html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml, cidMapFor(m.attachments)) : null}
                   text={m.bodyText}
@@ -255,6 +325,14 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
                         <span className="max-w-48 truncate">{a.filename}</span>
                         {a.sizeBytes !== null && a.sizeBytes !== undefined && (
                           <span className="text-zinc-400">{formatBytes(a.sizeBytes)}</span>
+                        )}
+                        {a.contentHash && (dupCounts.get(a.contentHash) ?? 0) > 1 && (
+                          <span
+                            title={`This exact file appears in ${dupCounts.get(a.contentHash)} messages`}
+                            className="rounded bg-zinc-200 px-1 text-[10px] text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                          >
+                            ×{dupCounts.get(a.contentHash)}
+                          </span>
                         )}
                       </a>
                     ))}

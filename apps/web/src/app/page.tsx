@@ -316,6 +316,44 @@ async function BriefingSection() {
   );
 }
 
+/**
+ * Inbox energy budgeting: turn unread + reply debt into a minutes estimate
+ * and point at the highest-value subset. Estimates are honest heuristics -
+ * ~40s to triage an unread message, ~3 min to write a real reply.
+ */
+async function EnergySection() {
+  await connection();
+  const [unread, needsReply] = await Promise.all([
+    prisma.message.count({
+      where: {
+        isRead: false,
+        isDraft: false,
+        isArchived: false,
+        OR: [{ snoozedUntil: null }, { snoozedUntil: { lt: new Date() } }],
+      },
+    }),
+    prisma.message.count({ where: { isDraft: false, aiLabels: { has: "NEEDS_REPLY" } } }),
+  ]);
+  if (unread + needsReply === 0) return null;
+  const triageMin = Math.ceil(unread * 0.7);
+  const replyMin = needsReply * 3;
+  const total = triageMin + replyMin;
+  // The "subset that matters": the reply debt only - triage the rest later.
+  const subset = replyMin + Math.ceil(unread * 0.15);
+  return (
+    <div className="border-b border-zinc-200 bg-white px-4 py-1.5 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+      <span>
+        Inbox work today:{" "}
+        <span className="font-medium text-zinc-700 dark:text-zinc-300">~{total} min</span>
+        {" "}({unread} unread, {needsReply} waiting replies).
+      </span>{" "}
+      <Link href="/?view=needs-reply" className="text-indigo-600 hover:underline dark:text-indigo-400">
+        Do the ~{subset}-min subset that matters →
+      </Link>
+    </div>
+  );
+}
+
 /** Server wrapper: the demo-account command only exists while the user has
  *  no real provider connected — it's for first-run education, not an
  *  everyday action. */
@@ -407,6 +445,9 @@ export default function Home(props: PageProps<"/">) {
       </Suspense>
       <Suspense fallback={null}>
         <BriefingSection />
+      </Suspense>
+      <Suspense fallback={null}>
+        <EnergySection />
       </Suspense>
       <Suspense fallback={<div className="flex-1 animate-pulse bg-zinc-50 dark:bg-zinc-900/40" />}>
         <MailPanes searchParams={props.searchParams} />

@@ -15,6 +15,7 @@ export type MailView =
   | "needs-reply"
   | "awaiting"
   | "reply-queue"
+  | "review"
   | "digest";
 
 export const VIEW_LABELS: Record<MailView, string> = {
@@ -28,6 +29,7 @@ export const VIEW_LABELS: Record<MailView, string> = {
   "needs-reply": "Needs reply",
   awaiting: "Awaiting reply",
   "reply-queue": "Reply queue",
+  review: "AI review",
   digest: "Digest",
 };
 
@@ -69,6 +71,9 @@ function viewWhere(view: MailView): Prisma.MessageWhereInput {
           { providerLabels: { hasSome: ["NEWSLETTER", "CATEGORY_PROMOTIONS"] } },
         ],
       };
+    // Low-confidence AI decisions held for human approval.
+    case "review":
+      return { isDraft: false, aiDecisions: { some: { status: "queued" } } };
     case "digest":
       return {
         isDraft: false,
@@ -89,6 +94,33 @@ function searchWhere(q: string): Prisma.MessageWhereInput {
   if (trimmed === "is:unread") return { isRead: false };
   if (trimmed === "is:read") return { isRead: true };
   if (trimmed === "is:starred") return { isStarred: true };
+  // file:<term> searches attachment names and their extracted text.
+  const fileMatch = /^file:(.+)$/.exec(trimmed);
+  if (fileMatch) {
+    const term = fileMatch[1].trim();
+    return {
+      attachments: {
+        some: {
+          OR: [
+            { filename: { contains: term, mode: "insensitive" } },
+            { contentText: { contains: term, mode: "insensitive" } },
+          ],
+        },
+      },
+    };
+  }
+  // Also surface attachment hits inside a plain query - "find the contract"
+  // should reach files, not just subjects.
+  const attachmentHit = {
+    attachments: {
+      some: {
+        OR: [
+          { filename: { contains: q, mode: "insensitive" as const } },
+          { contentText: { contains: q, mode: "insensitive" as const } },
+        ],
+      },
+    },
+  };
   return {
     OR: [
       { subject: { contains: q, mode: "insensitive" } },
@@ -96,6 +128,7 @@ function searchWhere(q: string): Prisma.MessageWhereInput {
       { fromName: { contains: q, mode: "insensitive" } },
       { snippet: { contains: q, mode: "insensitive" } },
       { bodyText: { contains: q, mode: "insensitive" } },
+      attachmentHit,
     ],
   };
 }
@@ -162,6 +195,10 @@ export async function getThread(threadId: string) {
     include: {
       emailAccount: { select: { emailAddress: true } },
       attachments: { orderBy: { createdAt: "asc" } },
+      aiDecisions: {
+        orderBy: { createdAt: "desc" },
+        take: 3,
+      },
     },
   });
 }

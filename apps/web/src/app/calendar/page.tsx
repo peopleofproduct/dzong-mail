@@ -80,6 +80,7 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
         location: true,
         organizer: true,
         startsAt: true,
+        endsAt: true,
         status: true,
         messageId: true,
         message: { select: { threadId: true } },
@@ -87,16 +88,28 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
     }),
   ]);
 
+  // Calendar-aware planning: flag scheduled sends that would land mid-meeting.
+  const eventSpan = (at: Date) =>
+    invites.find(
+      (e) =>
+        e.status !== "CANCELLED" &&
+        e.startsAt <= at &&
+        at <= (e.endsAt ?? new Date(e.startsAt.getTime() + 60 * 60_000)),
+    );
+
   const events: CalEvent[] = [
     ...scheduled
       .filter((m) => m.scheduledAt)
-      .map((m) => ({
-        id: `send-${m.id}`,
-        day: m.scheduledAt!.getDate(),
-        kind: "send" as const,
-        label: m.subject || "(no subject)",
-        sub: `to ${m.toAddresses[0] ?? "?"}`,
-      })),
+      .map((m) => {
+        const clash = eventSpan(m.scheduledAt!);
+        return {
+          id: `send-${m.id}`,
+          day: m.scheduledAt!.getDate(),
+          kind: "send" as const,
+          label: m.subject || "(no subject)",
+          sub: `to ${m.toAddresses[0] ?? "?"}${clash ? ` - lands during "${clash.summary ?? "a meeting"}"` : ""}`,
+        };
+      }),
     ...snoozed
       .filter((m) => m.snoozedUntil)
       .map((m) => ({

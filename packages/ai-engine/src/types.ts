@@ -46,4 +46,6 @@ export interface EmbeddingResponse {
 export interface ClassificationResult {
   labels: string[];
   confidence?: number;
+  /** One-line rationale, when the provider supplied one. */
+  reason?: string;
 }

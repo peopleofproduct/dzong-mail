@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Archive,
   BellOff,
+  ClipboardCheck,
   Folder,
   Inbox,
   LayoutList,
@@ -32,6 +33,7 @@ const VIEW_ICONS: Record<MailView, typeof Inbox> = {
   "needs-reply": ReplyAll,
   awaiting: Timer,
   "reply-queue": Sparkles,
+  review: ClipboardCheck,
   digest: LayoutList,
 };
 

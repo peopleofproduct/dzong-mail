@@ -35,6 +35,14 @@ export async function classifyAccountMessages(
   }
   const { provider, candidateLabels } = ai;
 
+  // Below this confidence a label decision is held for human review
+  // instead of applied silently.
+  const thresholdRow = await db.appSetting.findUnique({
+    where: { key: "aiConfidenceThreshold" },
+  });
+  const threshold =
+    typeof thresholdRow?.value === "number" ? thresholdRow.value : 0.65;
+
   const pending = await db.message.findMany({
     where: { emailAccountId: accountId, aiLabels: { isEmpty: true }, isDraft: false },
     orderBy: { receivedAt: "desc" },
@@ -50,13 +58,28 @@ export async function classifyAccountMessages(
       `Snippet: ${message.snippet ?? ""}`,
     ].join("\n");
     try {
-      const { labels } = await provider.classify(text, candidateLabels);
+      const { labels, confidence, reason } = await provider.classify(text, candidateLabels);
       if (labels.length > 0) {
-        await db.message.update({
-          where: { id: message.id },
-          data: { aiLabels: labels },
+        // Uncertain calls wait in the review queue; confident ones (and
+        // providers that return no score at all) apply as before.
+        const confident = confidence === undefined || confidence >= threshold;
+        if (confident) {
+          await db.message.update({
+            where: { id: message.id },
+            data: { aiLabels: labels },
+          });
+          labeledIds.push(message.id);
+        }
+        await db.aiDecision.create({
+          data: {
+            messageId: message.id,
+            kind: "label",
+            action: labels.join(","),
+            reason,
+            confidence,
+            status: confident ? "applied" : "queued",
+          },
         });
-        labeledIds.push(message.id);
       }
       classified++;
     } catch {

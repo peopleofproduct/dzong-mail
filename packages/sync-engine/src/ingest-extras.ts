@@ -14,6 +14,8 @@ export interface ParsedEvent {
   startsAt: Date;
   endsAt?: Date;
   status: string;
+  attendees: string[];
+  recurrence?: string;
 }
 
 /** iCal dates: 20261020T090000Z, 20261020T090000, or all-day 20261020. */
@@ -60,7 +62,7 @@ export function parseIcs(content: string): ParsedEvent[] {
     }
     if (upper === "END:VEVENT") {
       if (cur?.uid && cur.startsAt) {
-        events.push({ status: "CONFIRMED", ...cur } as ParsedEvent);
+        events.push({ status: "CONFIRMED", attendees: [], ...cur } as ParsedEvent);
       }
       cur = null;
       continue;
@@ -83,6 +85,16 @@ export function parseIcs(content: string): ParsedEvent[] {
         break;
       case "ORGANIZER":
         cur.organizer = p.value.replace(/^mailto:/i, "").trim();
+        break;
+      case "ATTENDEE":
+        cur.attendees = [
+          ...(cur.attendees ?? []),
+          // Lowercased so case-sensitive hasSome lookups match reliably.
+          p.value.replace(/^mailto:/i, "").trim().toLowerCase(),
+        ];
+        break;
+      case "RRULE":
+        cur.recurrence = p.value.trim();
         break;
       case "DTSTART": {
         const d = parseIcsDate(p.value);
@@ -138,6 +150,8 @@ export async function ingestCalendarEvents(
             startsAt: ev.startsAt,
             endsAt: ev.endsAt,
             status: ev.status,
+            attendees: ev.attendees,
+            recurrence: ev.recurrence,
           },
           update: {
             messageId,
@@ -148,6 +162,8 @@ export async function ingestCalendarEvents(
             startsAt: ev.startsAt,
             endsAt: ev.endsAt,
             status: ev.status,
+            attendees: ev.attendees,
+            recurrence: ev.recurrence,
           },
         });
         count++;

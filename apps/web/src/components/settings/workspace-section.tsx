@@ -5,6 +5,7 @@ import {
   getAutoFollowUp,
   getFollowUpDays,
   getRequestReadReceipts,
+  getSetting,
   getSplitLabels,
   getUndoSendSeconds,
 } from "@/lib/settings";
@@ -34,6 +35,7 @@ export async function WorkspaceSection() {
     followUpDays,
     autoFollowUp,
     requestReceipts,
+    confidenceThreshold,
     activeSplits,
     snippets,
     labelRows,
@@ -42,6 +44,7 @@ export async function WorkspaceSection() {
     getFollowUpDays(),
     getAutoFollowUp(),
     getRequestReadReceipts(),
+    getSetting<number>("aiConfidenceThreshold", 0.65),
     getSplitLabels(),
     prisma.snippet.findMany({ orderBy: { name: "asc" } }),
     prisma.message.findMany({
@@ -103,6 +106,18 @@ export async function WorkspaceSection() {
               <option value="comfortable">Comfortable</option>
               <option value="compact">Compact</option>
             </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-zinc-500">
+            AI auto-apply confidence floor (%)
+            <input
+              name="aiConfidenceThreshold"
+              type="number"
+              min={0}
+              max={100}
+              defaultValue={Math.round(confidenceThreshold * 100)}
+              className={inputClass}
+              title="Below this, AI decisions wait in the AI review queue"
+            />
           </label>
           <label className="flex items-end gap-2 pb-2 text-xs text-zinc-600 dark:text-zinc-300">
             <input

@@ -70,6 +70,39 @@ const dayKey = (d: Date) => d.toLocaleDateString("sv-SE");
  * Follow-up reminders: threads where the user's last message has gone
  * unanswered beyond `days`. One nudge per thread per day via dedupeKey.
  */
+/**
+ * Median hour-of-day a recipient tends to send mail, learned from their
+ * last 200 messages in our local store. Returns the next occurrence of
+ * that hour (today if still ahead, else tomorrow), or null when there
+ * are fewer than 3 samples to learn from.
+ */
+async function recipientNextActiveHour(
+  toAddresses: string[],
+  own: Set<string>,
+  db: PrismaClient,
+): Promise<Date | null> {
+  const recipient = toAddresses.find((a) => !own.has(a.toLowerCase()));
+  if (!recipient) return null;
+  const replies = await db.message.findMany({
+    where: { fromAddress: { equals: recipient, mode: "insensitive" }, isDraft: false },
+    orderBy: { receivedAt: "desc" },
+    take: 200,
+    select: { receivedAt: true },
+  });
+  if (replies.length < 3) return null;
+  const hours = replies.map((r) => r.receivedAt.getHours()).sort((a, b) => a - b);
+  const median = hours[Math.floor(hours.length / 2)];
+  const next = new Date();
+  next.setMinutes(0, 0, 0);
+  next.setHours(median);
+  if (next.getTime() <= Date.now() + 5 * 60_000) next.setDate(next.getDate() + 1);
+  return next;
+}
+
+/**
+ * Follow-up reminders: threads where the user's last message has gone
+ * unanswered beyond `days`. One nudge per thread per day via dedupeKey.
+ */
 export async function checkFollowUpReminders(
   db: PrismaClient = prisma,
   days?: number,
@@ -120,7 +153,14 @@ export async function checkFollowUpReminders(
       isDraft: false,
     },
     orderBy: { receivedAt: "desc" },
-    select: { threadId: true, fromAddress: true, subject: true, receivedAt: true, id: true },
+    select: {
+      threadId: true,
+      fromAddress: true,
+      toAddresses: true,
+      subject: true,
+      receivedAt: true,
+      id: true,
+    },
   });
   const seen = new Set<string>();
   let nudged = 0;
@@ -150,11 +190,28 @@ export async function checkFollowUpReminders(
       const draft = await draftAiReply(m.id, db);
       if (!draft.ok || !draft.draftId) continue;
       if (autoMode === "send") {
+        // Adaptive timing: if we know this recipient's reply cadence,
+        // schedule the nudge for their next typical-open hour instead of
+        // firing immediately. Falls back to the plain undo window.
+        const sendAt =
+          (await recipientNextActiveHour(m.toAddresses, own, db)) ??
+          new Date(Date.now() + undoSeconds * 1000);
         await db.message.update({
           where: { id: draft.draftId },
-          data: { scheduledAt: new Date(Date.now() + undoSeconds * 1000) },
+          data: { scheduledAt: sendAt },
         });
       }
+      await db.aiDecision
+        .create({
+          data: {
+            messageId: m.id,
+            kind: "follow-up",
+            action: autoMode === "send" ? "auto-sent nudge" : "drafted nudge",
+            reason: `No reply in ${ageDays} days; threshold ${effectiveDays}`,
+            status: "applied",
+          },
+        })
+        .catch(() => null);
       await emit(
         {
           kind: "follow-up",

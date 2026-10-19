@@ -116,6 +116,7 @@ model Message {
   hasAttachment Boolean      @default(false)
   attachments   Attachment[]
   calendarEvents CalendarEvent[]
+  aiDecisions    AiDecision[]
 
   // Semantic-search vector — brute-force cosine at local scale, no pgvector needed.
   embedding      Float[] @default([])
@@ -144,9 +145,15 @@ model Attachment {
   // Null when only metadata was synced and the content was not downloaded.
   storagePath String?
 
+  // Extracted plain text for searchable types (txt/md/csv/json/pdf...).
+  contentText String?
+  // sha256 of the bytes - dedupes the same file across threads.
+  contentHash String?
+
   createdAt DateTime @default(now())
 
   @@index([messageId])
+  @@index([contentHash])
 }
 
 // ─── AI routing configuration ─────────────────────────────────────────────────
@@ -288,10 +295,44 @@ model CalendarEvent {
   startsAt    DateTime
   endsAt      DateTime?
   status      String    @default("CONFIRMED") // CONFIRMED | TENTATIVE | CANCELLED
+  attendees   String[]  @default([]) // ATTENDEE mailto addresses
+  recurrence  String?   // raw RRULE value, kept for future expansion
   createdAt   DateTime  @default(now())
 
   @@unique([emailAccountId, uid])
   @@index([startsAt])
+}
+
+// Every AI- or rule-driven decision on a message, with reasoning the user
+// can inspect. Confidence below the auto-apply threshold lands status
+// "queued" in the review queue instead of being applied.
+model AiDecision {
+  id         String   @id @default(cuid())
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId  String
+  kind       String // "label" | "rule" | "draft" | "follow-up"
+  action     String // the label applied, rule name, etc.
+  reason     String? // why the AI/rule did this, in its own words
+  confidence Float? // 0-1, null when the provider gave none
+  status     String @default("applied") // "applied" | "queued" | "rejected"
+  createdAt  DateTime @default(now())
+
+  @@index([messageId])
+  @@index([status, createdAt])
+}
+
+// User- and worker-driven mutations, logged so anything is auditable and
+// reversible actions carry their inverse in `detail`.
+model AuditEntry {
+  id         String    @id @default(cuid())
+  action     String // "archive" | "unarchive" | "star" | "read" | "trash" | "move" | "label" | "rule-apply" | "send" | ...
+  targetType String // "message" | "thread" | "rule" | "task"
+  targetId   String
+  detail     Json? // inverse payload for reversible actions, e.g. {"setIsArchived": false}
+  undoneAt   DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
 }
 
 // Key-value store for user preferences that are not AI settings:

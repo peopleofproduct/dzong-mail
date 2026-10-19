@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, Inbox, PanelLeft, Settings, Sparkles } from "lucide-react";
+import { CalendarDays, History, Inbox, PanelLeft, Settings, Sparkles } from "lucide-react";
 import { ResizeHandle, usePaneWidth } from "./resize";
 
 const EVENT = "unwalled-sidebar-change";
@@ -93,6 +93,9 @@ export function IconRail({ pending, children }: { pending: number; children: Rea
 
         <a href="/calendar" title="Calendar — scheduled sends, snoozes, to-dos" className={btn}>
           <CalendarDays size={16} />
+        </a>
+        <a href="/audit" title="Activity log — every action, reversible" className={btn}>
+          <History size={16} />
         </a>
 
         <a href="/settings" title="Settings" className={`${btn} mt-auto`}>

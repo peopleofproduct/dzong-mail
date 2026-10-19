@@ -33,7 +33,8 @@ export abstract class BaseProvider implements AIProvider {
           role: "system",
           content:
             "Classify the email into zero or more of the allowed labels. " +
-            "Reply with a JSON array of labels only. Allowed labels: " +
+            'Reply with a JSON object {"labels": [...], "confidence": 0-1, "reason": "one line"}. ' +
+            "A bare JSON array of labels is also acceptable. Allowed labels: " +
             candidateLabels.join(", "),
         },
         { role: "user", content: text },
@@ -42,10 +43,20 @@ export abstract class BaseProvider implements AIProvider {
 
     try {
       const parsed = JSON.parse(response.text) as unknown;
-      const labels = Array.isArray(parsed)
-        ? parsed.filter((l): l is string => typeof l === "string")
-        : [];
-      return { labels: labels.filter((l) => candidateLabels.includes(l)) };
+      // Accept both the object form and the legacy bare-array form.
+      const raw = Array.isArray(parsed) ? parsed : (parsed as { labels?: unknown })?.labels;
+      const labels = (Array.isArray(raw) ? raw : []).filter(
+        (l): l is string => typeof l === "string",
+      );
+      const obj = Array.isArray(parsed) ? undefined : (parsed as Record<string, unknown>);
+      const confidence =
+        typeof obj?.confidence === "number" ? Math.min(1, Math.max(0, obj.confidence)) : undefined;
+      const reason = typeof obj?.reason === "string" ? obj.reason.slice(0, 300) : undefined;
+      return {
+        labels: labels.filter((l) => candidateLabels.includes(l)),
+        confidence,
+        reason,
+      };
     } catch {
       return { labels: [] };
     }

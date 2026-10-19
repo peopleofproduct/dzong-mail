@@ -147,7 +147,8 @@ export async function importMailFiles(
         continue;
       }
       imported++;
-      const { storeAttachmentContent } = await import("./attachments");
+      const { storeAttachmentContent, extractAttachmentText } = await import("./attachments");
+      const { createHash } = await import("node:crypto");
       for (const a of msg.attachments ?? []) {
         if (!a.content) continue;
         const storagePath = await storeAttachmentContent(created.id, {
@@ -162,6 +163,12 @@ export async function importMailFiles(
             mimeType: a.mimeType,
             sizeBytes: a.sizeBytes,
             storagePath,
+            contentHash: createHash("sha256").update(a.content).digest("hex"),
+            contentText: extractAttachmentText({
+              filename: a.filename,
+              mimeType: a.mimeType,
+              content: a.content,
+            }),
           },
         });
       }

@@ -210,6 +210,25 @@ export async function removeAccount(accountId: string) {
 
 // ─── Message operations ────────────────────────────────────────────────────
 
+/** Write a reversible-action record. `detail.inverse` names the inverse
+ *  mutation consumed by undoAuditEntry; `detail.ids` carries the rows. */
+async function audit(
+  action: string,
+  targetId: string,
+  detail: Record<string, unknown>,
+): Promise<void> {
+  await prisma.auditEntry
+    .create({
+      data: {
+        action,
+        targetType: "message",
+        targetId,
+        detail: detail as Prisma.InputJsonValue,
+      },
+    })
+    .catch(() => null); // auditing never blocks the mutation itself
+}
+
 export async function toggleMessageFlag(messageId: string, flag: "isRead" | "isStarred") {
   const message = await prisma.message.findUniqueOrThrow({ where: { id: messageId } });
   await prisma.message.update({
@@ -222,6 +241,11 @@ export async function toggleMessageFlag(messageId: string, flag: "isRead" | "isS
         : {}),
     },
   });
+  await audit(flag === "isStarred" ? "star" : "read", messageId, {
+    inverse: "toggle-flag",
+    flag,
+    ids: [messageId],
+  });
   revalidatePath("/");
 }
 
@@ -231,6 +255,7 @@ export async function archiveMessages(ids: string[]) {
     where: { id: { in: ids } },
     data: { isArchived: true },
   });
+  await audit("archive", ids[0], { inverse: "unarchive", ids });
   await snapshotInboxZero();
   revalidatePath("/");
 }
@@ -254,6 +279,7 @@ export async function unarchiveMessage(id: string) {
 export async function unarchiveMessages(ids: string[]) {
   if (ids.length === 0) return;
   await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isArchived: false } });
+  await audit("unarchive", ids[0], { inverse: "archive", ids });
   revalidatePath("/");
 }
 
@@ -276,6 +302,10 @@ export async function moveMessages(ids: string[], target: "inbox" | "archive" | 
       data: { isArchived: true, folder: "Trash" },
     });
   }
+  await audit(`move-${target}`, ids[0], {
+    inverse: target === "trash" ? "restore" : target === "archive" ? "unarchive" : "archive",
+    ids,
+  });
   await snapshotInboxZero();
   revalidatePath("/");
 }
@@ -291,17 +321,23 @@ export async function markMessagesRead(ids: string[], read = true) {
     where: { id: { in: ids }, readAt: { not: null } },
     data: { isRead: read },
   });
+  await audit(read ? "read" : "unread", ids[0], {
+    inverse: read ? "mark-unread" : "mark-read",
+    ids,
+  });
   revalidatePath("/");
 }
 
 export async function snoozeMessage(id: string, hours: number) {
   const until = new Date(Date.now() + hours * 60 * 60 * 1000);
   await prisma.message.update({ where: { id }, data: { snoozedUntil: until } });
+  await audit("snooze", id, { inverse: "unsnooze", ids: [id] });
   revalidatePath("/");
 }
 
 export async function unsnoozeMessage(id: string) {
   await prisma.message.update({ where: { id }, data: { snoozedUntil: null } });
+  await audit("unsnooze", id, { inverse: "noop", ids: [id] });
   revalidatePath("/");
 }
 
@@ -786,6 +822,12 @@ export async function savePrefs(formData: FormData) {
     autoFollowUp === "draft" || autoFollowUp === "send" ? autoFollowUp : "off",
   );
   await setSetting("requestReadReceipts", get("requestReadReceipts") === "on");
+  // 0-100 in the UI, stored as the 0-1 fraction the classifier compares.
+  const thresholdPct = Number(get("aiConfidenceThreshold")) || 65;
+  await setSetting(
+    "aiConfidenceThreshold",
+    Math.min(100, Math.max(0, thresholdPct)) / 100,
+  );
   // Density rides in a cookie (not AppSetting) so the layout-init script can
   // apply it before first paint without making the root layout dynamic.
   const cookieStore = await cookies();
@@ -904,4 +946,77 @@ export async function verifyAccountNow(accountId: string) {
   safeRedirect("/settings", {
     [result.ok ? "notice" : "error"]: `${result.emailAddress}: ${result.detail}`,
   });
+}
+
+// ─── AI decision review + action audit ───────────────────────────────────────
+
+/** Approve a queued AI decision (apply its labels) or reject it. */
+export async function reviewDecision(decisionId: string, approve: boolean) {
+  const decision = await prisma.aiDecision.findUniqueOrThrow({
+    where: { id: decisionId },
+  });
+  if (decision.status !== "queued") return;
+  if (approve && decision.kind === "label") {
+    const labels = decision.action.split(",").filter(Boolean);
+    await prisma.message.update({
+      where: { id: decision.messageId },
+      data: { aiLabels: { push: labels } },
+    });
+  }
+  await prisma.aiDecision.update({
+    where: { id: decisionId },
+    data: { status: approve ? "applied" : "rejected" },
+  });
+  revalidatePath("/");
+}
+
+/** Reverse a logged mutation using the inverse recorded in detail. */
+export async function undoAuditEntry(entryId: string): Promise<{ ok: boolean }> {
+  const entry = await prisma.auditEntry.findUnique({ where: { id: entryId } });
+  if (!entry || entry.undoneAt) return { ok: false };
+  const detail = entry.detail as { inverse?: string; ids?: string[]; flag?: string } | null;
+  const ids = detail?.ids ?? (entry.targetType === "message" ? [entry.targetId] : []);
+  if (!detail?.inverse || detail.inverse === "noop" || ids.length === 0) return { ok: false };
+
+  switch (detail.inverse) {
+    case "unarchive":
+      await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isArchived: false } });
+      break;
+    case "archive":
+      await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isArchived: true } });
+      break;
+    case "restore":
+      await prisma.message.updateMany({
+        where: { id: { in: ids } },
+        data: { isArchived: false, folder: "INBOX" },
+      });
+      break;
+    case "mark-unread":
+      await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isRead: false } });
+      break;
+    case "mark-read":
+      await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isRead: true } });
+      break;
+    case "unsnooze":
+      await prisma.message.updateMany({ where: { id: { in: ids } }, data: { snoozedUntil: null } });
+      break;
+    case "toggle-flag": {
+      const flag = detail.flag === "isStarred" ? "isStarred" : "isRead";
+      const rows = await prisma.message.findMany({ where: { id: { in: ids } } });
+      for (const row of rows) {
+        await prisma.message.update({
+          where: { id: row.id },
+          data: { [flag]: !row[flag] },
+        });
+      }
+      break;
+    }
+    default:
+      return { ok: false };
+  }
+  await prisma.auditEntry.update({ where: { id: entryId }, data: { undoneAt: new Date() } });
+  await snapshotInboxZero();
+  revalidatePath("/");
+  revalidatePath("/audit");
+  return { ok: true };
 }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -42,6 +43,62 @@ export async function storeAttachmentContent(
   return storagePath;
 }
 
+const TEXTUAL_MIME = /^text\//;
+const TEXTUAL_EXT = /\.(txt|md|markdown|csv|tsv|json|xml|html|log|eml|ics|yaml|yml)$/i;
+const MAX_TEXT_BYTES = 512 * 1024;
+
+/**
+ * Best-effort plain-text extraction for searchable attachments. Textual
+ * MIME types decode directly; PDFs are left to the lazy pdf extractor so
+ * sync never blocks on a heavy parse.
+ */
+export function extractAttachmentText(att: RawAttachment): string | null {
+  if (!att.content || att.content.length > MAX_TEXT_BYTES) return null;
+  const mime = att.mimeType ?? "";
+  const name = att.filename.toLowerCase();
+  if (mime === "application/pdf" || name.endsWith(".pdf")) {
+    return extractPdfText(att.content);
+  }
+  if (TEXTUAL_MIME.test(mime) || TEXTUAL_EXT.test(name)) {
+    const text = att.content.toString("utf8");
+    // Reject binary garbage masquerading as text.
+    return /[\uFFFD]/.test(text) ? null : text.slice(0, 100_000);
+  }
+  return null;
+}
+
+/**
+ * Minimal PDF text extractor: finds text-show operators (Tj / TJ) inside
+ * content streams and decodes their string operands. Lossy - ligatures and
+ * font-encoded glyphs degrade - but good enough for keyword search and far
+ * lighter than a PDF library dependency.
+ */
+function extractPdfText(buf: Buffer): string | null {
+  try {
+    const src = buf.toString("latin1");
+    const chunks: string[] = [];
+    // Literal strings preceding Tj or inside TJ arrays: (text) Tj / [(t)-2(t)] TJ
+    const re = /\(((?:\\.|[^\\()])*)\)\s*(?:Tj|'|")/g;
+    const arrRe = /\[((?:\(((?:\\.|[^\\()])*)\)|[^\]])*)\]\s*TJ/g;
+    const unescape = (s: string) =>
+      s
+        .replace(/\\([nrtbf()\\])/g, (_, c: string) =>
+          ({ n: "\n", r: "\r", t: "\t", b: "", f: "", "(": "(", ")": ")", "\\": "\\" })[c] ?? "",
+        )
+        .replace(/\\([0-7]{1,3})/g, (_, o: string) => String.fromCharCode(parseInt(o, 8)));
+    for (const m of src.matchAll(re)) chunks.push(unescape(m[1]));
+    for (const m of src.matchAll(arrRe)) {
+      for (const inner of m[1].matchAll(/\(((?:\\.|[^\\()])*)\)/g)) {
+        chunks.push(unescape(inner[1]));
+      }
+    }
+    const text = chunks.join(" ").replace(/\s+/g, " ").trim();
+    return text.length > 20 ? text.slice(0, 100_000) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Persist attachments for a batch of freshly inserted messages: write any
  * fetched content to local disk and create Attachment rows. `idByProviderId`
@@ -68,6 +125,8 @@ export async function persistAttachments(
           sizeBytes: att.sizeBytes ?? att.content?.length,
           contentId: att.contentId,
           storagePath,
+          contentHash: att.content ? createHash("sha256").update(att.content).digest("hex") : null,
+          contentText: extractAttachmentText(att),
         },
       });
       stored++;

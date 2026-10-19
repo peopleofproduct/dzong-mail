@@ -231,11 +231,39 @@ export async function applyAutomationRules(
       if (!matchesRule(rule, message)) continue;
       result.matched++;
       if (options.dryRun) continue;
+      // Snapshot the mutable flags so the audit entry can reverse the
+      // rule's effect on request.
+      const prev = {
+        isArchived: message.isArchived,
+        isStarred: message.isStarred,
+        isRead: message.isRead,
+        folder: message.folder,
+        labels: message.labels,
+      };
       try {
         for (const action of actions) {
           await applyAction(db, account.emailAddress, rule, message, action);
         }
         result.applied++;
+        await db.aiDecision.create({
+          data: {
+            messageId: message.id,
+            kind: "rule",
+            action: rule.name,
+            reason: `Matched ${rule.matchMode === "ANY" ? "any" : "all"} of ${
+              parseConditions(rule.conditions).length
+            } condition(s)`,
+            status: "applied",
+          },
+        });
+        await db.auditEntry.create({
+          data: {
+            action: "rule-apply",
+            targetType: "message",
+            targetId: message.id,
+            detail: { rule: rule.name, actions: actions.map((a) => a.type), prev },
+          },
+        });
       } catch (err) {
         result.errors.push(`${message.id}: ${String(err)}`);
       }
