@@ -48,13 +48,20 @@ export function DisconnectButton({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [typed, setTyped] = useState("");
   const revoke = revokeStep(provider, emailAddress);
+  const confirmed = typed.trim().toLowerCase() === emailAddress.toLowerCase();
+
+  const openModal = () => {
+    setTyped("");
+    setOpen(true);
+  };
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40"
       >
         Disconnect
@@ -95,6 +102,20 @@ export function DisconnectButton({
                 )}
               </p>
             </div>
+            <label className="mt-4 block text-xs text-zinc-500 dark:text-zinc-400">
+              Type{" "}
+              <strong className="font-mono text-zinc-700 dark:text-zinc-200">{emailAddress}</strong>{" "}
+              to confirm:
+              <input
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                placeholder={emailAddress}
+                autoComplete="off"
+                spellCheck={false}
+                className="mt-1.5 w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-black placeholder-zinc-400 focus:border-red-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            </label>
+
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
@@ -106,9 +127,10 @@ export function DisconnectButton({
               </button>
               <button
                 type="button"
-                disabled={pending}
+                disabled={pending || !confirmed}
+                title={confirmed ? "Disconnect this account" : `Type ${emailAddress} to enable`}
                 onClick={() => startTransition(() => removeAccount(accountId))}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {pending ? "Disconnecting…" : "Disconnect"}
               </button>
