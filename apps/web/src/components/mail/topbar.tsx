@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BarChart3, Keyboard, Menu, PenSquare, RefreshCw, Search } from "lucide-react";
-import { syncAllNow } from "@/lib/actions";
+import { BarChart3, Keyboard, Menu, PenSquare, Search } from "lucide-react";
+import { SyncStatus } from "./sync-status";
 import { ThemeToggle } from "./theme-toggle";
 import { buildParams } from "./params";
 
@@ -77,13 +77,7 @@ export function Topbar() {
           ✦ AI
         </button>
       </form>
-      <button
-        onClick={() => void syncAllNow()}
-        title="Sync all accounts"
-        className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-      >
-        <RefreshCw size={15} />
-      </button>
+      <SyncStatus />
       <button
         onClick={() => router.push("/analytics")}
         title="Analytics"

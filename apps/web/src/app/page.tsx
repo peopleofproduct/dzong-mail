@@ -17,7 +17,6 @@ import {
 } from "@/lib/queries";
 import { AiSetupBanner } from "@/components/ai-setup-banner";
 import { AskPanel } from "@/components/mail/ask-panel";
-import { AutoSync } from "@/components/mail/auto-sync";
 import { DigestList } from "@/components/mail/digest-list";
 import { DigestPanel } from "@/components/mail/digest-panel";
 import { IconRail } from "@/components/mail/icon-rail";
@@ -334,9 +333,6 @@ export default function Home(props: PageProps<"/">) {
       </Suspense>
       <Suspense fallback={null}>
         <KeyboardShortcuts />
-      </Suspense>
-      <Suspense fallback={null}>
-        <AutoSync />
       </Suspense>
     </div>
   );
