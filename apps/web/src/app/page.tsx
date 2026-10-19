@@ -8,6 +8,7 @@ import {
   getMessagesForFolder,
   getMessagesForLabel,
   getMessagesForView,
+  getReplyQueue,
   getSidebarData,
   parseView,
   searchMessagesSemantic,
@@ -18,6 +19,8 @@ import { AskPanel } from "@/components/mail/ask-panel";
 import { AutoSync } from "@/components/mail/auto-sync";
 import { DigestList } from "@/components/mail/digest-list";
 import { DigestPanel } from "@/components/mail/digest-panel";
+import { IconRail } from "@/components/mail/icon-rail";
+import { ReplyQueuePanel } from "@/components/mail/reply-queue-panel";
 import { serializeMessage } from "@/components/mail/types";
 import type { MailItem } from "@/components/mail/types";
 import { CommandPalette } from "@/components/mail/command-palette";
@@ -67,8 +70,8 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     items = (await getMessagesForLabel(label)).map(serializeMessage);
   } else if (folder) {
     items = (await getMessagesForFolder(folder)).map(serializeMessage);
-  } else if (view === "needs-reply" || view === "awaiting") {
-    const threads = await getFollowUpThreads(view);
+  } else if (view === "needs-reply" || view === "awaiting" || view === "reply-queue") {
+    const threads = await getFollowUpThreads(view === "awaiting" ? "awaiting" : "needs-reply");
     items = threads.map((t) => serializeMessage(t.latest));
   } else if (semantic && q) {
     const result = await searchMessagesSemantic(q);
@@ -139,6 +142,14 @@ async function PaneSection({ searchParams }: { searchParams: SearchParams }) {
   if (str(params, "view") === "digest") {
     return <DigestPanel generated={str(params, "digestgen") === "1"} />;
   }
+  if (str(params, "view") === "reply-queue") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {mobileBack}
+        <ReplyQueuePanel />
+      </div>
+    );
+  }
   const thread = str(params, "thread");
   if (!thread) {
     return (
@@ -189,26 +200,21 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
   if ((await getAccounts()).length === 0) redirect("/welcome");
 
   const paneOpen = Boolean(str(params, "thread") ?? str(params, "ask"));
+  const pendingReplies = (await getReplyQueue()).length;
 
   return (
     <div className="relative flex flex-1 overflow-hidden">
-      {/* CSS-only mobile nav drawer — the checkbox state drives the
-          sidebar slide-in on small screens without any client JS. */}
-      <input id="nav-toggle" type="checkbox" className="peer hidden" />
-      <div className="fixed inset-y-0 left-0 z-40 h-full -translate-x-full bg-white transition-transform duration-200 peer-checked:translate-x-0 md:static md:z-auto md:h-auto md:translate-x-0 md:transition-none dark:bg-zinc-950">
+      {/* Icon rail + collapsible folder sidebar (desktop collapse +
+          mobile drawer handled inside IconRail). */}
+      <IconRail pending={pendingReplies}>
         <Suspense
           fallback={
-            <aside className="w-56 shrink-0 animate-pulse border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950" />
+            <aside className="h-full w-56 shrink-0 animate-pulse border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950" />
           }
         >
           <SidebarSection searchParams={searchParams} />
         </Suspense>
-      </div>
-      <label
-        htmlFor="nav-toggle"
-        aria-hidden
-        className="fixed inset-0 z-30 hidden bg-black/40 peer-checked:block md:hidden"
-      />
+      </IconRail>
       <section
         className={`${paneOpen ? "hidden md:flex" : "flex"} min-h-0 w-full flex-col overflow-hidden border-r border-zinc-200 sm:w-[380px] sm:shrink-0 dark:border-zinc-800`}
       >

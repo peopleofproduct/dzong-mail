@@ -9,6 +9,7 @@ import {
   ReplyAll,
   Send,
   Settings,
+  Sparkles,
   Star,
   Timer,
   FileEdit,
@@ -27,6 +28,7 @@ const VIEW_ICONS: Record<MailView, typeof Inbox> = {
   newsletters: Newspaper,
   "needs-reply": ReplyAll,
   awaiting: Timer,
+  "reply-queue": Sparkles,
   digest: LayoutList,
 };
 

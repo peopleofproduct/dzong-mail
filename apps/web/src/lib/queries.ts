@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { semanticSearchMessages } from "@unwalled/sync-engine";
 import { serializeMessage } from "@/components/mail/types";
@@ -13,6 +14,7 @@ export type MailView =
   | "newsletters"
   | "needs-reply"
   | "awaiting"
+  | "reply-queue"
   | "digest";
 
 export const VIEW_LABELS: Record<MailView, string> = {
@@ -25,6 +27,7 @@ export const VIEW_LABELS: Record<MailView, string> = {
   newsletters: "Newsletters",
   "needs-reply": "Needs reply",
   awaiting: "Awaiting reply",
+  "reply-queue": "Reply queue",
   digest: "Digest",
 };
 
@@ -237,6 +240,28 @@ export async function getFollowUpThreads(kind: "awaiting" | "needs-reply") {
   return out;
 }
 
+export interface ReplyQueueItem {
+  thread: ThreadSummary;
+  /** Pending draft already written for this thread (AI or manual), if any. */
+  draft: Message | null;
+}
+
+/** Threads waiting on the owner's reply, newest first, each paired with its
+ *  pending draft — the review surface behind the rail's AI icon. Cached per
+ *  render so the rail badge, list pane, and queue panel share one scan. */
+export const getReplyQueue = cache(async (): Promise<ReplyQueueItem[]> => {
+  const threads = await getFollowUpThreads("needs-reply");
+  const top = threads.slice(0, 25);
+  const drafts = await prisma.message.findMany({
+    where: { threadId: { in: top.map((t) => t.threadId) }, isDraft: true },
+    orderBy: { receivedAt: "desc" },
+  });
+  return top.map((thread) => ({
+    thread,
+    draft: drafts.find((d) => d.threadId === thread.threadId) ?? null,
+  }));
+});
+
 export interface SidebarData {
   counts: Record<MailView, number>;
   folders: string[];
@@ -247,8 +272,10 @@ export async function getSidebarData(): Promise<SidebarData> {
   const [counts, folders, labelRows] = await Promise.all([
     Promise.all(
       (Object.keys(VIEW_LABELS) as MailView[]).map(async (view) => {
-        if (view === "needs-reply" || view === "awaiting") {
-          const threads = await getFollowUpThreads(view);
+        if (view === "needs-reply" || view === "awaiting" || view === "reply-queue") {
+          const threads = await getFollowUpThreads(
+            view === "awaiting" ? "awaiting" : "needs-reply",
+          );
           return threads.length;
         }
         return prisma.message.count({ where: viewWhere(view) });

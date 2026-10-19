@@ -196,6 +196,16 @@ export async function archiveMessages(ids: string[]) {
   revalidatePath("/");
 }
 
+/** Dismiss a whole thread from the reply queue — archives every synced
+ *  message in it (drafts survive so nothing written is lost). */
+export async function archiveThreadNow(threadId: string) {
+  await prisma.message.updateMany({
+    where: { threadId, isDraft: false },
+    data: { isArchived: true },
+  });
+  revalidatePath("/");
+}
+
 export async function unarchiveMessage(id: string) {
   await prisma.message.update({ where: { id }, data: { isArchived: false } });
   revalidatePath("/");
