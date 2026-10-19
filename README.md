@@ -195,7 +195,9 @@ Everything runs via `npm run dev` (Turborepo). Checks:
 
 Working today: everything above, plus the `npm run worker` background
 loop (scheduled sends, snooze returns, periodic sync + AI classify +
-embedding) and a local HTTP API for scripts and agents.
+embedding), **IMAP IDLE watchers for near-instant new-mail delivery**
+for IMAP accounts while the worker runs, and a local HTTP API for
+scripts and agents.
 Coming next (roughly in order): real-mailbox hardening on more providers,
 and a mobile story via an optional encrypted relay (the one thing
 local-first can't do alone — it'll be self-hostable too).

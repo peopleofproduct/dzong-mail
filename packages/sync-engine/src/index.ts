@@ -11,6 +11,8 @@ export { syncAccount, syncAllAccounts } from "./engine";
 export { sendEmail, dispatchScheduledDraft } from "./send";
 export type { SendInput, SendResult } from "./send";
 export { dispatchDueDrafts, returnDueSnoozes, runSyncCycle } from "./worker";
+export { startIdleWatchers } from "./idle";
+export { runPostSync } from "./post-sync";
 export {
   askInbox,
   embedAccountMessages,

@@ -2,10 +2,9 @@ import { basename } from "node:path";
 import { prisma } from "@unwalled/database";
 import type { PrismaClient } from "@unwalled/database";
 import { syncAllAccounts } from "./engine";
-import { classifyAccountMessages } from "./classify";
-import { applyAutomationRules } from "./rules";
+import { startIdleWatchers } from "./idle";
+import { runPostSync } from "./post-sync";
 import { dispatchScheduledDraft } from "./send";
-import { embedAccountMessages } from "./semantic";
 
 const TICK_MS = Number(process.env.WORKER_TICK_MS ?? 30_000);
 const SYNC_INTERVAL_MS = Number(process.env.WORKER_SYNC_INTERVAL_MS ?? 5 * 60_000);
@@ -57,31 +56,33 @@ export async function runSyncCycle(db: PrismaClient = prisma): Promise<void> {
     console.log(
       `[worker] synced ${outcome.accountId}: ${outcome.inserted} new, ${outcome.updated} updated`,
     );
-    const classification = await classifyAccountMessages(outcome.accountId, db);
-    if (classification.labeledIds.length > 0) {
-      console.log(`[worker] classified ${classification.classified} message(s)`);
-      await applyAutomationRules(outcome.accountId, db, {
-        messageIds: classification.labeledIds,
-        trigger: "ON_AI_CLASSIFICATION",
-      });
-    }
-    const embedding = await embedAccountMessages(outcome.accountId, db);
-    if (embedding.embedded > 0) {
-      console.log(`[worker] embedded ${embedding.embedded} message(s) for semantic search`);
-    } else if (embedding.reason) {
-      console.log(`[worker] embedding skipped: ${embedding.reason}`);
-    }
+    await runPostSync(outcome.accountId, outcome.inserted, db);
   }
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main(): Promise<void> {
+  // The web app gets UNWALLED_SECRET_KEY from Next's .env.local loader; the
+  // worker must load the same file or it can't decrypt stored credentials.
+  for (const p of ["apps/web/.env.local", "../../apps/web/.env.local"]) {
+    try {
+      process.loadEnvFile(p);
+      break;
+    } catch {
+      /* not found here — try the next path */
+    }
+  }
+
   console.log(
     `[worker] started — tick every ${TICK_MS / 1000}s, sync every ${SYNC_INTERVAL_MS / 60_000}m`,
   );
+  try {
+    await startIdleWatchers();
+  } catch (err) {
+    console.error("[worker] IDLE watchers failed to start:", err);
+  }
   let lastSync = 0;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       await dispatchDueDrafts();
