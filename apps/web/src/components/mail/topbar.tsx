@@ -8,6 +8,21 @@ import { SyncStatus } from "./sync-status";
 import { ThemeToggle } from "./theme-toggle";
 import { buildParams } from "./params";
 
+/** Natural-language queries go to the local assistant; short keyword-ish
+ *  input stays on the fast search path. */
+function isAssistantQuery(q: string): boolean {
+  const t = q.trim();
+  if (t.length === 0) return false;
+  if (t.endsWith("?")) return true;
+  if (
+    /^(who|what|when|where|why|how|which|whose|whom|is|are|was|were|do|does|did|can|could|should|shall|will|would|show|find|tell|list|summari[sz]e|any|give|get|help)\b/i.test(
+      t,
+    )
+  )
+    return true;
+  return t.split(/\s+/).length >= 6;
+}
+
 export function Topbar() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,7 +66,18 @@ export function Topbar() {
         onSubmit={(e) => {
           e.preventDefault();
           const q = new FormData(e.currentTarget).get("q")?.toString().trim();
-          router.push(buildParams(searchParams, { q: q || undefined }));
+          if (!q) {
+            router.push(buildParams(searchParams, { q: undefined }));
+            return;
+          }
+          // Ask-first: conversational input opens the assistant pane with
+          // grounded answers + actions; keywords hit the fast index.
+          router.push(
+            buildParams(
+              searchParams,
+              isAssistantQuery(q) ? { ask: q, q: undefined } : { q, ask: undefined },
+            ),
+          );
         }}
       >
         <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-zinc-400" />
@@ -60,7 +86,7 @@ export function Topbar() {
           name="q"
           type="search"
           defaultValue={searchParams.get("q") ?? ""}
-          placeholder="Search mail…  ( / )"
+          placeholder="Search or ask anything…  ( / )"
           className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-1.5 pr-14 pl-9 text-sm outline-none placeholder:text-zinc-400 focus:border-indigo-300 dark:border-zinc-800 dark:bg-zinc-900"
         />
         <button

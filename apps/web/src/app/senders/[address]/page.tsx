@@ -2,8 +2,17 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { prisma } from "@/lib/db";
+import { getRecipientStyle } from "@unwalled/sync-engine";
 import { SenderAvatar } from "@/components/mail/sender-avatar";
 import { Paperclip } from "lucide-react";
+
+const CATEGORY_LABEL: Record<string, string> = {
+  "inner-circle": "Inner circle",
+  professional: "Professional",
+  transactional: "Transactional",
+  broadcast: "Broadcast",
+  dormant: "Dormant",
+};
 
 function fmtDuration(mins: number): string {
   if (mins < 60) return `${Math.round(mins)} min`;
@@ -128,6 +137,23 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
   ].slice(0, 6);
   const first = fromThem[fromThem.length - 1]?.receivedAt;
   const upcoming = events.filter((e) => e.startsAt > new Date());
+
+  // Voice/tone profile from whichever account corresponds with them most.
+  const accountsWithMail = await prisma.message.groupBy({
+    by: ["emailAccountId"],
+    where: {
+      OR: [
+        { fromAddress: { equals: addr, mode: "insensitive" } },
+        { toAddresses: { hasSome: [addr, raw] } },
+      ],
+      isDraft: false,
+    },
+    _count: true,
+  });
+  const bestAccount = accountsWithMail.sort((a, b) => b._count - a._count)[0];
+  const style = bestAccount
+    ? await getRecipientStyle(addr, bestAccount.emailAccountId, prisma)
+    : null;
   const card = "rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900";
   const stat = "text-2xl font-semibold text-zinc-900 dark:text-zinc-50";
   const lbl = "text-xs text-zinc-400";
@@ -147,6 +173,11 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
               ? `Corresponding since ${first.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`
               : "No mail synced from this address"}
           </p>
+          {style && (
+            <span className="mt-1 inline-block w-fit rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+              {CATEGORY_LABEL[style.category] ?? style.category}
+            </span>
+          )}
           {topLabels.length > 0 && (
             <p className="mt-1 text-xs text-indigo-500 dark:text-indigo-400">
               Mostly: {topLabels.join(", ").toLowerCase().replaceAll("_", " ")}
@@ -211,6 +242,38 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
           )}
         </div>
       </div>
+
+      {style && style.exchanged > 0 && (
+        <div className={card}>
+          <h2 className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+            How you two write
+          </h2>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-4">
+            <dt className="text-zinc-400">Your greeting</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300">{style.myGreeting ?? "-"}</dd>
+            <dt className="text-zinc-400">Your sign-off</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300">{style.mySignoff ?? "-"}</dd>
+            <dt className="text-zinc-400">Your reply length</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300">
+              {style.myMedianWords !== null ? `~${style.myMedianWords} words` : "-"}
+            </dd>
+            <dt className="text-zinc-400">Your tone</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300">{style.myFormality ?? "-"}</dd>
+            <dt className="text-zinc-400">Their greeting</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300">{style.theirGreeting ?? "-"}</dd>
+            <dt className="text-zinc-400">Their reply length</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300">
+              {style.theirMedianWords !== null ? `~${style.theirMedianWords} words` : "-"}
+            </dd>
+            <dt className="text-zinc-400">Their tone</dt>
+            <dd className="text-zinc-700 dark:text-zinc-300">{style.theirFormality ?? "-"}</dd>
+          </dl>
+          <p className="mt-2 text-[11px] text-zinc-400">
+            Learned locally from {style.exchanged} exchanged messages - AI replies to them mirror
+            this voice{style.confident ? "" : " (more history sharpens it)"}.
+          </p>
+        </div>
+      )}
 
       {attachments.length > 0 && (
         <div className={card}>

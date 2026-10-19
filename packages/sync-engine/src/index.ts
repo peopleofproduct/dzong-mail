@@ -64,6 +64,8 @@ export { ImapSyncProvider } from "./providers/imap";
 export { GmailSyncProvider } from "./providers/gmail";
 export { GraphSyncProvider } from "./providers/graph";
 export { attachmentFilePath, attachmentsDir, dataDir, storeAttachmentContent } from "./attachments";
+export { getRecipientStyle, stylePromptFragment } from "./style";
+export type { RecipientStyle, SenderCategory } from "./style";
 export {
   checkFollowUpReminders,
   emit,

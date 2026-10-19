@@ -3,6 +3,7 @@ import type { EmailAccount, Message, PrismaClient } from "@unwalled/database";
 import type { AIProvider } from "@unwalled/ai-engine";
 import { resolveAIForAccount, resolveAIForUser } from "./ai";
 import type { RuleAction, RuleCondition } from "./rules";
+import { getRecipientStyle, stylePromptFragment } from "./style";
 
 function threadContext(messages: Message[], maxMessages = 8, maxChars = 4000): string {
   const recent = messages.slice(-maxMessages);
@@ -165,6 +166,9 @@ async function replyContext(
     : [message];
 
   const name = await senderName(message.emailAccount, db);
+  // Voice matching: teach the model how the user actually writes to this
+  // recipient (greeting, length, sign-off) from their shared history.
+  const style = await getRecipientStyle(message.fromAddress, message.emailAccountId, db);
   return {
     message,
     ai,
@@ -174,7 +178,8 @@ async function replyContext(
       `${name} <${message.emailAccount.emailAddress}>. Write only the reply body — ` +
       "no subject line, no preamble like 'Here is a reply'. " +
       `If you sign off, sign off as ${name} — never use placeholders ` +
-      "like '[Your Name]'. Match the sender's language and length.",
+      "like '[Your Name]'. Match the sender's language and length." +
+      stylePromptFragment(style),
     userPrompt: `Conversation so far:\n${threadContext(thread)}\n\nDraft a reply to the latest message.`,
   };
 }
@@ -355,6 +360,8 @@ export async function composeWithAI(
       ? await db.emailAccount.findUnique({ where: { id: input.accountId } })
       : null) ?? (await db.emailAccount.findFirst({ where: { userId } }));
   const name = account ? await senderName(account, db) : null;
+  const style =
+    account && input.to ? await getRecipientStyle(input.to, account.id, db) : null;
 
   const response = await ai.provider.complete({
     messages: [
@@ -363,7 +370,8 @@ export async function composeWithAI(
         content:
           "You are an email writing assistant. Output only the email body — " +
           "no subject, no commentary. Keep it natural and concise." +
-          (name ? ` If you sign off, sign off as ${name} — never use placeholders.` : ""),
+          (name ? ` If you sign off, sign off as ${name} — never use placeholders.` : "") +
+          stylePromptFragment(style),
       },
       {
         role: "user",
@@ -396,11 +404,16 @@ export async function composeVariantsWithAI(
       ? await db.emailAccount.findUnique({ where: { id: input.accountId } })
       : null) ?? (await db.emailAccount.findFirst({ where: { userId } }));
   const name = account ? await senderName(account, db) : null;
+  const style =
+    account && input.to
+      ? await getRecipientStyle(input.to, account.id, db)
+      : null;
 
   const systemBase =
     "You are an email writing assistant. Output only the email body — " +
     "no subject, no commentary. Keep it natural and concise." +
-    (name ? ` If you sign off, sign off as ${name} — never use placeholders.` : "");
+    (name ? ` If you sign off, sign off as ${name} — never use placeholders.` : "") +
+    stylePromptFragment(style);
   const userPrompt =
     `To: ${input.to ?? "unspecified"}\nSubject: ${input.subject ?? "unspecified"}\n` +
     `Instructions: ${input.instructions?.trim() || "Write an appropriate email for this subject."}`;
