@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { Mail } from "lucide-react";
-import { connectMockAccount } from "@/lib/actions";
+import { redirect } from "next/navigation";
 import {
   getAccounts,
   getDigestSenders,
@@ -14,6 +13,7 @@ import {
   searchMessagesSemantic,
   splitInboxGroups,
 } from "@/lib/queries";
+import { AiSetupBanner } from "@/components/ai-setup-banner";
 import { AskPanel } from "@/components/mail/ask-panel";
 import { AutoSync } from "@/components/mail/auto-sync";
 import { DigestList } from "@/components/mail/digest-list";
@@ -55,42 +55,6 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   const label = str(params, "label");
   const folder = str(params, "folder");
   const q = str(params, "q");
-
-  // First-run experience: no accounts at all → onboarding card, not an
-  // empty list that looks like a bug.
-  const accounts = await getAccounts();
-  if (accounts.length === 0 && !q && !label && !folder) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-        <Mail size={32} className="text-indigo-400" />
-        <div>
-          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-            Welcome to Unwalled Mail
-          </p>
-          <p className="mt-1 max-w-xs text-xs leading-relaxed text-zinc-400">
-            Connect a Gmail, Outlook, or any IMAP account — or explore with the demo inbox.
-            Everything stays on this machine.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <a
-            href="/settings"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-          >
-            Connect an account
-          </a>
-          <form action={connectMockAccount}>
-            <button
-              type="submit"
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            >
-              Load demo inbox
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   if (view === "digest") {
     return <DigestList senders={await getDigestSenders()} />;
@@ -141,9 +105,36 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
 async function PaneSection({ searchParams }: { searchParams: SearchParams }) {
   await connection();
   const params = await searchParams;
+  const baseParams = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => typeof v === "string")) as Record<
+      string,
+      string
+    >,
+  );
+
+  // Mobile-only "back to list" affordance: the thread renders as a full-screen
+  // overlay on small screens, so it needs its own way out.
+  const backParams = new URLSearchParams(baseParams);
+  backParams.delete("thread");
+  backParams.delete("ask");
+  backParams.delete("selected");
+  const mobileBack = (
+    <a
+      href={`/?${backParams.toString()}`}
+      className="flex items-center gap-1 border-b border-zinc-200 px-4 py-2.5 text-sm font-medium text-indigo-600 md:hidden dark:border-zinc-800 dark:text-indigo-400"
+    >
+      ‹ Back to list
+    </a>
+  );
+
   const askParam = params["ask"];
   if (typeof askParam === "string") {
-    return <AskPanel question={askParam || undefined} />;
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {mobileBack}
+        <AskPanel question={askParam || undefined} />
+      </div>
+    );
   }
   if (str(params, "view") === "digest") {
     return <DigestPanel generated={str(params, "digestgen") === "1"} />;
@@ -152,7 +143,7 @@ async function PaneSection({ searchParams }: { searchParams: SearchParams }) {
   if (!thread) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-zinc-300 dark:text-zinc-700">
-        <p className="text-sm text-zinc-400">
+        <p className="hidden text-sm text-zinc-400 md:block">
           Select a message — or press{" "}
           <kbd className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono dark:bg-zinc-800">j</kbd>/
           <kbd className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono dark:bg-zinc-800">k</kbd> to
@@ -164,14 +155,10 @@ async function PaneSection({ searchParams }: { searchParams: SearchParams }) {
     );
   }
   return (
-    <ThreadPanel
-      threadId={thread}
-      baseParams={new URLSearchParams(
-        Object.fromEntries(
-          Object.entries(params).filter(([, v]) => typeof v === "string"),
-        ) as Record<string, string>,
-      ).toString()}
-    />
+    <div className="flex min-h-0 flex-1 flex-col">
+      {mobileBack}
+      <ThreadPanel threadId={thread} baseParams={baseParams.toString()} />
+    </div>
   );
 }
 
@@ -191,6 +178,77 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
   );
 }
 
+/** Everything dynamic about the main shell — the first-run redirect and the
+ *  mobile pane visibility — lives inside one Suspense boundary so the outer
+ *  page stays prerenderable. */
+async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
+  await connection();
+  const params = await searchParams;
+
+  // First run: show the welcome/brand screen before the app shell.
+  if ((await getAccounts()).length === 0) redirect("/welcome");
+
+  const paneOpen = Boolean(str(params, "thread") ?? str(params, "ask"));
+
+  return (
+    <div className="relative flex flex-1 overflow-hidden">
+      {/* CSS-only mobile nav drawer — the checkbox state drives the
+          sidebar slide-in on small screens without any client JS. */}
+      <input id="nav-toggle" type="checkbox" className="peer hidden" />
+      <div className="fixed inset-y-0 left-0 z-40 -translate-x-full bg-white transition-transform duration-200 peer-checked:translate-x-0 md:static md:z-auto md:translate-x-0 md:transition-none dark:bg-zinc-950">
+        <Suspense
+          fallback={
+            <aside className="w-56 shrink-0 animate-pulse border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950" />
+          }
+        >
+          <SidebarSection searchParams={searchParams} />
+        </Suspense>
+      </div>
+      <label
+        htmlFor="nav-toggle"
+        aria-hidden
+        className="fixed inset-0 z-30 hidden bg-black/40 peer-checked:block md:hidden"
+      />
+      <section
+        className={`${paneOpen ? "hidden md:flex" : "flex"} w-full flex-col border-r border-zinc-200 sm:w-[380px] sm:shrink-0 dark:border-zinc-800`}
+      >
+        <Suspense
+          fallback={
+            <div className="flex-1 space-y-2 p-3">
+              {[...Array(8)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-16 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-900"
+                />
+              ))}
+            </div>
+          }
+        >
+          <ListSection searchParams={searchParams} />
+        </Suspense>
+      </section>
+      <section
+        className={`${paneOpen ? "flex" : "hidden md:flex"} fixed inset-0 z-30 min-w-0 flex-1 flex-col bg-white md:static md:z-auto md:bg-zinc-50/40 dark:bg-zinc-950 md:dark:bg-black/20`}
+      >
+        <Suspense
+          fallback={
+            <div className="flex-1 space-y-3 p-5">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-32 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-900"
+                />
+              ))}
+            </div>
+          }
+        >
+          <PaneSection searchParams={searchParams} />
+        </Suspense>
+      </section>
+    </div>
+  );
+}
+
 export default function Home(props: PageProps<"/">) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950">
@@ -202,47 +260,12 @@ export default function Home(props: PageProps<"/">) {
       <Suspense fallback={null}>
         <NoticeBanner searchParams={props.searchParams} />
       </Suspense>
-      <div className="flex flex-1 overflow-hidden">
-        <Suspense
-          fallback={
-            <aside className="w-56 shrink-0 animate-pulse border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950" />
-          }
-        >
-          <SidebarSection searchParams={props.searchParams} />
-        </Suspense>
-        <section className="flex w-[380px] shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800">
-          <Suspense
-            fallback={
-              <div className="flex-1 space-y-2 p-3">
-                {[...Array(8)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-16 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-900"
-                  />
-                ))}
-              </div>
-            }
-          >
-            <ListSection searchParams={props.searchParams} />
-          </Suspense>
-        </section>
-        <section className="flex min-w-0 flex-1 flex-col bg-zinc-50/40 dark:bg-black/20">
-          <Suspense
-            fallback={
-              <div className="flex-1 space-y-3 p-5">
-                {[...Array(3)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-32 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-900"
-                  />
-                ))}
-              </div>
-            }
-          >
-            <PaneSection searchParams={props.searchParams} />
-          </Suspense>
-        </section>
-      </div>
+      <Suspense fallback={null}>
+        <AiSetupBanner />
+      </Suspense>
+      <Suspense fallback={<div className="flex-1 animate-pulse bg-zinc-50 dark:bg-zinc-900/40" />}>
+        <MailPanes searchParams={props.searchParams} />
+      </Suspense>
 
       <Suspense fallback={null}>
         <ComposerSection searchParams={props.searchParams} />

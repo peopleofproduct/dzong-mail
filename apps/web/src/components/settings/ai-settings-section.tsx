@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { getLocalUser } from "@/lib/queries";
+import { resolveAIForUser } from "@unwalled/sync-engine";
 import { classifyNow, saveAISettings } from "@/lib/actions";
 
 const inputClass =
@@ -9,12 +10,22 @@ export async function AISettingsSection() {
   await connection();
   const user = await getLocalUser();
   const settings = user?.aiSettings;
+  const aiReady = user ? Boolean(await resolveAIForUser(user.id)) : false;
 
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+        <h2 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
           AI engine
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-medium normal-case ${
+              aiReady
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+            }`}
+          >
+            {aiReady ? "connected" : "not reachable"}
+          </span>
         </h2>
         <form action={classifyNow.bind(null, undefined)}>
           <button className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
@@ -22,6 +33,47 @@ export async function AISettingsSection() {
           </button>
         </form>
       </div>
+
+      <details className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+        <summary className="cursor-pointer text-sm font-medium text-indigo-900 dark:text-indigo-200">
+          New to local AI? Two-step setup with Ollama (free &amp; private)
+        </summary>
+        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-zinc-600 dark:text-zinc-300">
+          <li>
+            Install Ollama from{" "}
+            <a
+              href="https://ollama.com/download"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-600 underline dark:text-indigo-400"
+            >
+              ollama.com/download
+            </a>{" "}
+            (or{" "}
+            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">brew install ollama</code>)
+            and start it.
+          </li>
+          <li>
+            Pull a model:{" "}
+            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
+              ollama pull llama3.2:3b
+            </code>{" "}
+            and{" "}
+            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
+              ollama pull nomic-embed-text
+            </code>
+          </li>
+          <li>
+            Keep the defaults below — Ollama runs at{" "}
+            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">localhost:11434</code> —
+            then Save. Nothing ever leaves your machine.
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+          Rather use a cloud model? Pick OpenAI or Anthropic in the form and paste your own API key
+          — your mail goes only to the provider you choose.
+        </p>
+      </details>
 
       <form
         action={saveAISettings}

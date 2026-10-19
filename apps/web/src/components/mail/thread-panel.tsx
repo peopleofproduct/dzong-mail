@@ -1,8 +1,10 @@
 import { Paperclip } from "lucide-react";
 import { getThread } from "@/lib/queries";
 import { prisma } from "@/lib/db";
+import { cleanEmailHtml } from "@/lib/email-html";
 import { draftAiReplyNow, markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/actions";
 import { MarkReadOnMount } from "./mark-read-on-mount";
+import { MessageBody } from "./message-body";
 
 interface ThreadPanelProps {
   threadId: string;
@@ -136,13 +138,11 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
               <span className="ml-auto text-xs text-zinc-400">{m.receivedAt.toLocaleString()}</span>
             </header>
             <p className="mb-3 text-xs text-zinc-400">to {m.toAddresses.join(", ") || "me"}</p>
-            {m.bodyText ? (
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">
-                {m.bodyText}
-              </p>
-            ) : (
-              <p className="text-sm text-zinc-500 italic">{m.snippet ?? "No content synced."}</p>
-            )}
+            <MessageBody
+              html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml) : null}
+              text={m.bodyText}
+              fallback={m.snippet ?? "No content synced."}
+            />
             {m.attachments.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {m.attachments.map((a) => (

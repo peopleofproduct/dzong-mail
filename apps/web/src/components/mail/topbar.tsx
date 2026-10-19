@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BarChart3, Keyboard, PenSquare, RefreshCw, Search } from "lucide-react";
+import { BarChart3, Keyboard, Menu, PenSquare, RefreshCw, Search } from "lucide-react";
 import { syncAllNow } from "@/lib/actions";
+import { ThemeToggle } from "./theme-toggle";
 import { buildParams } from "./params";
 
 export function Topbar() {
@@ -11,6 +12,12 @@ export function Topbar() {
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const semanticOn = searchParams.get("sm") === "1";
+
+  // Close the mobile nav drawer after any navigation.
+  useEffect(() => {
+    const toggle = document.getElementById("nav-toggle") as HTMLInputElement | null;
+    if (toggle) toggle.checked = false;
+  }, [searchParams]);
 
   useEffect(() => {
     const onWindowKey = (e: KeyboardEvent) => {
@@ -30,7 +37,14 @@ export function Topbar() {
   }, [router, searchParams]);
 
   return (
-    <header className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
+    <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-zinc-200 bg-white/95 px-3 py-2.5 backdrop-blur sm:gap-3 sm:px-4 dark:border-zinc-800 dark:bg-zinc-950/95">
+      <label
+        htmlFor="nav-toggle"
+        title="Menu"
+        className="cursor-pointer rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 md:hidden dark:text-zinc-400 dark:hover:bg-zinc-800"
+      >
+        <Menu size={17} />
+      </label>
       <form
         className="relative flex-1"
         onSubmit={(e) => {
@@ -80,16 +94,17 @@ export function Topbar() {
       <button
         onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }))}
         title="Keyboard shortcuts ( ? )"
-        className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        className="hidden rounded-md p-2 text-zinc-500 hover:bg-zinc-100 sm:block dark:hover:bg-zinc-800"
       >
         <Keyboard size={15} />
       </button>
+      <ThemeToggle />
       <button
         onClick={() => router.push(buildParams(searchParams, { compose: "new" }))}
         className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
       >
         <PenSquare size={14} />
-        Compose
+        <span className="hidden sm:inline">Compose</span>
       </button>
     </header>
   );

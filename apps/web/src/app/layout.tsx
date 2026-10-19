@@ -17,9 +17,23 @@ export const metadata: Metadata = {
   description: "Open-source, local-first AI email client. Your data stays on your machine.",
 };
 
+const themeInit = `
+(function () {
+  try {
+    var pref = localStorage.getItem("unwalled-theme") || "system";
+    var dark = pref === "dark" || (pref === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", dark);
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
