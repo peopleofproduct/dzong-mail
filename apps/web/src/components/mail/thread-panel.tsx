@@ -7,6 +7,7 @@ import { markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/action
 import { AiDraftButton } from "./ai-draft-button";
 import { MarkReadOnMount } from "./mark-read-on-mount";
 import { MessageBody } from "./message-body";
+import { MessageDetails } from "./message-details";
 import { SenderAvatar } from "./sender-avatar";
 import { CollapsibleMessage } from "./collapsible-message";
 
@@ -30,6 +31,24 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Extract the transport facts Gmail shows in its "details" popover. */
+function transportDetails(headers: Record<string, string> | null) {
+  const h = headers ?? {};
+  const domainOf = (v: string) => v.match(/@([A-Za-z0-9.-]+)/)?.[1];
+  // Return-Path carries the bounce host (mailed-by); DKIM-Signature's d=
+  // or Authentication-Results' header.d carries the signing domain.
+  const mailedBy = h["Return-Path"] ? (domainOf(h["Return-Path"]) ?? null) : null;
+  const signedBy =
+    h["DKIM-Signature"]?.match(/\bd=([A-Za-z0-9.-]+)/i)?.[1] ??
+    h["Authentication-Results"]?.match(/header\.d=([A-Za-z0-9.-]+)/i)?.[1] ??
+    null;
+  // The last Received hop notes TLS (e.g. "with ESMTPS ... version=TLS1_3").
+  const security = /\bTLS[ _]?v?\d*\.?\d*/i.test(h["Received"] ?? "")
+    ? "Standard encryption (TLS)"
+    : null;
+  return { mailedBy, signedBy, security };
 }
 
 /** Build compose params to reopen a draft for editing and sending. */
@@ -185,9 +204,25 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
             }
             body={
               <div className="px-5 pb-4">
-                <p className="mb-3 text-xs text-zinc-400">
-                  to {m.toAddresses.join(", ") || "me"}
-                </p>
+                {(() => {
+                  const me = m.emailAccount.emailAddress.toLowerCase();
+                  const recipients = m.toAddresses.map((a) =>
+                    a.toLowerCase() === me ? "me" : a,
+                  );
+                  const t = transportDetails(m.headers as Record<string, string> | null);
+                  return (
+                    <MessageDetails
+                      to={recipients.join(", ") || "me"}
+                      details={{
+                        from: `${m.fromName ? `${m.fromName} ` : ""}<${m.fromAddress}>`,
+                        to: m.toAddresses.join(", ") || me,
+                        date: m.receivedAt.toLocaleString(),
+                        subject: m.subject ?? "(no subject)",
+                        ...t,
+                      }}
+                    />
+                  );
+                })()}
                 <MessageBody
                   html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml, cidMapFor(m.attachments)) : null}
                   text={m.bodyText}

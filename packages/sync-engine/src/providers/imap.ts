@@ -76,6 +76,25 @@ export class ImapSyncProvider implements MailSyncProvider {
                 : parsed.references
               : undefined;
 
+            // Keep the headers needed for reply threading and the Gmail-style
+            // details popover (mailed-by / signed-by / TLS). Received is a
+            // multi-value header; the first entry is the final delivery hop.
+            const hdr = (name: string) => {
+              const v = parsed.headers.get(name);
+              return Array.isArray(v) ? String(v[0]) : v ? String(v) : undefined;
+            };
+            const headers: Record<string, string> = {};
+            for (const name of [
+              "Message-ID",
+              "Return-Path",
+              "Authentication-Results",
+              "DKIM-Signature",
+              "Received",
+            ]) {
+              const v = hdr(name.toLowerCase());
+              if (v) headers[name] = v;
+            }
+
             messages.push({
               providerMessageId: `uid-${msg.uid}`,
               threadId: references ?? parsed.inReplyTo ?? parsed.messageId ?? undefined,
@@ -107,6 +126,7 @@ export class ImapSyncProvider implements MailSyncProvider {
               isStarred: flags.has("\\Flagged"),
               isDraft: flags.has("\\Draft"),
               providerLabels: [...flags].filter((f) => !f.startsWith("\\")),
+              headers,
             });
             if (msg.uid > maxUid) maxUid = msg.uid;
           }
