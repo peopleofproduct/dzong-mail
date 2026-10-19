@@ -55,6 +55,11 @@ Database connection: `DATABASE_URL` in `packages/database/.env`
 Local Postgres is installed via Homebrew (`postgresql@17`, `brew services
 start postgresql@17`) with a `postgres` superuser for the default URL.
 
+AI features (classify, drafts, summaries, NL rules) need Ollama running
+(`brew services start ollama`) plus a pulled model (e.g.
+`ollama pull llama3.2:3b`), then enable AI in /settings — or set a BYOK
+cloud key instead. Everything degrades gracefully when AI is off.
+
 Secrets at rest are AES-256-GCM encrypted with a key derived from
 `UNWALLED_SECRET_KEY`; a built-in dev key is used when unset (a warning is
 logged). Set it before storing real credentials.

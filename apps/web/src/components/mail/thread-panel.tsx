@@ -86,12 +86,17 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
             </form>
           )}
         </div>
-        {last.aiSummary && (
-          <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-xs leading-relaxed text-indigo-900 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200">
-            <span className="mr-1.5 font-semibold">✦ AI summary</span>
-            {last.aiSummary}
-          </div>
-        )}
+        {(() => {
+          const summary = [...messages].reverse().find((m) => m.aiSummary)?.aiSummary;
+          return (
+            summary && (
+              <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-xs leading-relaxed text-indigo-900 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200">
+                <span className="mr-1.5 font-semibold">✦ AI summary</span>
+                {summary}
+              </div>
+            )
+          );
+        })()}
       </div>
 
       <div className="flex flex-1 flex-col divide-y divide-zinc-100 dark:divide-zinc-800/60">
