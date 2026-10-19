@@ -1,10 +1,19 @@
+import { readFile } from "node:fs/promises";
 import { prisma } from "@unwalled/database";
 import type { EmailAccount, PrismaClient } from "@unwalled/database";
 import nodemailer from "nodemailer";
+import MailComposer from "nodemailer/lib/mail-composer";
 import { decryptIfPresent } from "./crypto";
+import { attachmentFilePath, storeAttachmentContent } from "./attachments";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GRAPH_API = "https://graph.microsoft.com/v1.0";
+
+export interface SendAttachment {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+}
 
 export interface SendInput {
   to: string[];
@@ -12,6 +21,7 @@ export interface SendInput {
   bcc?: string[];
   subject: string;
   bodyText: string;
+  attachments?: SendAttachment[];
   /** Provider thread to reply within (sets In-Reply-To where applicable). */
   threadId?: string;
   inReplyToHeader?: string;
@@ -25,8 +35,8 @@ export interface SendResult {
   scheduled: boolean;
 }
 
-function encodeRawMime(mime: string): string {
-  return Buffer.from(mime, "utf8")
+function encodeRawMime(mime: Buffer | string): string {
+  return (typeof mime === "string" ? Buffer.from(mime, "utf8") : mime)
     .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -39,21 +49,25 @@ function formattedFrom(account: EmailAccount): string {
   return name ? `"${name}" <${account.emailAddress}>` : account.emailAddress;
 }
 
-function buildMime(from: string, input: SendInput): string {
-  const lines = [
-    `From: ${from}`,
-    `To: ${input.to.join(", ")}`,
-    ...(input.cc?.length ? [`Cc: ${input.cc.join(", ")}`] : []),
-    `Subject: ${input.subject}`,
-    `Message-ID: <${crypto.randomUUID()}@unwalled.local>`,
-    ...(input.inReplyToHeader ? [`In-Reply-To: ${input.inReplyToHeader}`] : []),
-    `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset="UTF-8"`,
-    `Content-Transfer-Encoding: 8bit`,
-    ``,
-    input.bodyText,
-  ];
-  return lines.join("\r\n");
+/** Raw RFC 822 source for the Gmail API. MailComposer handles attachment
+ *  parts and header encoding correctly; the hand-rolled builder did neither. */
+function buildMime(from: string, input: SendInput): Promise<Buffer> {
+  const composer = new MailComposer({
+    from,
+    to: input.to.join(", "),
+    cc: input.cc?.join(", "),
+    bcc: input.bcc?.join(", "),
+    subject: input.subject,
+    text: input.bodyText,
+    inReplyTo: input.inReplyToHeader,
+    references: input.inReplyToHeader,
+    attachments: input.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType,
+    })),
+  });
+  return composer.compile().build() as Promise<Buffer>;
 }
 
 /** Record a sent message locally so threads and follow-up tracking stay complete. */
@@ -81,9 +95,27 @@ async function recordSent(
       isRead: true,
       isDraft: Boolean(input.scheduledAt),
       scheduledAt: input.scheduledAt,
+      hasAttachment: Boolean(input.attachments?.length),
       providerLabels: input.scheduledAt ? ["DRAFT"] : ["SENT"],
     },
   });
+  // Keep local copies of outgoing files so sent mail shows its attachments.
+  for (const a of input.attachments ?? []) {
+    const storagePath = await storeAttachmentContent(row.id, {
+      filename: a.filename,
+      mimeType: a.contentType,
+      content: a.content,
+    });
+    await db.attachment.create({
+      data: {
+        messageId: row.id,
+        filename: a.filename,
+        mimeType: a.contentType,
+        sizeBytes: a.content.length,
+        storagePath,
+      },
+    });
+  }
   return row.id;
 }
 
@@ -120,6 +152,11 @@ async function deliverViaSmtp(
     text: input.bodyText,
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
+    attachments: input.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType,
+    })),
   });
   return info.messageId ?? `smtp-${crypto.randomUUID()}`;
 }
@@ -140,7 +177,7 @@ async function deliverViaGmail(
   input: SendInput,
   accessToken: string,
 ): Promise<{ id: string; threadId?: string }> {
-  const raw = encodeRawMime(buildMime(formattedFrom(account), input));
+  const raw = encodeRawMime(await buildMime(formattedFrom(account), input));
   const res = await fetch(`${GMAIL_API}/messages/send`, {
     method: "POST",
     headers: {
@@ -188,6 +225,12 @@ async function deliverViaGraph(
         toRecipients: input.to.map(toRecipient),
         ccRecipients: (input.cc ?? []).map(toRecipient),
         bccRecipients: (input.bcc ?? []).map(toRecipient),
+        attachments: (input.attachments ?? []).map((a) => ({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: a.filename,
+          contentType: a.contentType,
+          contentBytes: a.content.toString("base64"),
+        })),
       },
       saveToSentItems: true,
     }),
@@ -253,9 +296,24 @@ export async function dispatchScheduledDraft(
 ): Promise<void> {
   const message = await db.message.findUniqueOrThrow({
     where: { id: messageId },
-    include: { emailAccount: true },
+    include: { emailAccount: true, attachments: true },
   });
   if (!message.isDraft) return;
+
+  // Reattach files stored when the draft was saved.
+  const attachments: SendAttachment[] = [];
+  for (const a of message.attachments) {
+    if (!a.storagePath) continue;
+    try {
+      attachments.push({
+        filename: a.filename,
+        contentType: a.mimeType ?? "application/octet-stream",
+        content: await readFile(attachmentFilePath(a.storagePath)),
+      });
+    } catch {
+      // File went missing from disk - send without it rather than fail.
+    }
+  }
 
   const input: SendInput = {
     to: message.toAddresses,
@@ -263,6 +321,7 @@ export async function dispatchScheduledDraft(
     bcc: message.bccAddresses,
     subject: message.subject ?? "",
     bodyText: message.bodyText ?? message.snippet ?? "",
+    attachments: attachments.length ? attachments : undefined,
     threadId: message.threadId ?? undefined,
   };
 

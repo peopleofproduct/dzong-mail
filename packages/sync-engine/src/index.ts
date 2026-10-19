@@ -9,7 +9,7 @@ export type {
 export { encryptSecret, decryptSecret, decryptIfPresent } from "./crypto";
 export { syncAccount, syncAllAccounts } from "./engine";
 export { sendEmail, dispatchScheduledDraft } from "./send";
-export type { SendInput, SendResult } from "./send";
+export type { SendAttachment, SendInput, SendResult } from "./send";
 export { dispatchDueDrafts, returnDueSnoozes, runSyncCycle } from "./worker";
 export { startIdleWatchers } from "./idle";
 export { runPostSync } from "./post-sync";
@@ -63,4 +63,4 @@ export { MockSyncProvider } from "./providers/mock";
 export { ImapSyncProvider } from "./providers/imap";
 export { GmailSyncProvider } from "./providers/gmail";
 export { GraphSyncProvider } from "./providers/graph";
-export { attachmentFilePath, attachmentsDir, dataDir } from "./attachments";
+export { attachmentFilePath, attachmentsDir, dataDir, storeAttachmentContent } from "./attachments";

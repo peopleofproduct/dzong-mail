@@ -1,6 +1,7 @@
 "use server";
 
 import { join } from "node:path";
+import { readFile, rm } from "node:fs/promises";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -18,12 +19,14 @@ import {
   generateRuleFromPrompt,
   saveReplyDraft,
   sendEmail,
+  createDraftRow,
   summarizeThread,
   syncAccount,
   unsubscribeMessage,
   unsubscribeSender,
 } from "@unwalled/sync-engine";
-import type { GeneratedRule, RuleAction, RuleCondition } from "@unwalled/sync-engine";
+import type { GeneratedRule, RuleAction, RuleCondition, SendAttachment } from "@unwalled/sync-engine";
+import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@unwalled/sync-engine";
 import type { Prisma } from "@unwalled/database";
 
 const DEMO_USER_EMAIL = "me@unwalled.local";
@@ -317,13 +320,63 @@ export async function unsubscribeFromMessage(id: string) {
 
 // ─── Composing ─────────────────────────────────────────────────────────────
 
-export async function sendEmailAction(formData: FormData) {
-  const get = (key: string) => String(formData.get(key) ?? "").trim();
-  const accountId = get("accountId");
-  const to = get("to")
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+/** Collect uploaded files from the composer form into SendAttachments. */
+async function formAttachments(formData: FormData): Promise<SendAttachment[]> {
+  const files = formData.getAll("attachments");
+  const out: SendAttachment[] = [];
+  let total = 0;
+  for (const f of files) {
+    if (!(f instanceof File) || f.size === 0) continue;
+    total += f.size;
+    if (total > MAX_ATTACHMENT_BYTES) {
+      throw new Error("Attachments exceed the 20 MB limit");
+    }
+    out.push({
+      filename: f.name,
+      contentType: f.type || "application/octet-stream",
+      content: Buffer.from(await f.arrayBuffer()),
+    });
+  }
+  return out;
+}
+
+/** Files stored on a draft row, reloaded for sending. */
+async function storedDraftAttachments(draftId: string): Promise<SendAttachment[]> {
+  const rows = await prisma.attachment.findMany({ where: { messageId: draftId } });
+  const out: SendAttachment[] = [];
+  for (const a of rows) {
+    if (!a.storagePath) continue;
+    try {
+      out.push({
+        filename: a.filename,
+        contentType: a.mimeType ?? "application/octet-stream",
+        content: await readFile(attachmentFilePath(a.storagePath)),
+      });
+    } catch {
+      // File missing on disk - skip rather than block the send.
+    }
+  }
+  return out;
+}
+
+/** Remove a draft row and any files it stored locally. */
+async function deleteDraftWithFiles(draftId: string) {
+  await prisma.message.delete({ where: { id: draftId } }).catch(() => {});
+  await rm(join(attachmentsDir(), draftId), { recursive: true, force: true }).catch(() => {});
+}
+
+const splitAddresses = (raw: string) =>
+  raw
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+
+export async function sendEmailAction(formData: FormData) {
+  const get = (key: string) => String(formData.get(key) ?? "").trim();
+  const accountId = get("accountId");
+  const to = splitAddresses(get("to"));
   if (!accountId || to.length === 0) {
     safeRedirect("/", { error: "Recipient and account are required" });
   }
@@ -331,17 +384,17 @@ export async function sendEmailAction(formData: FormData) {
     ? new Date(Date.now() + Number(get("sendLater")) * 60 * 60 * 1000)
     : undefined;
 
+  const draftId = get("draftId");
   try {
+    const uploads = await formAttachments(formData);
+    const stored = draftId ? await storedDraftAttachments(draftId) : [];
     await sendEmail(accountId, {
       to,
-      cc: get("cc")
-        ? get("cc")
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : undefined,
+      cc: splitAddresses(get("cc")),
+      bcc: splitAddresses(get("bcc")),
       subject: get("subject"),
       bodyText: get("body"),
+      attachments: [...uploads, ...stored],
       threadId: get("threadId") || undefined,
       inReplyToHeader: get("inReplyTo") || undefined,
       scheduledAt,
@@ -350,12 +403,112 @@ export async function sendEmailAction(formData: FormData) {
     safeRedirect("/", { error: String(err) });
   }
   // If this send originated from an existing draft row, consume it.
-  const draftId = get("draftId");
-  if (draftId) {
-    await prisma.message.delete({ where: { id: draftId } }).catch(() => {});
-  }
+  if (draftId) await deleteDraftWithFiles(draftId);
   revalidatePath("/");
   safeRedirect("/", { notice: scheduledAt ? "Send scheduled" : "Message sent" });
+}
+
+/**
+ * Persist the composer's current state as a draft when the window closes.
+ * Returns the draft id so a repeat close updates rather than duplicates.
+ * Called from the client - never redirects.
+ */
+export async function saveComposerDraft(formData: FormData): Promise<{
+  ok: boolean;
+  saved?: boolean;
+  draftId?: string;
+  reason?: string;
+}> {
+  const get = (key: string) => String(formData.get(key) ?? "").trim();
+  const accountId = get("accountId");
+  if (!accountId) return { ok: false, reason: "No account" };
+  const to = splitAddresses(get("to"));
+  const cc = splitAddresses(get("cc"));
+  const bcc = splitAddresses(get("bcc"));
+  const subject = get("subject");
+  const body = get("body");
+  const uploads = await formAttachments(formData).catch(() => [] as SendAttachment[]);
+
+  if (to.length === 0 && !subject && !body && uploads.length === 0) {
+    return { ok: true, saved: false };
+  }
+
+  try {
+    const account = await prisma.emailAccount.findUniqueOrThrow({ where: { id: accountId } });
+    const draftId = get("draftId");
+    let row;
+    if (draftId) {
+      row = await prisma.message.update({
+        where: { id: draftId },
+        data: {
+          toAddresses: to,
+          ccAddresses: cc,
+          bccAddresses: bcc,
+          subject: subject || null,
+          bodyText: body,
+          snippet: body.slice(0, 200),
+          hasAttachment: uploads.length > 0,
+        },
+      });
+    } else {
+      row = await createDraftRow(prisma, {
+        emailAccountId: accountId,
+        threadId: get("threadId") || null,
+        subject,
+        fromAddress: account.emailAddress,
+        toAddresses: to,
+        ccAddresses: cc,
+        bccAddresses: bcc,
+        bodyText: body,
+      });
+    }
+
+    // New uploads replace nothing - they append to whatever the draft has.
+    for (const a of uploads) {
+      const storagePath = await storeAttachmentContent(row.id, {
+        filename: a.filename,
+        mimeType: a.contentType,
+        content: a.content,
+      });
+      await prisma.attachment.create({
+        data: {
+          messageId: row.id,
+          filename: a.filename,
+          mimeType: a.contentType,
+          sizeBytes: a.content.length,
+          storagePath,
+        },
+      });
+    }
+    if (uploads.length > 0 && draftId) {
+      await prisma.message.update({ where: { id: row.id }, data: { hasAttachment: true } });
+    }
+
+    revalidatePath("/");
+    return { ok: true, saved: true, draftId: row.id };
+  } catch (err) {
+    return { ok: false, reason: String(err) };
+  }
+}
+
+/** Trash button in the composer - discards the draft without saving. */
+export async function discardComposerDraft(draftId: string | null): Promise<{ ok: boolean }> {
+  if (draftId) await deleteDraftWithFiles(draftId);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Remove a single stored attachment from a draft being edited. */
+export async function removeDraftAttachment(attachmentId: string): Promise<{ ok: boolean }> {
+  const row = await prisma.attachment.findUnique({ where: { id: attachmentId } });
+  if (row) {
+    await prisma.attachment.delete({ where: { id: attachmentId } });
+    if (row.storagePath) {
+      await rm(attachmentFilePath(row.storagePath), { force: true }).catch(() => {});
+    }
+  }
+  revalidatePath("/");
+  return { ok: true };
 }
 
 // ─── AI features ────────────────────────────────────────────────────────────

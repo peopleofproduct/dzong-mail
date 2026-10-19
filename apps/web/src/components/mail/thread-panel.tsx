@@ -57,6 +57,8 @@ function draftParams(
     id: string;
     emailAccountId: string;
     toAddresses: string[];
+    ccAddresses: string[];
+    bccAddresses: string[];
     subject: string | null;
     bodyText: string | null;
     threadId: string | null;
@@ -68,6 +70,8 @@ function draftParams(
   p.set("draftId", m.id);
   p.set("accountId", m.emailAccountId);
   p.set("to", m.toAddresses.join(", "));
+  if (m.ccAddresses.length) p.set("cc", m.ccAddresses.join(", "));
+  if (m.bccAddresses.length) p.set("bcc", m.bccAddresses.join(", "));
   p.set("subject", m.subject ?? "");
   if (m.bodyText) p.set("body", m.bodyText);
   if (m.threadId) p.set("threadId", m.threadId);

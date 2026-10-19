@@ -32,6 +32,7 @@ import { NoticeBanner } from "@/components/notice-banner";
 import { Sidebar } from "@/components/mail/sidebar";
 import { ThreadPanel } from "@/components/mail/thread-panel";
 import { Topbar } from "@/components/mail/topbar";
+import { prisma } from "@/lib/db";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -230,6 +231,16 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
   const params = await searchParams;
   if (!str(params, "compose")) return null;
   const accounts = await getAccounts();
+  // Reopening a saved draft restores its stored attachment chips.
+  const draftId = str(params, "draftId");
+  const draftAttachments = draftId
+    ? (
+        await prisma.attachment.findMany({
+          where: { messageId: draftId },
+          select: { id: true, filename: true, sizeBytes: true },
+        })
+      ).map((a) => ({ ...a, sizeBytes: a.sizeBytes ?? null }))
+    : [];
   return (
     <Composer
       accounts={accounts.map((a) => ({
@@ -237,6 +248,7 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
         emailAddress: a.emailAddress,
         provider: a.provider,
       }))}
+      draftAttachments={draftAttachments}
     />
   );
 }

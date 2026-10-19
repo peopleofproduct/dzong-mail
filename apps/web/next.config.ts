@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // Keep the dev-tools "N" bubble off the icon rail's settings button.
   devIndicators: { position: "bottom-right" },
   transpilePackages: ["@unwalled/database", "@unwalled/ai-engine", "@unwalled/sync-engine"],
+  experimental: {
+    // Composer attachments upload through a server action (default cap is 1 MB).
+    serverActions: { bodySizeLimit: "25mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {
