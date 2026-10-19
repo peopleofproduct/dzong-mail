@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -9,7 +10,12 @@ import type { NextRequest } from "next/server";
 export function apiGuard(request: NextRequest): NextResponse | null {
   const token = process.env.UNWALLED_API_TOKEN;
   if (!token) return null;
-  if (request.headers.get("authorization") === `Bearer ${token}`) return null;
+  const presented = request.headers.get("authorization") ?? "";
+  const expected = `Bearer ${token}`;
+  const match =
+    presented.length === expected.length &&
+    timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+  if (match) return null;
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 

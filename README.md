@@ -46,8 +46,9 @@ Free. Open source. MIT. Yours.
 - **Attachments, stored locally** — files land on your disk
   (`~/.unwalled-mail/attachments`), show up in the thread, and download
   straight from the app.
-- **A local HTTP API** — `/api/v1/*` endpoints so scripts and other agents
-  can search, ask, sync, and send. See [docs/API.md](docs/API.md).
+- **A local HTTP API + MCP server** — `/api/v1/*` endpoints ([docs/API.md](docs/API.md))
+  and an MCP server ([docs/MCP.md](docs/MCP.md)) so Claude Desktop, Cursor, or
+  your own agents can search, ask, triage, and send — all on your machine.
 - **Follow-up tracking** — "needs reply" and "awaiting response" views so
   nothing slips.
 - **Analytics** — volume, top senders, label breakdown, all computed

@@ -18,7 +18,8 @@
     "db:push": "turbo db:push",
     "db:seed": "tsx scripts/seed-demo.ts",
     "worker": "tsx packages/sync-engine/src/worker.ts",
-    "setup": "bash scripts/setup.sh"
+    "setup": "bash scripts/setup.sh",
+    "mcp": "npm run start -w @unwalled/mcp-server"
   },
   "devDependencies": {
     "prettier": "^3.3.3",

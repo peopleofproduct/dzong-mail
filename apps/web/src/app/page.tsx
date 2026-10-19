@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
+import { Mail } from "lucide-react";
+import { connectMockAccount } from "@/lib/actions";
 import {
   getAccounts,
   getDigestSenders,
@@ -52,6 +54,42 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   const label = str(params, "label");
   const folder = str(params, "folder");
   const q = str(params, "q");
+
+  // First-run experience: no accounts at all → onboarding card, not an
+  // empty list that looks like a bug.
+  const accounts = await getAccounts();
+  if (accounts.length === 0 && !q && !label && !folder) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+        <Mail size={32} className="text-indigo-400" />
+        <div>
+          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+            Welcome to Unwalled Mail
+          </p>
+          <p className="mt-1 max-w-xs text-xs leading-relaxed text-zinc-400">
+            Connect a Gmail, Outlook, or any IMAP account — or explore with the demo inbox.
+            Everything stays on this machine.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href="/settings"
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            Connect an account
+          </a>
+          <form action={connectMockAccount}>
+            <button
+              type="submit"
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              Load demo inbox
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (view === "digest") {
     return <DigestList senders={await getDigestSenders()} />;

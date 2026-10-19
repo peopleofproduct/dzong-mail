@@ -46,6 +46,33 @@ function ComposerInner({ accounts }: ComposerProps) {
   const isReply = mode === "reply";
   const isDraft = mode === "draft";
 
+  if (accounts.length === 0) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        onClick={close}
+      >
+        <div
+          className="w-full max-w-sm rounded-xl bg-white p-6 text-center shadow-2xl dark:bg-zinc-950 dark:ring-1 dark:ring-zinc-800"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+            No mail account connected
+          </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            Connect an account in Settings before composing.
+          </p>
+          <a
+            href="/settings"
+            className="mt-4 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            Go to Settings
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   const writeWithAI = () => {
     setAiError(null);
     startTransition(async () => {
