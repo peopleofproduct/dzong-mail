@@ -51,14 +51,14 @@ Run from the repo root:
   generated messages
 
 Database connection: `DATABASE_URL` in `packages/database/.env`
-(default `postgresql://postgres:postgres@localhost:5432/unwalled_mail`).
-Local Postgres is installed via Homebrew (`postgresql@17`, `brew services
-start postgresql@17`) with a `postgres` superuser for the default URL.
+(see `.env.example`). Any local PostgreSQL 14+ works — see
+`docs/SETUP.md` for per-OS setup.
 
-AI features (classify, drafts, summaries, NL rules) need Ollama running
-(`brew services start ollama`) plus a pulled model (e.g.
-`ollama pull llama3.2:3b`), then enable AI in /settings — or set a BYOK
-cloud key instead. Everything degrades gracefully when AI is off.
+AI features (classify, drafts, summaries, NL rules) need a running
+provider: Ollama (`ollama serve`) with a pulled model (e.g.
+`ollama pull llama3.2:3b`), or a BYOK OpenAI/Anthropic key entered in
+`/settings`. All three providers are real API clients; everything
+degrades gracefully when AI is off.
 
 Secrets at rest are AES-256-GCM encrypted with a key derived from
 `UNWALLED_SECRET_KEY`; a built-in dev key is used when unset (a warning is
@@ -74,8 +74,6 @@ encrypted tokens on the `EmailAccount` row.
 - Strict TypeScript everywhere; `tsc --noEmit` must stay clean.
 - ESLint flat configs per package; Prettier handles formatting
   (`eslint-config-prettier` last in `apps/web`).
-- No real external API handshakes yet — `ai-engine` cloud providers are
-  scaffolds; only the Ollama provider is functional (still local).
 - Secrets/credentials are stored locally and must never leave the machine
   or be committed. `.env` files are gitignored.
 
