@@ -25,6 +25,9 @@ import { ResizableListPane } from "@/components/mail/resizable-list-pane";
 import { serializeMessage } from "@/components/mail/types";
 import type { MailItem } from "@/components/mail/types";
 import { CommandPalette } from "@/components/mail/command-palette";
+import { UndoSendToast } from "@/components/mail/undo-send-toast";
+import { MorningBriefingCard } from "@/components/mail/morning-briefing";
+import { getSplitLabels } from "@/lib/settings";
 import { Composer } from "@/components/mail/composer";
 import { KeyboardShortcuts } from "@/components/mail/keyboard-shortcuts";
 import { MessageList } from "@/components/mail/message-list";
@@ -112,7 +115,9 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   // Superhuman-style split inbox: only on the plain inbox view, not
   // searches/labels/folders where grouping would hide ordering.
   const sections =
-    view === "inbox" && !q && !label && !folder ? splitInboxGroups(items) : undefined;
+    view === "inbox" && !q && !label && !folder
+      ? splitInboxGroups(items, await getSplitLabels())
+      : undefined;
 
   return (
     <>
@@ -231,16 +236,24 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
   const params = await searchParams;
   if (!str(params, "compose")) return null;
   const accounts = await getAccounts();
-  // Reopening a saved draft restores its stored attachment chips.
+  // Reopening a saved draft restores its stored attachment chips and, when
+  // the draft was written with the rich editor, its formatted body.
   const draftId = str(params, "draftId");
-  const draftAttachments = draftId
-    ? (
-        await prisma.attachment.findMany({
+  const [draftAttachments, snippets, draftBody] = await Promise.all([
+    draftId
+      ? prisma.attachment.findMany({
           where: { messageId: draftId },
           select: { id: true, filename: true, sizeBytes: true },
         })
-      ).map((a) => ({ ...a, sizeBytes: a.sizeBytes ?? null }))
-    : [];
+      : Promise.resolve([]),
+    prisma.snippet.findMany({ orderBy: { name: "asc" } }),
+    draftId
+      ? prisma.message.findUnique({
+          where: { id: draftId },
+          select: { bodyHtml: true },
+        })
+      : Promise.resolve(null),
+  ]);
   return (
     <Composer
       accounts={accounts.map((a) => ({
@@ -248,8 +261,58 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
         emailAddress: a.emailAddress,
         provider: a.provider,
       }))}
-      draftAttachments={draftAttachments}
+      draftAttachments={draftAttachments.map((a) => ({ ...a, sizeBytes: a.sizeBytes ?? null }))}
+      draftBodyHtml={draftBody?.bodyHtml ?? undefined}
+      snippets={snippets}
     />
+  );
+}
+
+/** Undo-send toast: reads the ?undo=<messageId> param the send action sets,
+ *  renders the countdown only while the send is still queued. */
+async function UndoSection({ searchParams }: { searchParams: SearchParams }) {
+  await connection();
+  const params = await searchParams;
+  const undo = str(params, "undo");
+  if (!undo) return null;
+  const msg = await prisma.message.findUnique({
+    where: { id: undo },
+    select: { subject: true, isDraft: true, scheduledAt: true },
+  });
+  if (!msg?.isDraft || !msg.scheduledAt) return null;
+  return <UndoSendToast messageId={undo} subject={msg.subject ?? "(no subject)"} />;
+}
+
+/** "While you slept" briefing — aggregates the worker's AgentRun log since
+ *  yesterday evening plus what is still waiting on the user. */
+async function BriefingSection() {
+  await connection();
+  const since = new Date();
+  since.setDate(since.getDate() - 1);
+  since.setHours(18, 0, 0, 0);
+  if (since > new Date()) since.setDate(since.getDate() - 1); // before 18:00 today? look back to day-before 18:00
+  const [runs, draftsWaiting, followUpsWaiting] = await Promise.all([
+    prisma.agentRun.findMany({ where: { ranAt: { gte: since } }, select: { summary: true } }),
+    prisma.message.count({ where: { isDraft: true, providerLabels: { has: "AI_DRAFT" } } }),
+    prisma.notification.count({ where: { kind: "follow-up", readAt: null } }),
+  ]);
+  const stats = {
+    inserted: 0, classified: 0, rulesApplied: 0, sent: 0, unsnoozed: 0,
+    followUpReminders: 0, draftsWaiting, followUpsWaiting,
+  };
+  for (const r of runs) {
+    const s = r.summary as Record<string, number>;
+    stats.inserted += s.inserted ?? 0;
+    stats.classified += s.classified ?? 0;
+    stats.rulesApplied += s.rulesApplied ?? 0;
+    stats.sent += s.sent ?? 0;
+    stats.unsnoozed += s.unsnoozed ?? 0;
+    stats.followUpReminders += s.followUpReminders ?? 0;
+  }
+  const total = stats.inserted + stats.sent + stats.unsnoozed + stats.followUpReminders;
+  if (total === 0 && draftsWaiting === 0 && followUpsWaiting === 0) return null;
+  return (
+    <MorningBriefingCard stats={stats} dateKey={new Date().toLocaleDateString("sv-SE")} />
   );
 }
 
@@ -342,6 +405,9 @@ export default function Home(props: PageProps<"/">) {
       <Suspense fallback={null}>
         <AiSetupBanner />
       </Suspense>
+      <Suspense fallback={null}>
+        <BriefingSection />
+      </Suspense>
       <Suspense fallback={<div className="flex-1 animate-pulse bg-zinc-50 dark:bg-zinc-900/40" />}>
         <MailPanes searchParams={props.searchParams} />
       </Suspense>
@@ -351,6 +417,9 @@ export default function Home(props: PageProps<"/">) {
       </Suspense>
       <Suspense fallback={null}>
         <CommandPaletteSection />
+      </Suspense>
+      <Suspense fallback={null}>
+        <UndoSection searchParams={props.searchParams} />
       </Suspense>
       <Suspense fallback={null}>
         <KeyboardShortcuts />

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { connection } from "next/server";
 import { Lock, Mail, Search, Sparkles, Workflow } from "lucide-react";
 import { connectMockAccount } from "@/lib/actions";
@@ -27,10 +28,25 @@ const features = [
   },
 ];
 
-export default async function WelcomePage() {
+/** The demo is onboarding education — hidden once a real provider exists.
+ *  Kept inside Suspense so the rest of the welcome page stays static. */
+async function DemoCta() {
   await connection();
-  // The demo is onboarding education — hide it once a real provider exists.
   const showDemo = !(await getAccounts()).some((a) => a.provider !== "MOCK");
+  if (!showDemo) return null;
+  return (
+    <form action={connectMockAccount}>
+      <button
+        type="submit"
+        className="w-full rounded-lg px-5 py-3 text-sm font-medium text-zinc-500 hover:bg-zinc-50 sm:w-auto dark:text-zinc-400 dark:hover:bg-zinc-900"
+      >
+        Explore the demo inbox →
+      </button>
+    </form>
+  );
+}
+
+export default function WelcomePage() {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto bg-white dark:bg-zinc-950">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 dark:border-zinc-800 dark:bg-zinc-950/95">
@@ -69,16 +85,9 @@ export default async function WelcomePage() {
           >
             Connect another provider
           </a>
-          {showDemo && (
-            <form action={connectMockAccount}>
-              <button
-                type="submit"
-                className="w-full rounded-lg px-5 py-3 text-sm font-medium text-zinc-500 hover:bg-zinc-50 sm:w-auto dark:text-zinc-400 dark:hover:bg-zinc-900"
-              >
-                Explore the demo inbox →
-              </button>
-            </form>
-          )}
+          <Suspense fallback={null}>
+            <DemoCta />
+          </Suspense>
         </div>
 
         <div className="mt-12 grid gap-6 sm:grid-cols-2">

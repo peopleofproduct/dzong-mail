@@ -5,10 +5,16 @@ import { syncAllAccounts } from "./engine";
 import { startIdleWatchers } from "./idle";
 import { runPostSync } from "./post-sync";
 import { dispatchScheduledDraft } from "./send";
+import { checkFollowUpReminders, emit, recordAgentRun } from "./notify";
 
 const TICK_MS = Number(process.env.WORKER_TICK_MS ?? 30_000);
 const SYNC_INTERVAL_MS = Number(process.env.WORKER_SYNC_INTERVAL_MS ?? 5 * 60_000);
 const SEND_RETRY_BACKOFF_MS = 15 * 60_000;
+const FOLLOW_UP_INTERVAL_MS = 60 * 60_000;
+// Optional env override; when unset the AppSetting (Settings UI) wins.
+const FOLLOW_UP_DAYS = process.env.WORKER_FOLLOW_UP_DAYS
+  ? Number(process.env.WORKER_FOLLOW_UP_DAYS)
+  : undefined;
 
 /** Deliver scheduled drafts that have come due; failed sends retry in 15 min. */
 export async function dispatchDueDrafts(db: PrismaClient = prisma): Promise<number> {
@@ -22,8 +28,26 @@ export async function dispatchDueDrafts(db: PrismaClient = prisma): Promise<numb
       await dispatchScheduledDraft(draft.id, db);
       sent++;
       console.log(`[worker] sent scheduled draft ${draft.id} — "${draft.subject}"`);
+      await emit(
+        {
+          kind: "send",
+          title: "Scheduled message sent",
+          body: draft.subject ?? "(no subject)",
+          messageId: draft.id,
+        },
+        db,
+      );
     } catch (err) {
       console.error(`[worker] scheduled send failed for ${draft.id}:`, err);
+      await emit(
+        {
+          kind: "send",
+          title: "Scheduled send failed - will retry",
+          body: draft.subject ?? "(no subject)",
+          messageId: draft.id,
+        },
+        db,
+      );
       await db.message.update({
         where: { id: draft.id },
         data: { scheduledAt: new Date(Date.now() + SEND_RETRY_BACKOFF_MS) },
@@ -51,12 +75,22 @@ export async function returnDueSnoozes(db: PrismaClient = prisma): Promise<numbe
  */
 export async function runSyncCycle(db: PrismaClient = prisma): Promise<void> {
   const outcomes = await syncAllAccounts(db);
+  const summary = { inserted: 0, updated: 0, classified: 0, embedded: 0, rulesApplied: 0 };
   for (const outcome of outcomes) {
+    summary.inserted += outcome.inserted;
+    summary.updated += outcome.updated;
     if (outcome.inserted === 0) continue;
     console.log(
       `[worker] synced ${outcome.accountId}: ${outcome.inserted} new, ${outcome.updated} updated`,
     );
-    await runPostSync(outcome.accountId, outcome.inserted, db);
+    const stats = await runPostSync(outcome.accountId, outcome.inserted, db);
+    summary.classified += stats.classified;
+    summary.embedded += stats.embedded;
+    summary.rulesApplied += stats.rulesApplied;
+  }
+  // Only log cycles that did work - an all-zero row is briefing noise.
+  if (summary.inserted + summary.updated > 0) {
+    await recordAgentRun("sync", summary, db);
   }
 }
 
@@ -83,13 +117,25 @@ async function main(): Promise<void> {
     console.error("[worker] IDLE watchers failed to start:", err);
   }
   let lastSync = 0;
+  let lastFollowUp = 0;
   while (true) {
     try {
-      await dispatchDueDrafts();
-      await returnDueSnoozes();
+      const sent = await dispatchDueDrafts();
+      const unsnoozed = await returnDueSnoozes();
+      if (sent + unsnoozed > 0) {
+        await recordAgentRun("maintenance", { sent, unsnoozed });
+      }
       if (Date.now() - lastSync >= SYNC_INTERVAL_MS) {
         lastSync = Date.now();
         await runSyncCycle();
+      }
+      if (Date.now() - lastFollowUp >= FOLLOW_UP_INTERVAL_MS) {
+        lastFollowUp = Date.now();
+        const nudged = await checkFollowUpReminders(prisma, FOLLOW_UP_DAYS);
+        if (nudged > 0) {
+          console.log(`[worker] ${nudged} follow-up reminder(s) raised`);
+          await recordAgentRun("maintenance", { followUpReminders: nudged });
+        }
       }
     } catch (err) {
       console.error("[worker] tick failed:", err);

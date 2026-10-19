@@ -76,6 +76,17 @@ export async function RulesSection() {
                 <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-zinc-800">
                   {rule.matchMode === "ALL" ? "all conditions" : "any condition"}
                 </span>
+                {rule.autoSendDrafts && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                    auto-send
+                  </span>
+                )}
+                {Array.isArray(rule.actions) &&
+                  (rule.actions as { type?: string }[]).some((a) => a.type === "WEBHOOK") && (
+                    <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                      webhook
+                    </span>
+                  )}
                 <span className="ml-auto text-xs text-zinc-400">
                   {rule.lastRunAt ? `ran ${rule.lastRunAt.toLocaleString()}` : "never run"}
                 </span>

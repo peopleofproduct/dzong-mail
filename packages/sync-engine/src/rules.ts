@@ -9,15 +9,19 @@ export interface RuleCondition {
 }
 
 export type RuleActionType =
-  "ARCHIVE" | "ADD_LABEL" | "MARK_READ" | "STAR" | "MOVE_FOLDER" | "DRAFT_REPLY" | "DELETE";
+  "ARCHIVE" | "ADD_LABEL" | "MARK_READ" | "STAR" | "MOVE_FOLDER" | "DRAFT_REPLY" | "DELETE" | "WEBHOOK";
 
 export interface RuleAction {
   type: RuleActionType;
-  /** Target label for ADD_LABEL, folder for MOVE_FOLDER. */
+  /** Target label for ADD_LABEL, folder for MOVE_FOLDER, URL for WEBHOOK. */
   value?: string;
   /** Body template for DRAFT_REPLY — supports {{from_name}} / {{subject}}. */
   template?: string;
 }
+
+const WEBHOOK_TIMEOUT_MS = 8_000;
+/** Auto-send drafts queue through the same window users get for undo-send. */
+const AUTO_SEND_DELAY_MS = 15_000;
 
 export interface RuleEvalResult {
   ruleId: string;
@@ -77,9 +81,36 @@ export function matchesRule(rule: AutomationRule, message: Message): boolean {
     : conditions.every((c) => matchesCondition(message, c));
 }
 
+/** POST a compact, body-free payload to the rule's webhook URL. The call
+ *  carries metadata only - message bodies never leave the machine. */
+async function fireWebhook(url: string, rule: AutomationRule, message: Message): Promise<void> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+    body: JSON.stringify({
+      event: "rule.matched",
+      rule: { id: rule.id, name: rule.name },
+      message: {
+        id: message.id,
+        threadId: message.threadId,
+        from: message.fromAddress,
+        fromName: message.fromName,
+        subject: message.subject,
+        snippet: message.snippet,
+        receivedAt: message.receivedAt,
+        labels: message.labels,
+        aiLabels: message.aiLabels,
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`webhook ${url} returned ${res.status}`);
+}
+
 async function applyAction(
   db: PrismaClient,
   accountEmail: string,
+  rule: AutomationRule,
   message: Message,
   action: RuleAction,
 ): Promise<void> {
@@ -112,26 +143,41 @@ async function applyAction(
     case "DELETE":
       await db.message.delete({ where: { id: message.id } });
       break;
-    case "DRAFT_REPLY":
+    case "WEBHOOK":
+      if (!action.value) break;
+      await fireWebhook(action.value, rule, message);
+      break;
+    case "DRAFT_REPLY": {
+      let draft;
       if (!action.template) {
         // No template → generate the reply with the user's AI provider.
         const result = await draftAiReply(message.id, db);
-        if (!result.ok) {
+        if (!result.ok || !result.draftId) {
           throw new Error(result.reason ?? "AI draft failed");
         }
-        break;
+        draft = { id: result.draftId };
+      } else {
+        draft = await createDraftRow(db, {
+          emailAccountId: message.emailAccountId,
+          threadId: message.threadId,
+          subject: `Re: ${message.subject ?? ""}`,
+          fromAddress: accountEmail,
+          toAddresses: [message.fromAddress],
+          bodyText: action.template
+            .replaceAll("{{from_name}}", message.fromName ?? message.fromAddress)
+            .replaceAll("{{subject}}", message.subject ?? ""),
+        });
       }
-      await createDraftRow(db, {
-        emailAccountId: message.emailAccountId,
-        threadId: message.threadId,
-        subject: `Re: ${message.subject ?? ""}`,
-        fromAddress: accountEmail,
-        toAddresses: [message.fromAddress],
-        bodyText: action.template
-          .replaceAll("{{from_name}}", message.fromName ?? message.fromAddress)
-          .replaceAll("{{subject}}", message.subject ?? ""),
-      });
+      // Auto-send queues the draft through the worker's send window so the
+      // user still gets the undo window before it leaves the machine.
+      if (rule.autoSendDrafts) {
+        await db.message.update({
+          where: { id: draft.id },
+          data: { scheduledAt: new Date(Date.now() + AUTO_SEND_DELAY_MS) },
+        });
+      }
       break;
+    }
   }
 }
 
@@ -187,7 +233,7 @@ export async function applyAutomationRules(
       if (options.dryRun) continue;
       try {
         for (const action of actions) {
-          await applyAction(db, account.emailAddress, message, action);
+          await applyAction(db, account.emailAddress, rule, message, action);
         }
         result.applied++;
       } catch (err) {

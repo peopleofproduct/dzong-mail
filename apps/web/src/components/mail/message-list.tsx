@@ -50,9 +50,39 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
   const gPending = useRef(0);
   const vPending = useRef(0);
 
+  // Optimistic layer: flag patches paint instantly; `hidden` removes rows the
+  // server will filter out on the next render (archive/snooze in the inbox).
+  // Both reset the moment fresh server data arrives, so a failed action snaps
+  // the row back without any explicit rollback code.
+  const [opt, setOpt] = useState<Record<string, Partial<MailItem>>>({});
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // Reset during render when fresh server data arrives (React's documented
+  // alternative to resetting state inside an effect).
+  const [prevMessages, setPrevMessages] = useState(messages);
+  if (prevMessages !== messages) {
+    setPrevMessages(messages);
+    setOpt({});
+    setHidden(new Set());
+  }
+  const displayed = useMemo(
+    () =>
+      messages
+        .filter((m) => !hidden.has(m.id))
+        .map((m) => (opt[m.id] ? { ...m, ...opt[m.id] } : m)),
+    [messages, opt, hidden],
+  );
+  const patch = useCallback((ids: string[], p: Partial<MailItem>, hide = false) => {
+    setOpt((o) => {
+      const n = { ...o };
+      for (const id of ids) n[id] = { ...n[id], ...p };
+      return n;
+    });
+    if (hide) setHidden((h) => new Set([...h, ...ids]));
+  }, []);
+
   const currentIndex = useMemo(
-    () => messages.findIndex((m) => m.id === selectedId),
-    [messages, selectedId],
+    () => displayed.findIndex((m) => m.id === selectedId),
+    [displayed, selectedId],
   );
 
   const select = useCallback(
@@ -76,10 +106,10 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
 
   const move = useCallback(
     (delta: number) => {
-      const next = Math.min(Math.max(currentIndex + delta, 0), messages.length - 1);
-      select(messages[next]?.id);
+      const next = Math.min(Math.max(currentIndex + delta, 0), displayed.length - 1);
+      select(displayed[next]?.id);
     },
-    [currentIndex, messages, select],
+    [currentIndex, displayed, select],
   );
 
   const targets = useCallback(
@@ -91,10 +121,35 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     (ids: string[]) => {
       if (ids.length === 0) return;
       lastArchived.current = ids;
+      patch(ids, { isArchived: true }, true);
       void archiveMessages(ids);
       setChecked(new Set());
     },
-    [setChecked],
+    [setChecked, patch],
+  );
+
+  const toggleRead = useCallback(
+    (m: MailItem) => {
+      patch([m.id], { isRead: !m.isRead });
+      void toggleMessageFlag(m.id, "isRead");
+    },
+    [patch],
+  );
+
+  const toggleStar = useCallback(
+    (m: MailItem) => {
+      patch([m.id], { isStarred: !m.isStarred });
+      void toggleMessageFlag(m.id, "isStarred");
+    },
+    [patch],
+  );
+
+  const snooze = useCallback(
+    (id: string) => {
+      patch([id], { snoozedUntil: new Date(Date.now() + 86400000).toISOString() }, true);
+      void snoozeMessage(id, 24);
+    },
+    [patch],
   );
 
   useEffect(() => {
@@ -118,10 +173,12 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           return;
         }
         if (e.key === "i") {
+          patch(ids, { isArchived: false }, true);
           void moveMessages(ids, "inbox");
           return;
         }
         if (e.key === "t") {
+          patch(ids, {}, true);
           void moveMessages(ids, "trash");
           return;
         }
@@ -137,7 +194,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
       if (gPending.current && now - gPending.current < 1000 && e.key === "g") {
         gPending.current = 0;
         e.preventDefault();
-        select(messages[0]?.id);
+        select(displayed[0]?.id);
         return;
       }
 
@@ -153,11 +210,11 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           move(-1);
           break;
         case "G":
-          select(messages[messages.length - 1]?.id);
+          select(displayed[displayed.length - 1]?.id);
           break;
         case "Enter":
         case "o": {
-          const item = messages[currentIndex];
+          const item = displayed[currentIndex];
           if (item) openThread(item);
           break;
         }
@@ -172,7 +229,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           break;
         }
         case "A":
-          setChecked(new Set(messages.map((m) => m.id)));
+          setChecked(new Set(displayed.map((m) => m.id)));
           break;
         case "e":
           archive(targets());
@@ -180,18 +237,25 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
         case "z":
           // Undo the most recent bulk archive.
           if (lastArchived.current.length > 0) {
-            void unarchiveMessages(lastArchived.current);
+            const ids = lastArchived.current;
+            patch(ids, { isArchived: false });
+            setHidden((h) => new Set([...h].filter((id) => !ids.includes(id))));
+            void unarchiveMessages(ids);
             lastArchived.current = [];
           }
           break;
-        case "s":
-          if (selectedId) void toggleMessageFlag(selectedId, "isStarred");
+        case "s": {
+          const m = displayed[currentIndex];
+          if (m) toggleStar(m);
           break;
-        case "u":
-          if (selectedId) void toggleMessageFlag(selectedId, "isRead");
+        }
+        case "u": {
+          const m = displayed[currentIndex];
+          if (m) toggleRead(m);
           break;
+        }
         case "h":
-          if (selectedId) void snoozeMessage(selectedId, 24);
+          if (selectedId) snooze(selectedId);
           break;
         case "Escape":
           // Clearing a multi-select takes priority over closing the thread —
@@ -205,7 +269,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [messages, currentIndex, selectedId, move, openThread, targets, archive, select, checked]);
+  }, [displayed, currentIndex, selectedId, move, openThread, targets, archive, select, checked, patch, toggleRead, toggleStar, snooze]);
 
   const toggleSection = (title: string) => {
     setCollapsed((prev) => {
@@ -253,7 +317,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
         <button
           onClick={(e) => {
             e.stopPropagation();
-            void toggleMessageFlag(m.id, "isStarred");
+            toggleStar(m);
           }}
           aria-label="Star"
           className={`mt-1 shrink-0 ${
@@ -356,6 +420,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               title="Unarchive"
               onClick={(e) => {
                 e.stopPropagation();
+                patch([m.id], { isArchived: false }, true);
                 void unarchiveMessage(m.id);
               }}
               className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
@@ -379,6 +444,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               title="Unsnooze"
               onClick={(e) => {
                 e.stopPropagation();
+                patch([m.id], { snoozedUntil: null }, true);
                 void unsnoozeMessage(m.id);
               }}
               className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
@@ -390,7 +456,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               title="Snooze 24h (h)"
               onClick={(e) => {
                 e.stopPropagation();
-                void snoozeMessage(m.id, 24);
+                snooze(m.id);
               }}
               className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
             >
@@ -401,7 +467,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             title={m.isRead ? "Mark unread (u)" : "Mark read (u)"}
             onClick={(e) => {
               e.stopPropagation();
-              void toggleMessageFlag(m.id, "isRead");
+              toggleRead(m);
             }}
             className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
           >
@@ -424,7 +490,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     );
   };
 
-  if (messages.length === 0) {
+  if (displayed.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-sm text-zinc-400">
         Nothing here. Hit <kbd className="mx-1 rounded bg-zinc-100 px-1 dark:bg-zinc-800">⌘K</kbd>
@@ -433,7 +499,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     );
   }
 
-  const byId = new Map(messages.map((m) => [m.id, m]));
+  const byId = new Map(displayed.map((m) => [m.id, m]));
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -449,7 +515,11 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             Archive
           </button>
           <button
-            onClick={() => void markMessagesRead([...checked])}
+            onClick={() => {
+              const ids = [...checked];
+              patch(ids, { isRead: true });
+              void markMessagesRead(ids);
+            }}
             className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700"
           >
             Mark read
@@ -488,7 +558,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
         })
       ) : (
         <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-          {messages.map(renderRow)}
+          {displayed.map(renderRow)}
         </ul>
       )}
     </div>

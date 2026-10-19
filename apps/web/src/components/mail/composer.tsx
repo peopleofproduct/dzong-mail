@@ -21,6 +21,8 @@ import {
 import { buildParams } from "./params";
 import { VariantPicker } from "./variant-picker";
 import type { DraftVariant } from "./variant-picker";
+import { RichBody } from "./rich-body";
+import type { RichBodyHandle } from "./rich-body";
 
 interface AccountOption {
   id: string;
@@ -34,11 +36,23 @@ interface StoredAttachment {
   sizeBytes: number | null;
 }
 
+interface SnippetOption {
+  id: string;
+  name: string;
+  body: string;
+}
+
 interface ComposerProps {
   accounts: AccountOption[];
   /** Files already stored on the draft being edited (compose=draft). */
   draftAttachments?: StoredAttachment[];
+  /** Formatted body stored on the draft - restores rich text on reopen. */
+  draftBodyHtml?: string;
+  snippets?: SnippetOption[];
 }
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
 
 const field =
   "w-full bg-transparent px-4 py-2.5 text-sm text-black placeholder-zinc-400 focus:outline-none dark:text-zinc-100";
@@ -49,7 +63,7 @@ function formatBytes(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function Composer({ accounts, draftAttachments }: ComposerProps) {
+export function Composer({ accounts, draftAttachments, draftBodyHtml, snippets }: ComposerProps) {
   const searchParams = useSearchParams();
   if (!searchParams.get("compose")) return null;
   // Key by the compose-relevant params so each compose session mounts fresh
@@ -62,12 +76,14 @@ export function Composer({ accounts, draftAttachments }: ComposerProps) {
     <ComposerInner
       accounts={accounts}
       draftAttachments={draftAttachments}
+      draftBodyHtml={draftBodyHtml}
+      snippets={snippets}
       key={sessionKey}
     />
   );
 }
 
-function ComposerInner({ accounts, draftAttachments }: ComposerProps) {
+function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: ComposerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get("compose")!;
@@ -83,6 +99,7 @@ function ComposerInner({ accounts, draftAttachments }: ComposerProps) {
   const [bcc, setBcc] = useState(initial.bcc);
   const [subject, setSubject] = useState(initial.subject);
   const [body, setBody] = useState(initial.body);
+  const [bodyHtml, setBodyHtml] = useState(() => draftBodyHtml ?? escapeHtml(initial.body));
   const [files, setFiles] = useState<File[]>([]);
   const [stored, setStored] = useState<StoredAttachment[]>(draftAttachments ?? []);
   const [showCcBcc, setShowCcBcc] = useState(Boolean(initial.cc || initial.bcc));
@@ -97,6 +114,7 @@ function ComposerInner({ accounts, draftAttachments }: ComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const hintRef = useRef<HTMLInputElement>(null);
   const accountRef = useRef<HTMLSelectElement>(null);
+  const bodyRef = useRef<RichBodyHandle>(null);
 
   const isReply = mode === "reply";
   const isDraft = mode === "draft";
@@ -131,6 +149,7 @@ function ComposerInner({ accounts, draftAttachments }: ComposerProps) {
     fd.set("bcc", bcc);
     fd.set("subject", subject);
     fd.set("body", body);
+    fd.set("bodyHtml", bodyHtml);
     fd.set("threadId", searchParams.get("threadId") ?? "");
     for (const f of files) fd.append("attachments", f);
     return fd;
@@ -340,14 +359,16 @@ function ComposerInner({ accounts, draftAttachments }: ComposerProps) {
             )}
             {aiError && <p className="px-4 pt-2 text-xs text-red-500">{aiError}</p>}
 
-            <textarea
-              name="body"
-              placeholder="Write your message…"
-              required
-              className="min-h-0 flex-1 resize-none bg-transparent px-4 py-3 text-sm text-black placeholder-zinc-400 focus:outline-none dark:text-zinc-100"
+            <input type="hidden" name="body" value={body} />
+            <input type="hidden" name="bodyHtml" value={bodyHtml} />
+            <RichBody
+              ref={bodyRef}
+              initialHtml={draftBodyHtml ?? escapeHtml(initial.body)}
               autoFocus={isReply}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onTextChange={(text, html) => {
+                setBody(text);
+                setBodyHtml(html);
+              }}
             />
 
             {(files.length > 0 || stored.length > 0) && (
@@ -436,6 +457,28 @@ function ComposerInner({ accounts, draftAttachments }: ComposerProps) {
                   if (el) el.dataset.role = "picker";
                 }}
               />
+              {snippets && snippets.length > 0 && (
+                <select
+                  defaultValue=""
+                  title="Insert a snippet"
+                  aria-label="Insert a snippet"
+                  className="rounded-md bg-transparent px-1 py-1.5 text-xs text-zinc-500 focus:outline-none"
+                  onChange={(e) => {
+                    const s = snippets.find((x) => x.id === e.target.value);
+                    if (s) bodyRef.current?.insert(escapeHtml(s.body));
+                    e.target.value = "";
+                  }}
+                >
+                  <option value="" disabled>
+                    Snippet…
+                  </option>
+                  {snippets.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={() => (showAiHint ? writeWithAI() : setShowAiHint(true))}
@@ -466,7 +509,7 @@ function ComposerInner({ accounts, draftAttachments }: ComposerProps) {
           busy={pending}
           pickLabel="Insert into reply"
           onPick={(b) => {
-            setBody(b);
+            bodyRef.current?.set(escapeHtml(b));
             setVariants(null);
           }}
           onRegenerate={writeWithAI}

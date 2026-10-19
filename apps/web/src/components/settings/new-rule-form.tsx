@@ -15,6 +15,7 @@ const ACTION_TYPES = [
   "STAR",
   "MOVE_FOLDER",
   "DRAFT_REPLY",
+  "WEBHOOK",
   "DELETE",
 ];
 
@@ -128,6 +129,11 @@ export function NewRuleForm({ accounts }: { accounts: AccountOption[] }) {
           <input type="checkbox" name="isEnabled" defaultChecked className="accent-indigo-600" />
           Enabled
         </label>
+        <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+          <input type="checkbox" name="autoSend" className="accent-indigo-600" />
+          Auto-send drafts
+          <span className="text-[10px] text-zinc-400">(still undoable during the send delay)</span>
+        </label>
 
         <p className="col-span-2 mt-1 text-xs font-medium text-zinc-500">Condition (JSON array)</p>
         <textarea
@@ -147,7 +153,8 @@ export function NewRuleForm({ accounts }: { accounts: AccountOption[] }) {
         />
         <p className="col-span-2 text-[10px] text-zinc-400">
           Fields: {CONDITION_FIELDS.join(", ")} · Operators: {OPERATORS.join(", ")} · Actions:{" "}
-          {ACTION_TYPES.join(", ")} — DRAFT_REPLY with no template generates an AI draft.
+          {ACTION_TYPES.join(", ")} — DRAFT_REPLY with no template generates an AI draft; WEBHOOK
+          posts the message to the rule URL (or its own &quot;value&quot;).
         </p>
         <button className="col-span-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500">
           Save rule

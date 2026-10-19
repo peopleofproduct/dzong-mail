@@ -18,6 +18,7 @@
     "db:push": "turbo db:push",
     "db:seed": "tsx scripts/seed-demo.ts",
     "worker": "tsx packages/sync-engine/src/worker.ts",
+    "verify:providers": "tsx scripts/verify-providers.ts",
     "setup": "bash scripts/setup.sh",
     "mcp": "npm run start -w @unwalled/mcp-server"
   },

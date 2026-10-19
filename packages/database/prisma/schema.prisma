@@ -201,14 +201,79 @@ model AutomationRule {
   conditions Json
 
   // e.g. [{ "type": "ARCHIVE" }, { "type": "ADD_LABEL", "label": "Finance" },
-  //       { "type": "DRAFT_REPLY", "template": "..." }]
+  //       { "type": "DRAFT_REPLY", "template": "..." },
+  //       { "type": "WEBHOOK", "value": "https://..." }]
   actions Json
+
+  // When true, drafts created by this rule's DRAFT_REPLY action are
+  // auto-queued through the send window instead of waiting for review.
+  autoSendDrafts Boolean @default(false)
 
   lastRunAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, isEnabled, priority])
+}
+
+// ─── Local app state ──────────────────────────────────────────────────────────
+
+// Activity surfaced to the user: new mail, follow-up reminders, send
+// results, overnight-agent summaries. dedupeKey prevents repeat rows.
+model Notification {
+  id        String    @id @default(cuid())
+  kind      String
+  dedupeKey String?   @unique
+  title     String
+  body      String?
+  messageId String?
+  threadId  String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([readAt])
+}
+
+// Composer templates the user can insert from the snippet picker.
+model Snippet {
+  id        String   @id @default(cuid())
+  name      String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Local to-dos rendered on the calendar alongside mail-derived events.
+model Task {
+  id        String    @id @default(cuid())
+  title     String
+  notes     String?
+  dueAt     DateTime?
+  doneAt    DateTime?
+  messageId String?
+  createdAt DateTime  @default(now())
+
+  @@index([dueAt])
+}
+
+// One row per background-worker cycle — the audit trail behind the
+// "while you slept" morning briefing.
+model AgentRun {
+  id      String   @id @default(cuid())
+  kind    String // "sync" | "maintenance"
+  summary Json
+  ranAt   DateTime @default(now())
+
+  @@index([ranAt])
+}
+
+// Key-value store for user preferences that are not AI settings:
+// inbox split labels, notification preferences, undo-send window.
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -218,6 +283,7 @@ enum MailProvider {
   MICROSOFT
   IMAP_SMTP
   MOCK
+  IMPORTED // messages imported from .eml/.mbox files - never synced or sent
 }
 
 enum EncryptionType {

@@ -27,6 +27,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     message: {
       ...serializeMessage(message),
       bodyText: message.bodyText,
+      scheduledAt: message.scheduledAt,
       attachments: message.attachments.map((a) => ({
         id: a.id,
         filename: a.filename,

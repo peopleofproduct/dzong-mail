@@ -24,10 +24,13 @@ import {
   syncAccount,
   unsubscribeMessage,
   unsubscribeSender,
+  importMailFiles,
+  verifyAccount,
 } from "@unwalled/sync-engine";
 import type { GeneratedRule, RuleAction, RuleCondition, SendAttachment } from "@unwalled/sync-engine";
 import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@unwalled/sync-engine";
 import { snapshotInboxZero } from "@/lib/achievements";
+import { getUndoSendSeconds, setSetting } from "@/lib/settings";
 import type { Prisma } from "@unwalled/database";
 
 const DEMO_USER_EMAIL = "me@unwalled.local";
@@ -384,32 +387,66 @@ export async function sendEmailAction(formData: FormData) {
   if (!accountId || to.length === 0) {
     safeRedirect("/", { error: "Recipient and account are required" });
   }
-  const scheduledAt = get("sendLater")
+  const explicitLater = get("sendLater")
     ? new Date(Date.now() + Number(get("sendLater")) * 60 * 60 * 1000)
     : undefined;
+  // Undo-send: every send queues through a short window first. Setting the
+  // window to 0 restores instant sends.
+  const undoSeconds = await getUndoSendSeconds();
+  const scheduledAt = explicitLater ??
+    (undoSeconds > 0 ? new Date(Date.now() + undoSeconds * 1000) : undefined);
 
   const draftId = get("draftId");
+  let rowId: string | undefined;
   try {
     const uploads = await formAttachments(formData);
     const stored = draftId ? await storedDraftAttachments(draftId) : [];
-    await sendEmail(accountId, {
+    const result = await sendEmail(accountId, {
       to,
       cc: splitAddresses(get("cc")),
       bcc: splitAddresses(get("bcc")),
       subject: get("subject"),
       bodyText: get("body"),
+      bodyHtml: get("bodyHtml") || undefined,
       attachments: [...uploads, ...stored],
       threadId: get("threadId") || undefined,
       inReplyToHeader: get("inReplyTo") || undefined,
       scheduledAt,
     });
+    rowId = result.messageRowId;
   } catch (err) {
     safeRedirect("/", { error: String(err) });
   }
   // If this send originated from an existing draft row, consume it.
   if (draftId) await deleteDraftWithFiles(draftId);
   revalidatePath("/");
-  safeRedirect("/", { notice: scheduledAt ? "Send scheduled" : "Message sent" });
+  if (explicitLater) safeRedirect("/", { notice: "Send scheduled" });
+  if (scheduledAt && rowId) {
+    safeRedirect("/", { undo: rowId });
+  }
+  safeRedirect("/", { notice: "Message sent" });
+}
+
+/** Cancel a queued send inside the undo window — the message drops back to
+ *  Drafts untouched, like Gmail's Undo. */
+export async function cancelScheduledSend(messageId: string): Promise<{ ok: boolean }> {
+  await prisma.message.updateMany({
+    where: { id: messageId, isDraft: true, scheduledAt: { not: null } },
+    data: { scheduledAt: null },
+  });
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Skip the wait — dispatch a queued send right now. */
+export async function dispatchQueuedSend(messageId: string): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    await dispatchScheduledDraft(messageId);
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: String(err) };
+  }
 }
 
 /**
@@ -450,6 +487,7 @@ export async function saveComposerDraft(formData: FormData): Promise<{
           bccAddresses: bcc,
           subject: subject || null,
           bodyText: body,
+          bodyHtml: get("bodyHtml") || null,
           snippet: body.slice(0, 200),
           hasAttachment: uploads.length > 0,
         },
@@ -464,6 +502,7 @@ export async function saveComposerDraft(formData: FormData): Promise<{
         ccAddresses: cc,
         bccAddresses: bcc,
         bodyText: body,
+        bodyHtml: get("bodyHtml") || undefined,
       });
     }
 
@@ -623,6 +662,9 @@ export async function saveRule(formData: FormData) {
     conditions: conditions as unknown as Prisma.InputJsonValue,
     actions: actions as unknown as Prisma.InputJsonValue,
     emailAccountId,
+    // Auto-send routes rule drafts through the undo window, so "auto" still
+    // means recallable for the configured delay.
+    autoSendDrafts: get("autoSend") === "on",
   };
 
   if (ruleId) {
@@ -714,5 +756,122 @@ export async function classifyNow(accountId?: string) {
       classified > 0
         ? `Classified ${classified} message(s)`
         : `Nothing classified — ${reason ?? "no pending messages"}`,
+  });
+}
+
+// ─── Preferences (AppSetting) ────────────────────────────────────────────────
+
+export async function savePrefs(formData: FormData) {
+  const get = (key: string) => String(formData.get(key) ?? "").trim();
+  await setSetting("undoSendSeconds", Math.max(0, Number(get("undoSendSeconds")) || 0));
+  await setSetting("followUpDays", Math.max(1, Number(get("followUpDays")) || 3));
+  revalidatePath("/settings");
+  safeRedirect("/settings", { notice: "Preferences saved" });
+}
+
+/** Pin/unpin labels as custom inbox sections. */
+export async function saveSplitLabels(formData: FormData) {
+  const labels = formData.getAll("splitLabel").map(String).filter(Boolean);
+  await setSetting("inboxSplitLabels", labels);
+  revalidatePath("/settings");
+  revalidatePath("/");
+  safeRedirect("/settings", { notice: labels.length ? "Inbox sections saved" : "Back to default sections" });
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export async function markNotificationRead(id: string): Promise<{ ok: boolean }> {
+  await prisma.notification.update({ where: { id }, data: { readAt: new Date() } });
+  return { ok: true };
+}
+
+export async function markAllNotificationsRead(): Promise<{ ok: boolean }> {
+  await prisma.notification.updateMany({
+    where: { readAt: null },
+    data: { readAt: new Date() },
+  });
+  return { ok: true };
+}
+
+// ─── Snippets ─────────────────────────────────────────────────────────────────
+
+export async function saveSnippet(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const id = String(formData.get("snippetId") ?? "").trim();
+  if (!name || !body) safeRedirect("/settings", { error: "Snippet needs a name and body" });
+  if (id) {
+    await prisma.snippet.update({ where: { id }, data: { name, body } });
+  } else {
+    await prisma.snippet.create({ data: { name, body } });
+  }
+  revalidatePath("/settings");
+  safeRedirect("/settings", { notice: "Snippet saved" });
+}
+
+export async function deleteSnippet(id: string) {
+  await prisma.snippet.delete({ where: { id } });
+  revalidatePath("/settings");
+}
+
+// ─── Tasks (calendar to-dos) ─────────────────────────────────────────────────
+
+export async function saveTask(formData: FormData) {
+  const title = String(formData.get("title") ?? "").trim();
+  const dueAt = String(formData.get("dueAt") ?? "").trim();
+  if (!title) return;
+  await prisma.task.create({
+    data: {
+      title,
+      notes: String(formData.get("notes") ?? "").trim() || null,
+      dueAt: dueAt ? new Date(dueAt) : null,
+    },
+  });
+  revalidatePath("/calendar");
+}
+
+export async function toggleTask(id: string) {
+  const task = await prisma.task.findUniqueOrThrow({ where: { id } });
+  await prisma.task.update({
+    where: { id },
+    data: { doneAt: task.doneAt ? null : new Date() },
+  });
+  revalidatePath("/calendar");
+}
+
+export async function deleteTask(id: string) {
+  await prisma.task.delete({ where: { id } });
+  revalidatePath("/calendar");
+}
+
+// ─── Import (.eml / .mbox) ────────────────────────────────────────────────────
+
+const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
+
+export async function importMailAction(formData: FormData) {
+  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) safeRedirect("/settings", { error: "Choose .eml or .mbox files" });
+  let total = 0;
+  const inputs: { name: string; data: Buffer }[] = [];
+  for (const f of files) {
+    total += f.size;
+    if (total > MAX_IMPORT_BYTES) {
+      safeRedirect("/settings", { error: "Import exceeds the 100 MB limit" });
+    }
+    inputs.push({ name: f.name, data: Buffer.from(await f.arrayBuffer()) });
+  }
+  const result = await importMailFiles(inputs);
+  revalidatePath("/");
+  safeRedirect("/settings", {
+    notice: `Imported ${result.imported} message(s)${result.skipped ? `, skipped ${result.skipped}` : ""}`,
+  });
+}
+
+// ─── Provider verification ───────────────────────────────────────────────────
+
+export async function verifyAccountNow(accountId: string) {
+  const result = await verifyAccount(accountId);
+  safeRedirect("/settings", {
+    [result.ok ? "notice" : "error"]: `${result.emailAddress}: ${result.detail}`,
   });
 }

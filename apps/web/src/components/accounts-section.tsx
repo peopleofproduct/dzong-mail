@@ -5,6 +5,7 @@ import {
   connectOAuthAccount,
   syncAccountNow,
   updateAccountDisplayName,
+  verifyAccountNow,
 } from "@/lib/actions";
 import { DisconnectButton } from "@/components/disconnect-button";
 import { GmailConnectCard, OtherProviderCard } from "@/components/connect-forms";
@@ -53,6 +54,19 @@ export async function AccountsSection() {
                     : " · never synced"}
                 </span>
               </div>
+              {account.provider !== "MOCK" && account.provider !== "IMPORTED" && (
+                <form
+                  action={verifyAccountNow.bind(null, account.id)}
+                  title="Live-check credentials and connectivity"
+                >
+                  <button
+                    type="submit"
+                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  >
+                    Verify
+                  </button>
+                </form>
+              )}
               <form action={syncAccountNow.bind(null, account.id)}>
                 <button
                   type="submit"

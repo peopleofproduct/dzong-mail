@@ -64,6 +64,7 @@ export async function createDraftRow(
     ccAddresses?: string[];
     bccAddresses?: string[];
     bodyText: string;
+    bodyHtml?: string;
     /** Tag the draft AI_DRAFT when a model wrote it (vs. a static template). */
     aiGenerated?: boolean;
   },
@@ -81,6 +82,7 @@ export async function createDraftRow(
       ccAddresses: input.ccAddresses ?? [],
       bccAddresses: input.bccAddresses ?? [],
       bodyText: input.bodyText,
+      bodyHtml: input.bodyHtml,
       receivedAt: new Date(),
       isRead: true,
       isDraft: true,

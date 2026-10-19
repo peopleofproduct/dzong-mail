@@ -21,6 +21,8 @@ function providerFor(account: EmailAccount): MailSyncProvider {
       return new GmailSyncProvider();
     case "MICROSOFT":
       return new GraphSyncProvider();
+    case "IMPORTED":
+      throw new Error("Imported accounts hold local mail only - nothing to sync");
     default: {
       const exhaustive: never = account.provider;
       throw new Error(`No sync provider for ${String(exhaustive)}`);

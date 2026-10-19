@@ -21,6 +21,8 @@ export interface SendInput {
   bcc?: string[];
   subject: string;
   bodyText: string;
+  /** Rich-text body — sent as multipart/alternative alongside bodyText. */
+  bodyHtml?: string;
   attachments?: SendAttachment[];
   /** Provider thread to reply within (sets In-Reply-To where applicable). */
   threadId?: string;
@@ -59,6 +61,7 @@ function buildMime(from: string, input: SendInput): Promise<Buffer> {
     bcc: input.bcc?.join(", "),
     subject: input.subject,
     text: input.bodyText,
+    html: input.bodyHtml,
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
     attachments: input.attachments?.map((a) => ({
@@ -91,6 +94,7 @@ async function recordSent(
       ccAddresses: input.cc ?? [],
       bccAddresses: input.bcc ?? [],
       bodyText: input.bodyText,
+      bodyHtml: input.bodyHtml,
       receivedAt: new Date(),
       isRead: true,
       isDraft: Boolean(input.scheduledAt),
@@ -150,6 +154,7 @@ async function deliverViaSmtp(
     bcc: input.bcc?.join(", "),
     subject: input.subject,
     text: input.bodyText,
+    html: input.bodyHtml,
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
     attachments: input.attachments?.map((a) => ({
@@ -221,7 +226,10 @@ async function deliverViaGraph(
     body: JSON.stringify({
       message: {
         subject: input.subject,
-        body: { contentType: "Text", content: input.bodyText },
+        body: {
+          contentType: input.bodyHtml ? "HTML" : "Text",
+          content: input.bodyHtml ?? input.bodyText,
+        },
         toRecipients: input.to.map(toRecipient),
         ccRecipients: (input.cc ?? []).map(toRecipient),
         bccRecipients: (input.bcc ?? []).map(toRecipient),
@@ -278,6 +286,8 @@ async function deliver(
       if (!token) throw new Error(`Account ${account.id} has no access token — reconnect`);
       return { providerMessageId: await deliverViaGraph(account, input, token) };
     }
+    case "IMPORTED":
+      throw new Error("Imported accounts cannot send mail");
     default: {
       const exhaustive: never = account.provider;
       throw new Error(`No sender for provider ${String(exhaustive)}`);
@@ -321,6 +331,7 @@ export async function dispatchScheduledDraft(
     bcc: message.bccAddresses,
     subject: message.subject ?? "",
     bodyText: message.bodyText ?? message.snippet ?? "",
+    bodyHtml: message.bodyHtml ?? undefined,
     attachments: attachments.length ? attachments : undefined,
     threadId: message.threadId ?? undefined,
   };
@@ -369,6 +380,8 @@ export async function sendEmail(
       if (!token) throw new Error(`Account ${accountId} has no access token — reconnect`);
       return sendViaGraph(db, account, input, token);
     }
+    case "IMPORTED":
+      throw new Error("Imported accounts cannot send mail");
     default: {
       const exhaustive: never = account.provider;
       throw new Error(`No sender for provider ${String(exhaustive)}`);

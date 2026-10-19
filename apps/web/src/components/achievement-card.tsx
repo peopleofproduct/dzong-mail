@@ -183,6 +183,11 @@ export function AchievementCard({
           <p className="mt-8 text-xs text-zinc-500">
             Local-first mail - data never leaves the machine.
           </p>
+          <p className="mt-1 text-[10px] text-zinc-600">
+            Streaks count forward from when you started using Unwalled - there is no
+            historical record of past clear-inbox days to backfill, so early numbers are
+            honest ones.
+          </p>
         </div>
       </div>
     </section>

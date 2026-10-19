@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BarChart3, Keyboard, Menu, PenSquare, Search } from "lucide-react";
+import { NotificationBell } from "./notification-bell";
 import { SyncStatus } from "./sync-status";
 import { ThemeToggle } from "./theme-toggle";
 import { buildParams } from "./params";
@@ -78,6 +79,7 @@ export function Topbar() {
         </button>
       </form>
       <SyncStatus />
+      <NotificationBell />
       <button
         onClick={() => router.push("/analytics")}
         title="Analytics"

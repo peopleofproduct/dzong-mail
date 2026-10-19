@@ -6,6 +6,7 @@ import { AISettingsSection } from "@/components/settings/ai-settings-section";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RulesSection } from "@/components/settings/rules-section";
 import { SubscriptionsSection } from "@/components/settings/subscriptions-section";
+import { WorkspaceSection } from "@/components/settings/workspace-section";
 
 function SectionSkeleton() {
   return <div className="h-32 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />;
@@ -37,6 +38,9 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
         </Suspense>
         <Suspense fallback={<SectionSkeleton />}>
           <AccountsSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton />}>
+          <WorkspaceSection />
         </Suspense>
         <Suspense fallback={<SectionSkeleton />}>
           <RulesSection />

@@ -64,3 +64,13 @@ export { ImapSyncProvider } from "./providers/imap";
 export { GmailSyncProvider } from "./providers/gmail";
 export { GraphSyncProvider } from "./providers/graph";
 export { attachmentFilePath, attachmentsDir, dataDir, storeAttachmentContent } from "./attachments";
+export {
+  checkFollowUpReminders,
+  emit,
+  notifyNewMail,
+  recordAgentRun,
+} from "./notify";
+export { importMailFiles, getOrCreateImportAccount } from "./import-mail";
+export type { ImportResult } from "./import-mail";
+export { verifyAccount, verifyAllAccounts } from "./verify";
+export type { VerifyOutcome } from "./verify";

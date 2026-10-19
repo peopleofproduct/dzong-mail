@@ -381,7 +381,8 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
 const BULK_LABELS = new Set(["NEWSLETTER", "MARKETING", "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL"]);
 
 /** Group serialized inbox items into split-inbox sections (Superhuman-style):
- *  Priority → Newsletters & bulk → Everything else. */
+ *  Priority → Newsletters & bulk → Everything else by default, or the
+ *  user's own pinned label sections when they've configured splits. */
 export function splitInboxGroups(
   items: {
     id: string;
@@ -389,8 +390,29 @@ export function splitInboxGroups(
     isStarred: boolean;
     aiLabels: string[];
     providerLabels: string[];
+    labels?: string[];
   }[],
+  splitLabels?: string[],
 ): { title: string; ids: string[] }[] {
+  // Custom splits: one section per pinned label, remainder underneath.
+  if (splitLabels && splitLabels.length > 0) {
+    const used = new Set<string>();
+    const sections = splitLabels.map((label) => {
+      const ids = items
+        .filter((m) => {
+          const has = (m.labels ?? []).includes(label) || m.aiLabels.includes(label);
+          if (has) used.add(m.id);
+          return has;
+        })
+        .map((m) => m.id);
+      return { title: `#${label}`, ids };
+    });
+    const rest = items.filter((m) => !used.has(m.id)).map((m) => m.id);
+    return [...sections, { title: "Everything else", ids: rest }].filter(
+      (s) => s.ids.length > 0,
+    );
+  }
+
   const priority: string[] = [];
   const bulk: string[] = [];
   const rest: string[] = [];
