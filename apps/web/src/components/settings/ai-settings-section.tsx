@@ -38,7 +38,7 @@ export async function AISettingsSection() {
         </select>
         <input
           name="model"
-          placeholder="Model"
+          placeholder="Model (e.g. llama3.2:3b, gpt-4o-mini, claude-sonnet-4-5)"
           defaultValue={settings?.model ?? "llama3.1"}
           className={inputClass}
         />
@@ -96,7 +96,9 @@ export async function AISettingsSection() {
       </form>
       <p className="text-xs text-zinc-400">
         Keys stay on this machine — AES-256-GCM encrypted with your local UNWALLED_SECRET_KEY. With
-        Ollama selected, no data leaves localhost.
+        Ollama selected, no data leaves localhost. OpenAI and Anthropic are supported as optional
+        BYOK providers; note Anthropic has no embeddings API, so semantic features need Ollama or
+        OpenAI for embeddings.
       </p>
     </section>
   );

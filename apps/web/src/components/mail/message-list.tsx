@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Archive, ArchiveRestore, BellOff, CheckCheck, Star, X } from "lucide-react";
 import {
   archiveMessages,
   markMessagesRead,
+  moveMessages,
   snoozeMessage,
   toggleMessageFlag,
   unarchiveMessage,
+  unarchiveMessages,
   unsnoozeMessage,
   unsubscribeFromMessage,
 } from "@/lib/actions";
@@ -33,6 +35,9 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
   const searchParams = useSearchParams();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["Newsletters & bulk"]));
+  const lastArchived = useRef<string[]>([]);
+  const gPending = useRef(0);
+  const vPending = useRef(0);
 
   const currentIndex = useMemo(
     () => messages.findIndex((m) => m.id === selectedId),
@@ -71,22 +76,76 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     [checked, selectedId],
   );
 
+  const archive = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      lastArchived.current = ids;
+      void archiveMessages(ids);
+      setChecked(new Set());
+    },
+    [setChecked],
+  );
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      const now = Date.now();
+
+      // v-chord: move to inbox/archive/trash
+      if (e.key === "v") {
+        vPending.current = now;
+        return;
+      }
+      if (vPending.current && now - vPending.current < 1000) {
+        vPending.current = 0;
+        const ids = targets();
+        if (e.key === "a") {
+          archive(ids);
+          return;
+        }
+        if (e.key === "i") {
+          void moveMessages(ids, "inbox");
+          return;
+        }
+        if (e.key === "t") {
+          void moveMessages(ids, "trash");
+          return;
+        }
+        // Unknown chord key — fall through to normal handling.
+      }
+
+      // g-chord: jump to top (the global g→view chords live in
+      // KeyboardShortcuts; both listeners see the same keys harmlessly).
+      if (e.key === "g") {
+        gPending.current = now;
+        return;
+      }
+      if (gPending.current && now - gPending.current < 1000 && e.key === "g") {
+        gPending.current = 0;
+        e.preventDefault();
+        select(messages[0]?.id);
+        return;
+      }
+
       switch (e.key) {
         case "j":
+        case "ArrowDown":
           e.preventDefault();
           move(1);
           break;
         case "k":
+        case "ArrowUp":
           e.preventDefault();
           move(-1);
           break;
-        case "Enter": {
+        case "G":
+          select(messages[messages.length - 1]?.id);
+          break;
+        case "Enter":
+        case "o": {
           const item = messages[currentIndex];
           if (item) openThread(item);
           break;
@@ -101,9 +160,18 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           });
           break;
         }
+        case "A":
+          setChecked(new Set(messages.map((m) => m.id)));
+          break;
         case "e":
-          void archiveMessages(targets());
-          setChecked(new Set());
+          archive(targets());
+          break;
+        case "z":
+          // Undo the most recent bulk archive.
+          if (lastArchived.current.length > 0) {
+            void unarchiveMessages(lastArchived.current);
+            lastArchived.current = [];
+          }
           break;
         case "s":
           if (selectedId) void toggleMessageFlag(selectedId, "isStarred");
@@ -115,13 +183,18 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           if (selectedId) void snoozeMessage(selectedId, 24);
           break;
         case "Escape":
-          router.push(buildParams(searchParams, { thread: undefined }));
+          // Clearing a multi-select takes priority over closing the thread —
+          // the global handler in KeyboardShortcuts owns thread/compose close.
+          if (checked.size > 0) {
+            e.stopImmediatePropagation();
+            setChecked(new Set());
+          }
           break;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [messages, currentIndex, selectedId, move, openThread, targets, router, searchParams]);
+  }, [messages, currentIndex, selectedId, move, openThread, targets, archive, select, checked]);
 
   const toggleSection = (title: string) => {
     setCollapsed((prev) => {
@@ -249,7 +322,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               title="Archive (e)"
               onClick={(e) => {
                 e.stopPropagation();
-                void archiveMessages([m.id]);
+                archive([m.id]);
               }}
               className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
             >
@@ -325,7 +398,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             {checked.size} selected
           </span>
           <button
-            onClick={() => void archiveMessages([...checked]).then(() => setChecked(new Set()))}
+            onClick={() => archive([...checked])}
             className="rounded bg-zinc-900 px-2 py-1 text-white dark:bg-zinc-100 dark:text-black"
           >
             Archive

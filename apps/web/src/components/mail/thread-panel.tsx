@@ -61,6 +61,17 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
   const inReplyTo = (last.headers as Record<string, string> | null)?.["Message-ID"];
   if (inReplyTo) replyParams.set("inReplyTo", inReplyTo);
 
+  const fwdParams = new URLSearchParams(baseParams);
+  fwdParams.set("compose", "new");
+  fwdParams.set("accountId", last.emailAccountId);
+  fwdParams.set("subject", `Fwd: ${(last.subject ?? "").replace(/^Fwd?:\s*/i, "")}`);
+  fwdParams.set(
+    "body",
+    `\n\n---------- Forwarded message ---------\nFrom: ${last.fromName ?? ""} <${last.fromAddress}>\n` +
+      `Date: ${last.receivedAt.toLocaleString()}\nSubject: ${last.subject ?? ""}\n\n` +
+      (last.bodyText ?? last.snippet ?? ""),
+  );
+
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
       {unread.length > 0 && <MarkReadOnMount ids={unread} action={markMessagesRead} />}
@@ -141,6 +152,13 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
         >
           ↩ Reply
+        </a>
+        <a
+          id="thread-forward"
+          href={`/?${fwdParams.toString()}`}
+          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        >
+          ↪ Forward
         </a>
         {!last.isDraft && (
           <form action={draftAiReplyNow.bind(null, last.id)}>

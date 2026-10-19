@@ -182,6 +182,34 @@ export async function unarchiveMessage(id: string) {
   revalidatePath("/");
 }
 
+export async function unarchiveMessages(ids: string[]) {
+  if (ids.length === 0) return;
+  await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isArchived: false } });
+  revalidatePath("/");
+}
+
+/** Move-to keyboard chord: archive back to inbox, or tag a folder. */
+export async function moveMessages(ids: string[], target: "inbox" | "archive" | "trash") {
+  if (ids.length === 0) return;
+  if (target === "inbox") {
+    await prisma.message.updateMany({
+      where: { id: { in: ids } },
+      data: { isArchived: false, folder: "INBOX" },
+    });
+  } else if (target === "archive") {
+    await prisma.message.updateMany({
+      where: { id: { in: ids } },
+      data: { isArchived: true },
+    });
+  } else {
+    await prisma.message.updateMany({
+      where: { id: { in: ids } },
+      data: { isArchived: true, folder: "Trash" },
+    });
+  }
+  revalidatePath("/");
+}
+
 export async function markMessagesRead(ids: string[], read = true) {
   if (ids.length === 0) return;
   await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isRead: read } });

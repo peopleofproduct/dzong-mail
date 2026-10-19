@@ -24,7 +24,10 @@ async function main() {
 
   const account = await prisma.emailAccount.findFirstOrThrow({ where: { provider: "MOCK" } });
 
-  console.log("CLASSIFY:", JSON.stringify(await classifyAccountMessages(account.id, prisma, { limit: 10 })));
+  console.log(
+    "CLASSIFY:",
+    JSON.stringify(await classifyAccountMessages(account.id, prisma, { limit: 10 })),
+  );
 
   const msg = await prisma.message.findFirstOrThrow({
     where: { isDraft: false, threadId: { not: null } },
@@ -35,7 +38,9 @@ async function main() {
 
   console.log(
     "NL RULE:",
-    JSON.stringify(await generateRuleFromPrompt(user.id, "archive newsletters from noreply senders")),
+    JSON.stringify(
+      await generateRuleFromPrompt(user.id, "archive newsletters from noreply senders"),
+    ),
   );
 
   // Ensure the cold-email preset exists, then run all rules
@@ -58,4 +63,7 @@ async function main() {
   console.log("LABEL DIST:", JSON.stringify(labelRows.slice(0, 10)));
   await prisma.$disconnect();
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

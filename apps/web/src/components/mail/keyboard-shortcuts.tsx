@@ -17,20 +17,25 @@ const GO_TO: Record<string, string> = {
 };
 
 const HELP: Array<{ keys: string; action: string }> = [
-  { keys: "j / k", action: "Move selection down / up" },
-  { keys: "Enter", action: "Open selected thread" },
+  { keys: "j / k / ↑ / ↓", action: "Move selection" },
+  { keys: "Enter / o", action: "Open selected thread" },
+  { keys: "g g / G", action: "Jump to top / bottom" },
   { keys: "x", action: "Toggle checkbox on selected" },
+  { keys: "⇧A", action: "Select all visible" },
   { keys: "e", action: "Archive selected / checked" },
+  { keys: "z", action: "Undo last archive" },
+  { keys: "v then i/a/t", action: "Move to Inbox / Archive / Trash" },
   { keys: "s", action: "Star / unstar" },
   { keys: "u", action: "Toggle read / unread" },
   { keys: "h", action: "Snooze 24 hours" },
-  { keys: "r", action: "Reply to open thread" },
+  { keys: "r / f", action: "Reply / Forward open thread" },
   { keys: "c", action: "Compose new message" },
+  { keys: "⌘⏎ / Ctrl⏎", action: "Send (inside composer)" },
   { keys: "/", action: "Focus search" },
   { keys: "g then i/s/d/t/a/n", action: "Go to Inbox/Starred/Drafts/Sent/Archive/Newsletters" },
   { keys: "g then r/w/z", action: "Needs reply / Awaiting / Snoozed" },
   { keys: "⌘K", action: "Command palette" },
-  { keys: "Esc", action: "Close composer / thread" },
+  { keys: "Esc", action: "Clear selection, then close composer / thread" },
   { keys: "?", action: "Toggle this help" },
 ];
 
@@ -73,6 +78,9 @@ export function KeyboardShortcuts() {
         case "r":
           // Reuse the thread panel's reply link so params stay consistent.
           document.getElementById("thread-reply")?.click();
+          break;
+        case "f":
+          document.getElementById("thread-forward")?.click();
           break;
         case "Escape":
           if (searchParams.get("compose")) {

@@ -76,7 +76,16 @@ function ComposerInner({ accounts }: ComposerProps) {
             <X size={16} />
           </button>
         </div>
-        <form action={sendEmailAction} className="flex flex-col gap-2 p-4">
+        <form
+          action={sendEmailAction}
+          className="flex flex-col gap-2 p-4"
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.requestSubmit();
+            }
+          }}
+        >
           <select
             name="accountId"
             defaultValue={searchParams.get("accountId") ?? accounts[0]?.id}
