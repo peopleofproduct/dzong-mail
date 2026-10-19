@@ -1,5 +1,16 @@
 import type { EmailAccount } from "@unwalled/database";
 
+/** Provider-agnostic attachment: metadata plus content when the provider
+ * returned it inline. Persisted to local disk by the engine. */
+export interface RawAttachment {
+  filename: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  /** cid: identifier for inline (embedded image) attachments. */
+  contentId?: string;
+  content?: Buffer;
+}
+
 /** Provider-agnostic normalized message, ready for persistence. */
 export interface RawMessage {
   providerMessageId: string;
@@ -15,6 +26,7 @@ export interface RawMessage {
   headers?: Record<string, string>;
   bodyText?: string;
   bodyHtml?: string;
+  attachments?: RawAttachment[];
   sizeBytes?: number;
   receivedAt: Date;
   isRead: boolean;

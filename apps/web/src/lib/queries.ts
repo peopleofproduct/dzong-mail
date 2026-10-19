@@ -12,7 +12,8 @@ export type MailView =
   | "archive"
   | "newsletters"
   | "needs-reply"
-  | "awaiting";
+  | "awaiting"
+  | "digest";
 
 export const VIEW_LABELS: Record<MailView, string> = {
   inbox: "Inbox",
@@ -24,6 +25,7 @@ export const VIEW_LABELS: Record<MailView, string> = {
   newsletters: "Newsletters",
   "needs-reply": "Needs reply",
   awaiting: "Awaiting reply",
+  digest: "Digest",
 };
 
 export function parseView(raw: string | undefined): MailView {
@@ -61,6 +63,16 @@ function viewWhere(view: MailView): Prisma.MessageWhereInput {
         isDraft: false,
         OR: [
           { aiLabels: { has: "NEWSLETTER" } },
+          { providerLabels: { hasSome: ["NEWSLETTER", "CATEGORY_PROMOTIONS"] } },
+        ],
+      };
+    case "digest":
+      return {
+        isDraft: false,
+        isArchived: false,
+        receivedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        OR: [
+          { aiLabels: { hasSome: ["NEWSLETTER", "MARKETING", "COLD_PITCH"] } },
           { providerLabels: { hasSome: ["NEWSLETTER", "CATEGORY_PROMOTIONS"] } },
         ],
       };
@@ -128,8 +140,61 @@ export async function getThread(threadId: string) {
   return prisma.message.findMany({
     where: { threadId },
     orderBy: { receivedAt: "asc" },
-    include: { emailAccount: { select: { emailAddress: true } } },
+    include: {
+      emailAccount: { select: { emailAddress: true } },
+      attachments: { orderBy: { createdAt: "asc" } },
+    },
   });
+}
+
+export interface DigestSender {
+  fromAddress: string;
+  fromName: string | null;
+  count: number;
+  latestSubject: string | null;
+  latestThreadId: string | null;
+  latestReceivedAt: string;
+}
+
+/** Bulk/newsletter senders from the last N days, grouped for the digest view. */
+export async function getDigestSenders(days = 7): Promise<DigestSender[]> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const rows = await prisma.message.findMany({
+    where: {
+      isDraft: false,
+      isArchived: false,
+      receivedAt: { gte: since },
+      OR: [
+        { aiLabels: { hasSome: ["NEWSLETTER", "MARKETING", "COLD_PITCH"] } },
+        { providerLabels: { hasSome: ["NEWSLETTER", "CATEGORY_PROMOTIONS"] } },
+      ],
+    },
+    orderBy: { receivedAt: "desc" },
+    select: {
+      fromAddress: true,
+      fromName: true,
+      subject: true,
+      threadId: true,
+      receivedAt: true,
+    },
+  });
+
+  const bySender = new Map<string, DigestSender>();
+  for (const m of rows) {
+    const existing = bySender.get(m.fromAddress);
+    if (existing) existing.count++;
+    else {
+      bySender.set(m.fromAddress, {
+        fromAddress: m.fromAddress,
+        fromName: m.fromName,
+        count: 1,
+        latestSubject: m.subject,
+        latestThreadId: m.threadId,
+        latestReceivedAt: m.receivedAt.toISOString(),
+      });
+    }
+  }
+  return [...bySender.values()].sort((a, b) => b.count - a.count);
 }
 
 export interface ThreadSummary {

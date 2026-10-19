@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import {
   getAccounts,
+  getDigestSenders,
   getFollowUpThreads,
   getMessagesForFolder,
   getMessagesForLabel,
@@ -12,6 +13,8 @@ import {
   splitInboxGroups,
 } from "@/lib/queries";
 import { AskPanel } from "@/components/mail/ask-panel";
+import { DigestList } from "@/components/mail/digest-list";
+import { DigestPanel } from "@/components/mail/digest-panel";
 import { serializeMessage } from "@/components/mail/types";
 import type { MailItem } from "@/components/mail/types";
 import { CommandPalette } from "@/components/mail/command-palette";
@@ -49,6 +52,10 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   const label = str(params, "label");
   const folder = str(params, "folder");
   const q = str(params, "q");
+
+  if (view === "digest") {
+    return <DigestList senders={await getDigestSenders()} />;
+  }
 
   const semantic = str(params, "sm") === "1";
   let semanticNote: string | undefined;
@@ -98,6 +105,9 @@ async function PaneSection({ searchParams }: { searchParams: SearchParams }) {
   const askParam = params["ask"];
   if (typeof askParam === "string") {
     return <AskPanel question={askParam || undefined} />;
+  }
+  if (str(params, "view") === "digest") {
+    return <DigestPanel generated={str(params, "digestgen") === "1"} />;
   }
   const thread = str(params, "thread");
   if (!thread) {

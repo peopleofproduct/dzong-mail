@@ -2,11 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Archive, ArchiveRestore, BellOff, CheckCheck, Star, X } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  BellOff,
+  CheckCheck,
+  Paperclip,
+  Send,
+  Star,
+  X,
+} from "lucide-react";
 import {
   archiveMessages,
   markMessagesRead,
   moveMessages,
+  sendDraftNow,
   snoozeMessage,
   toggleMessageFlag,
   unarchiveMessage,
@@ -267,6 +277,9 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
                 <BellOff size={11} className="shrink-0 text-zinc-400" />
               </span>
             )}
+            {m.hasAttachment && (
+              <Paperclip size={11} className="shrink-0 text-zinc-400" aria-label="Has attachment" />
+            )}
             {m.score !== undefined && (
               <span
                 title="Semantic match score"
@@ -314,6 +327,18 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           )}
         </div>
         <div className="hidden shrink-0 items-center gap-1 group-hover:flex">
+          {m.isDraft && (
+            <button
+              title="Send now"
+              onClick={(e) => {
+                e.stopPropagation();
+                void sendDraftNow(m.id);
+              }}
+              className="rounded p-1 text-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-950"
+            >
+              <Send size={14} />
+            </button>
+          )}
           {m.isArchived ? (
             <button
               title="Unarchive"

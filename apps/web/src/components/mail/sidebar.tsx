@@ -3,6 +3,7 @@ import {
   Archive,
   BellOff,
   Inbox,
+  LayoutList,
   Mail,
   Newspaper,
   ReplyAll,
@@ -26,6 +27,7 @@ const VIEW_ICONS: Record<MailView, typeof Inbox> = {
   newsletters: Newspaper,
   "needs-reply": ReplyAll,
   awaiting: Timer,
+  digest: LayoutList,
 };
 
 interface SidebarProps {

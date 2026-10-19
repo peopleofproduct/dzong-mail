@@ -140,6 +140,72 @@ export async function semanticSearchMessages(
 }
 
 /**
+ * Generate a short AI digest of recent low-priority mail (newsletters,
+ * marketing, promotions) — the "morning briefing" for bulk senders.
+ */
+export async function generateDigest(
+  userId: string,
+  db: PrismaClient = prisma,
+  options: { days?: number; limit?: number } = {},
+): Promise<AskResult> {
+  const ai = await resolveAIForUser(userId, db);
+  if (!ai) return { ok: false, reason: "AI disabled or unreachable" };
+
+  const since = new Date(Date.now() - (options.days ?? 7) * 24 * 60 * 60 * 1000);
+  const bulk = await db.message.findMany({
+    where: {
+      emailAccount: { userId },
+      isDraft: false,
+      isArchived: false,
+      receivedAt: { gte: since },
+      OR: [
+        { aiLabels: { hasSome: ["NEWSLETTER", "MARKETING", "COLD_PITCH"] } },
+        { providerLabels: { hasSome: ["NEWSLETTER", "CATEGORY_PROMOTIONS"] } },
+      ],
+    },
+    orderBy: { receivedAt: "desc" },
+    take: options.limit ?? 40,
+    include: { emailAccount: { select: { emailAddress: true } } },
+  });
+  if (bulk.length === 0) {
+    return { ok: false, reason: "No bulk/newsletter mail in the window — inbox is clean" };
+  }
+
+  const context = bulk
+    .map(
+      (m, i) =>
+        `[email ${i + 1}] From: ${m.fromName ?? ""} <${m.fromAddress}> | Subject: ${m.subject ?? ""} | ${m.snippet ?? ""}`,
+    )
+    .join("\n");
+
+  const completion = await ai.provider.complete({
+    messages: [
+      {
+        role: "system",
+        content:
+          "Write a compact digest of these low-priority emails for the user. " +
+          "Group by sender where they repeat, one bullet per topic, cite [email N]. " +
+          "Flag anything that looks actionable rather than informational. " +
+          "Plain text, short lines, no greeting.\n\n" +
+          context,
+      },
+      {
+        role: "user",
+        content: `Digest of ${bulk.length} messages from the last ${options.days ?? 7} days.`,
+      },
+    ],
+    temperature: 0.2,
+    maxTokens: 600,
+  });
+
+  return {
+    ok: true,
+    answer: completion.text,
+    sources: bulk.slice(0, ASK_TOP_K).map((message) => ({ message, score: 0 })),
+  };
+}
+
+/**
  * "Ask my inbox" — retrieve the most relevant messages semantically, then
  * answer the question grounded in their content. Read-only; cites sources.
  */

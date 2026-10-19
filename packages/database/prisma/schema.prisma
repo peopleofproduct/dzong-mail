@@ -110,6 +110,9 @@ model Message {
   labels         String[] @default([]) // user- and rule-applied labels
   aiSummary      String?
 
+  hasAttachment Boolean      @default(false)
+  attachments   Attachment[]
+
   // Semantic-search vector — brute-force cosine at local scale, no pgvector needed.
   embedding      Float[] @default([])
   embeddingModel String?
@@ -121,6 +124,25 @@ model Message {
   @@index([emailAccountId, receivedAt])
   @@index([threadId])
   @@index([fromAddress])
+}
+
+model Attachment {
+  id        String  @id @default(cuid())
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+
+  filename  String
+  mimeType  String?
+  sizeBytes Int?
+  contentId String? // cid: for inline references
+
+  // Path relative to the attachments dir (UNWALLED_DATA_DIR/attachments).
+  // Null when only metadata was synced and the content was not downloaded.
+  storagePath String?
+
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
 }
 
 // ─── AI routing configuration ─────────────────────────────────────────────────

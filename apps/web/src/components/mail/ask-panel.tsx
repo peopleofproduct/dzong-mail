@@ -68,9 +68,9 @@ export async function AskPanel({ question }: { question?: string }) {
           <div className="space-y-2 pt-6 text-center text-sm text-zinc-400">
             <p>Try questions like:</p>
             <ul className="space-y-1 text-xs">
-              <li>"what did Alice say about the hiking trip?"</li>
-              <li>"any receipts or invoices this month?"</li>
-              <li>"summarize the Linear sprint thread"</li>
+              <li>&quot;what did Alice say about the hiking trip?&quot;</li>
+              <li>&quot;any receipts or invoices this month?&quot;</li>
+              <li>&quot;summarize the Linear sprint thread&quot;</li>
             </ul>
           </div>
         )}

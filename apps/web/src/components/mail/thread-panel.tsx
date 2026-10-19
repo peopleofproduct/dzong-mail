@@ -1,12 +1,19 @@
+import { Paperclip } from "lucide-react";
 import { getThread } from "@/lib/queries";
 import { prisma } from "@/lib/db";
-import { draftAiReplyNow, markMessagesRead, summarizeThreadNow } from "@/lib/actions";
+import { draftAiReplyNow, markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/actions";
 import { MarkReadOnMount } from "./mark-read-on-mount";
 
 interface ThreadPanelProps {
   threadId: string;
   /** Query string to preserve when building the reply link. */
   baseParams: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** Build compose params to reopen a draft for editing and sending. */
@@ -36,7 +43,10 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
   const messages = threadId.startsWith("single-")
     ? await prisma.message.findMany({
         where: { id: threadId.slice(7) },
-        include: { emailAccount: { select: { emailAddress: true } } },
+        include: {
+          emailAccount: { select: { emailAddress: true } },
+          attachments: { orderBy: { createdAt: "asc" } },
+        },
       })
     : await getThread(threadId);
 
@@ -133,13 +143,47 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
             ) : (
               <p className="text-sm text-zinc-500 italic">{m.snippet ?? "No content synced."}</p>
             )}
+            {m.attachments.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {m.attachments.map((a) => (
+                  <a
+                    key={a.id}
+                    href={a.storagePath ? `/api/attachments/${a.id}` : undefined}
+                    title={
+                      a.storagePath ? `Download ${a.filename}` : `${a.filename} (not downloaded)`
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs ${
+                      a.storagePath
+                        ? "border-zinc-300 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                        : "cursor-default border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-700"
+                    }`}
+                  >
+                    <Paperclip size={12} />
+                    <span className="max-w-48 truncate">{a.filename}</span>
+                    {a.sizeBytes !== null && a.sizeBytes !== undefined && (
+                      <span className="text-zinc-400">{formatBytes(a.sizeBytes)}</span>
+                    )}
+                  </a>
+                ))}
+              </div>
+            )}
             {m.isDraft && (
-              <a
-                href={`/?${draftParams(m, baseParams)}`}
-                className="mt-3 inline-block rounded-md border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
-              >
-                Edit &amp; send draft →
-              </a>
+              <div className="mt-3 flex items-center gap-2">
+                <a
+                  href={`/?${draftParams(m, baseParams)}`}
+                  className="inline-block rounded-md border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                >
+                  Edit &amp; send draft →
+                </a>
+                <form action={sendDraftNow.bind(null, m.id)}>
+                  <button
+                    type="submit"
+                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
+                  >
+                    Send now
+                  </button>
+                </form>
+              </div>
             )}
           </article>
         ))}

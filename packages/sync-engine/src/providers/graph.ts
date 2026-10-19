@@ -1,4 +1,12 @@
-import type { MailSyncProvider, ProviderSyncResult, RawMessage, SyncContext } from "../types";
+import type {
+  MailSyncProvider,
+  ProviderSyncResult,
+  RawAttachment,
+  RawMessage,
+  SyncContext,
+} from "../types";
+
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
 const GRAPH_API = "https://graph.microsoft.com/v1.0";
 
@@ -13,6 +21,7 @@ const SELECT = [
   "receivedDateTime",
   "isRead",
   "isDraft",
+  "hasAttachments",
   "internetMessageId",
   "parentFolderId",
   "body",
@@ -33,8 +42,19 @@ interface GraphMessage {
   receivedDateTime?: string;
   isRead?: boolean;
   isDraft?: boolean;
+  hasAttachments?: boolean;
   parentFolderId?: string;
   body?: { contentType?: string; content?: string };
+}
+
+interface GraphAttachment {
+  id?: string;
+  name?: string;
+  contentType?: string;
+  size?: number;
+  contentId?: string;
+  isInline?: boolean;
+  contentBytes?: string; // base64, fileAttachment only
 }
 
 interface GraphDeltaPage {
@@ -72,6 +92,7 @@ export class GraphSyncProvider implements MailSyncProvider {
 
       for (const msg of page.value ?? []) {
         if ("@removed" in msg) continue;
+        const attachments = msg.hasAttachments ? await this.fetchAttachments(headers, msg.id) : [];
         messages.push({
           providerMessageId: msg.id,
           threadId: msg.conversationId,
@@ -85,6 +106,7 @@ export class GraphSyncProvider implements MailSyncProvider {
           bccAddresses: [],
           bodyHtml: msg.body?.contentType === "html" ? msg.body.content : undefined,
           bodyText: msg.body?.contentType === "text" ? msg.body.content : msg.bodyPreview,
+          attachments,
           receivedAt: msg.receivedDateTime ? new Date(msg.receivedDateTime) : new Date(),
           isRead: msg.isRead ?? false,
           isStarred: false,
@@ -101,5 +123,33 @@ export class GraphSyncProvider implements MailSyncProvider {
     }
 
     return { messages, nextSyncToken: deltaLink };
+  }
+
+  /** fileAttachment resources carry contentBytes inline; over the size cap we
+   * record metadata only and leave the file on the server. */
+  private async fetchAttachments(
+    headers: Record<string, string>,
+    messageId: string,
+  ): Promise<RawAttachment[]> {
+    const res = await fetch(
+      `${GRAPH_API}/me/messages/${encodeURIComponent(messageId)}/attachments` +
+        `?$select=id,name,contentType,size,contentId,isInline,contentBytes&$top=50`,
+      { headers },
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { value?: GraphAttachment[] };
+    return (data.value ?? []).flatMap((a) => {
+      if (!a.name) return [];
+      const oversized = (a.size ?? 0) > MAX_ATTACHMENT_BYTES;
+      return [
+        {
+          filename: a.name,
+          mimeType: a.contentType,
+          sizeBytes: a.size,
+          contentId: a.contentId,
+          content: a.contentBytes && !oversized ? Buffer.from(a.contentBytes, "base64") : undefined,
+        },
+      ];
+    });
   }
 }

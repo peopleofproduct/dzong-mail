@@ -1,5 +1,6 @@
 import { prisma } from "@unwalled/database";
 import type { EmailAccount, PrismaClient } from "@unwalled/database";
+import { persistAttachments } from "./attachments";
 import { decryptIfPresent } from "./crypto";
 import { applyAutomationRules } from "./rules";
 import { GmailSyncProvider } from "./providers/gmail";
@@ -94,8 +95,14 @@ export async function syncAccount(
         emailAccountId: account.id,
         providerMessageId: { in: fresh.map((m) => m.providerMessageId) },
       },
-      select: { id: true },
+      select: { id: true, providerMessageId: true },
     });
+    const idByProviderId = new Map(inserted.map((m) => [m.providerMessageId, m.id]));
+    try {
+      await persistAttachments(fresh, idByProviderId, db);
+    } catch (err) {
+      console.error(`[sync] attachment persistence failed for ${account.id}:`, err);
+    }
     try {
       await applyAutomationRules(account.id, db, {
         messageIds: inserted.map((m) => m.id),

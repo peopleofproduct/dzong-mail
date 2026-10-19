@@ -84,6 +84,13 @@ export class ImapSyncProvider implements MailSyncProvider {
               bccAddresses: [],
               bodyText: parsed.text ?? undefined,
               bodyHtml: parsed.html || undefined,
+              attachments: (parsed.attachments ?? []).map((a) => ({
+                filename: a.filename ?? "attachment",
+                mimeType: a.contentType,
+                sizeBytes: a.size,
+                contentId: a.cid,
+                content: a.content,
+              })),
               sizeBytes: msg.size ?? msg.source.length,
               receivedAt:
                 parsed.date ?? (msg.internalDate ? new Date(msg.internalDate) : new Date()),

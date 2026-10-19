@@ -1,4 +1,10 @@
-import type { MailSyncProvider, ProviderSyncResult, RawMessage, SyncContext } from "../types";
+import type {
+  MailSyncProvider,
+  ProviderSyncResult,
+  RawAttachment,
+  RawMessage,
+  SyncContext,
+} from "../types";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const MAX_MESSAGES = 100;
@@ -11,7 +17,8 @@ interface GmailHeader {
 
 interface GmailBodyPart {
   mimeType?: string;
-  body?: { data?: string };
+  filename?: string;
+  body?: { data?: string; attachmentId?: string; size?: number };
   parts?: GmailBodyPart[];
 }
 
@@ -48,6 +55,20 @@ function extractBodies(part: GmailBodyPart | undefined): {
     out.html ??= found.html;
   }
   return out;
+}
+
+/** Parts carrying a filename are attachments (or inline bodies saved as files). */
+function collectAttachmentParts(part: GmailBodyPart | undefined, out: GmailBodyPart[] = []) {
+  if (!part) return out;
+  if (part.filename && part.filename.length > 0) out.push(part);
+  for (const child of part.parts ?? []) collectAttachmentParts(child, out);
+  return out;
+}
+
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+
+function b64urlToBuffer(data: string): Buffer {
+  return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64");
 }
 
 interface GmailHistoryEntry {
@@ -163,6 +184,33 @@ export class GmailSyncProvider implements MailSyncProvider {
       const from = parseAddressHeader(headerValue(headers, "From"));
       const labels = msg.labelIds ?? [];
 
+      const attachments: RawAttachment[] = [];
+      for (const part of collectAttachmentParts(msg.payload)) {
+        const filename = part.filename;
+        if (!filename) continue;
+        const size = part.body?.size;
+        if (size !== undefined && size > MAX_ATTACHMENT_BYTES) {
+          attachments.push({ filename, mimeType: part.mimeType, sizeBytes: size });
+          continue;
+        }
+        let content: Buffer | undefined;
+        if (part.body?.data) {
+          content = b64urlToBuffer(part.body.data);
+        } else if (part.body?.attachmentId) {
+          const attRes = await get(`/messages/${msg.id}/attachments/${part.body.attachmentId}`);
+          if (attRes.ok) {
+            const attData = (await attRes.json()) as { data?: string };
+            if (attData.data) content = b64urlToBuffer(attData.data);
+          }
+        }
+        attachments.push({
+          filename,
+          mimeType: part.mimeType,
+          sizeBytes: size ?? content?.length,
+          content,
+        });
+      }
+
       messages.push({
         providerMessageId: msg.id,
         threadId: msg.threadId,
@@ -177,6 +225,7 @@ export class GmailSyncProvider implements MailSyncProvider {
         headers: Object.fromEntries((headers ?? []).map((h) => [h.name, h.value])),
         bodyText: bodies.text,
         bodyHtml: bodies.html,
+        attachments,
         sizeBytes: msg.sizeEstimate,
         receivedAt: msg.internalDate ? new Date(Number(msg.internalDate)) : new Date(),
         isRead: !labels.includes("UNREAD"),

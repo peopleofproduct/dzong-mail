@@ -10,6 +10,7 @@ import {
   buildMicrosoftAuthorizationUrl,
   classifyAccountMessages,
   composeWithAI,
+  dispatchScheduledDraft,
   draftAiReply,
   encryptSecret,
   generateRuleFromPrompt,
@@ -225,6 +226,29 @@ export async function snoozeMessage(id: string, hours: number) {
 export async function unsnoozeMessage(id: string) {
   await prisma.message.update({ where: { id }, data: { snoozedUntil: null } });
   revalidatePath("/");
+}
+
+/** Archive everything currently unarchived from one sender (digest cleanup). */
+export async function archiveSenderNow(fromAddress: string) {
+  await prisma.message.updateMany({
+    where: { fromAddress, isArchived: false, isDraft: false },
+    data: { isArchived: true },
+  });
+  revalidatePath("/");
+}
+
+/** Send a draft immediately through its account's real provider. */
+export async function sendDraftNow(messageId: string) {
+  const message = await prisma.message.findUniqueOrThrow({ where: { id: messageId } });
+  if (!message.isDraft || message.toAddresses.length === 0) {
+    safeRedirect("/", { error: "Draft has no recipient" });
+  }
+  try {
+    await dispatchScheduledDraft(messageId);
+    safeRedirect("/", { notice: "Draft sent" });
+  } catch (err) {
+    safeRedirect("/", { error: String(err) });
+  }
 }
 
 export async function unsubscribeFromMessage(id: string) {

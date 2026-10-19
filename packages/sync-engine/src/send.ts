@@ -236,8 +236,9 @@ async function deliver(
 }
 
 /**
- * Dispatch a previously scheduled draft: deliver it through the account's
- * real provider and flip the existing row from Drafts to Sent.
+ * Dispatch a draft: deliver it through the account's real provider and flip
+ * the existing row from Drafts to Sent. Used by the worker for scheduled
+ * sends and by the UI for manual "send now" on drafts.
  */
 export async function dispatchScheduledDraft(
   messageId: string,
@@ -247,7 +248,7 @@ export async function dispatchScheduledDraft(
     where: { id: messageId },
     include: { emailAccount: true },
   });
-  if (!message.isDraft || !message.scheduledAt) return;
+  if (!message.isDraft) return;
 
   const input: SendInput = {
     to: message.toAddresses,
