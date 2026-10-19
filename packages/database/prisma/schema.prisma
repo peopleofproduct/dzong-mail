@@ -1,0 +1,198 @@
+// Unwalled Mail — local-first data model
+// All data lives on the user's own PostgreSQL instance.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Local profile ────────────────────────────────────────────────────────────
+
+model User {
+  id          String  @id @default(cuid())
+  email       String  @unique
+  name        String?
+  avatarPath  String?
+  preferences Json    @default("{}")
+
+  accounts        EmailAccount[]
+  aiSettings      AISettings?
+  automationRules AutomationRule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Connected mailbox ────────────────────────────────────────────────────────
+
+model EmailAccount {
+  id           String       @id @default(cuid())
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  provider     MailProvider
+  emailAddress String
+  displayName  String?
+
+  // Generic IMAP/SMTP configuration
+  imapHost          String?
+  imapPort          Int?
+  imapSecurity      EncryptionType?
+  smtpHost          String?
+  smtpPort          Int?
+  smtpSecurity      EncryptionType?
+  username          String?
+  passwordEncrypted String?
+
+  // OAuth — user-supplied client credentials (BYOK)
+  oauthClientId       String?
+  oauthClientSecret   String?
+  oauthAccessToken    String?
+  oauthRefreshToken   String?
+  oauthTokenExpiresAt DateTime?
+  oauthScopes         String[]        @default([])
+
+  // Synchronization state (historyId / delta token / UIDVALIDITY depending on provider)
+  syncToken           String?
+  lastSyncedAt        DateTime?
+  syncEnabled         Boolean  @default(true)
+  syncIntervalMinutes Int      @default(5)
+  isActive            Boolean  @default(true)
+
+  messages        Message[]
+  automationRules AutomationRule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, emailAddress])
+  @@index([userId])
+}
+
+// ─── Synchronized message metadata ────────────────────────────────────────────
+
+model Message {
+  id               String       @id @default(cuid())
+  emailAccount     EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  emailAccountId   String
+  providerMessageId String
+  threadId         String?
+  folder           String?
+
+  subject    String?
+  snippet    String?
+  fromAddress String
+  fromName   String?
+  toAddresses  String[] @default([])
+  ccAddresses  String[] @default([])
+  bccAddresses String[] @default([])
+  headers    Json?
+  sizeBytes  Int?
+
+  // Message bodies stay on local disk; this points at the stored file.
+  localBodyPath String?
+
+  receivedAt DateTime
+  isRead     Boolean @default(false)
+  isStarred  Boolean @default(false)
+  isDraft    Boolean @default(false)
+
+  providerLabels String[] @default([])
+  aiLabels       String[] @default([])
+  aiSummary      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([emailAccountId, providerMessageId])
+  @@index([emailAccountId, receivedAt])
+  @@index([threadId])
+  @@index([fromAddress])
+}
+
+// ─── AI routing configuration ─────────────────────────────────────────────────
+
+model AISettings {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  provider        AIProvider @default(OLLAMA)
+  baseUrl         String? // e.g. http://localhost:11434 — null falls back to the provider default
+  apiKeyEncrypted String? // cloud BYOK, stored locally
+  model           String   @default("llama3.1")
+  embeddingModel  String?
+  temperature     Float    @default(0.2)
+  enabled         Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── User-defined automation ──────────────────────────────────────────────────
+
+model AutomationRule {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  // Optional: scope the rule to one account; null applies it to all of the user's accounts
+  emailAccount   EmailAccount? @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  emailAccountId String?
+
+  name        String
+  description String?
+  isEnabled   Boolean @default(true)
+  priority    Int     @default(0)
+
+  trigger   RuleTrigger    @default(ON_MESSAGE_SYNC)
+  matchMode RuleMatchMode  @default(ALL)
+
+  // e.g. [{ "field": "subject", "operator": "contains", "value": "invoice" },
+  //       { "field": "aiLabel",  "operator": "equals",   "value": "newsletter" }]
+  conditions Json
+
+  // e.g. [{ "type": "ARCHIVE" }, { "type": "ADD_LABEL", "label": "Finance" },
+  //       { "type": "DRAFT_REPLY", "template": "..." }]
+  actions Json
+
+  lastRunAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isEnabled, priority])
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum MailProvider {
+  GOOGLE
+  MICROSOFT
+  IMAP_SMTP
+}
+
+enum EncryptionType {
+  NONE
+  SSL_TLS
+  STARTTLS
+}
+
+enum AIProvider {
+  OLLAMA
+  OPENAI
+  ANTHROPIC
+}
+
+enum RuleTrigger {
+  ON_MESSAGE_SYNC
+  ON_AI_CLASSIFICATION
+  MANUAL
+}
+
+enum RuleMatchMode {
+  ALL
+  ANY
+}
