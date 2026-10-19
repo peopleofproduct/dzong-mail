@@ -18,6 +18,8 @@ export interface MailItem {
   labels: string[];
   accountEmail: string;
   hasUnsubscribe: boolean;
+  /** Semantic-search relevance score, present on `?sm=1` results. */
+  score?: number;
 }
 
 export function serializeMessage(m: {

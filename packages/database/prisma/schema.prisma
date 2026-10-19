@@ -110,6 +110,10 @@ model Message {
   labels         String[] @default([]) // user- and rule-applied labels
   aiSummary      String?
 
+  // Semantic-search vector — brute-force cosine at local scale, no pgvector needed.
+  embedding      Float[] @default([])
+  embeddingModel String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

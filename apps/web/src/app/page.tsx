@@ -8,8 +8,10 @@ import {
   getMessagesForView,
   getSidebarData,
   parseView,
+  searchMessagesSemantic,
   splitInboxGroups,
 } from "@/lib/queries";
+import { AskPanel } from "@/components/mail/ask-panel";
 import { serializeMessage } from "@/components/mail/types";
 import type { MailItem } from "@/components/mail/types";
 import { CommandPalette } from "@/components/mail/command-palette";
@@ -48,6 +50,8 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   const folder = str(params, "folder");
   const q = str(params, "q");
 
+  const semantic = str(params, "sm") === "1";
+  let semanticNote: string | undefined;
   let items: MailItem[];
   if (label) {
     items = (await getMessagesForLabel(label)).map(serializeMessage);
@@ -56,6 +60,12 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   } else if (view === "needs-reply" || view === "awaiting") {
     const threads = await getFollowUpThreads(view);
     items = threads.map((t) => serializeMessage(t.latest));
+  } else if (semantic && q) {
+    const result = await searchMessagesSemantic(q);
+    items = result.hits;
+    if (!result.ok) semanticNote = result.reason ?? "semantic search unavailable";
+    else if (result.hits.length === 0)
+      semanticNote = "No semantic matches — run the worker once to embed your mail";
   } else {
     items = (await getMessagesForView(view, q)).map(serializeMessage);
   }
@@ -66,18 +76,29 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     view === "inbox" && !q && !label && !folder ? splitInboxGroups(items) : undefined;
 
   return (
-    <MessageList
-      messages={items}
-      selectedId={str(params, "selected")}
-      threadId={str(params, "thread")}
-      sections={sections}
-    />
+    <>
+      {semanticNote && (
+        <p className="border-b border-zinc-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-zinc-800 dark:bg-amber-950/40 dark:text-amber-300">
+          {semanticNote}
+        </p>
+      )}
+      <MessageList
+        messages={items}
+        selectedId={str(params, "selected")}
+        threadId={str(params, "thread")}
+        sections={sections}
+      />
+    </>
   );
 }
 
 async function PaneSection({ searchParams }: { searchParams: SearchParams }) {
   await connection();
   const params = await searchParams;
+  const askParam = params["ask"];
+  if (typeof askParam === "string") {
+    return <AskPanel question={askParam || undefined} />;
+  }
   const thread = str(params, "thread");
   if (!thread) {
     return (

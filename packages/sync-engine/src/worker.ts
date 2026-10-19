@@ -5,6 +5,7 @@ import { syncAllAccounts } from "./engine";
 import { classifyAccountMessages } from "./classify";
 import { applyAutomationRules } from "./rules";
 import { dispatchScheduledDraft } from "./send";
+import { embedAccountMessages } from "./semantic";
 
 const TICK_MS = Number(process.env.WORKER_TICK_MS ?? 30_000);
 const SYNC_INTERVAL_MS = Number(process.env.WORKER_SYNC_INTERVAL_MS ?? 5 * 60_000);
@@ -63,6 +64,12 @@ export async function runSyncCycle(db: PrismaClient = prisma): Promise<void> {
         messageIds: classification.labeledIds,
         trigger: "ON_AI_CLASSIFICATION",
       });
+    }
+    const embedding = await embedAccountMessages(outcome.accountId, db);
+    if (embedding.embedded > 0) {
+      console.log(`[worker] embedded ${embedding.embedded} message(s) for semantic search`);
+    } else if (embedding.reason) {
+      console.log(`[worker] embedding skipped: ${embedding.reason}`);
     }
   }
 }

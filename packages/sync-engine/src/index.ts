@@ -11,6 +11,8 @@ export { syncAccount, syncAllAccounts } from "./engine";
 export { sendEmail, dispatchScheduledDraft } from "./send";
 export type { SendInput, SendResult } from "./send";
 export { dispatchDueDrafts, returnDueSnoozes, runSyncCycle } from "./worker";
+export { askInbox, embedAccountMessages, semanticSearchMessages, cosineSimilarity } from "./semantic";
+export type { AskResult, EmbedOutcome, SemanticHit } from "./semantic";
 export {
   applyAutomationRules,
   matchesCondition,

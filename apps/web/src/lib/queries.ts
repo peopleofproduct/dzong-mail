@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { semanticSearchMessages } from "@unwalled/sync-engine";
+import { serializeMessage } from "@/components/mail/types";
 import type { Message, Prisma } from "@unwalled/database";
 
 export type MailView =
@@ -87,6 +89,18 @@ export async function getMessagesForView(view: MailView, q?: string, take = 100)
     take,
     include: { emailAccount: { select: { emailAddress: true, provider: true } } },
   });
+}
+
+/** Semantic (embedding) search across the local user's mail. */
+export async function searchMessagesSemantic(q: string, take = 50) {
+  const user = await getLocalUser();
+  if (!user) return { ok: false as const, hits: [], reason: "no local user" };
+  const result = await semanticSearchMessages(user.id, q, prisma, { limit: take });
+  return {
+    ok: result.ok,
+    reason: result.reason,
+    hits: result.hits.map((h) => ({ ...serializeMessage(h.message), score: h.score })),
+  };
 }
 
 export async function getMessagesForLabel(label: string, take = 100) {

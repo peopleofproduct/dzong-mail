@@ -267,6 +267,14 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
                 <BellOff size={11} className="shrink-0 text-zinc-400" />
               </span>
             )}
+            {m.score !== undefined && (
+              <span
+                title="Semantic match score"
+                className="shrink-0 rounded bg-indigo-50 px-1 text-[10px] font-medium text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
+              >
+                ✦ {m.score.toFixed(2)}
+              </span>
+            )}
             <span className="ml-auto shrink-0 text-[11px] text-zinc-400">
               {new Date(m.receivedAt).toLocaleDateString(undefined, {
                 month: "short",

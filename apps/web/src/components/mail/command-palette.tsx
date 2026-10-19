@@ -72,6 +72,15 @@ export function CommandPalette() {
               </Command.Item>
               <Command.Item
                 onSelect={() => {
+                  router.push(buildParams(searchParams, { ask: "", thread: undefined }));
+                  setOpen(false);
+                }}
+                className="cursor-pointer rounded-md px-2 py-2 text-sm aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800"
+              >
+                Ask my inbox <span className="float-right text-zinc-400">✦</span>
+              </Command.Item>
+              <Command.Item
+                onSelect={() => {
                   void syncAllNow();
                   setOpen(false);
                 }}

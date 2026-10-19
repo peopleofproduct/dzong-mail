@@ -10,6 +10,7 @@ export function Topbar() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
+  const semanticOn = searchParams.get("sm") === "1";
 
   useEffect(() => {
     const onWindowKey = (e: KeyboardEvent) => {
@@ -45,8 +46,22 @@ export function Topbar() {
           type="search"
           defaultValue={searchParams.get("q") ?? ""}
           placeholder="Search mail…  ( / )"
-          className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-1.5 pr-3 pl-9 text-sm outline-none placeholder:text-zinc-400 focus:border-indigo-300 dark:border-zinc-800 dark:bg-zinc-900"
+          className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-1.5 pr-14 pl-9 text-sm outline-none placeholder:text-zinc-400 focus:border-indigo-300 dark:border-zinc-800 dark:bg-zinc-900"
         />
+        <button
+          type="button"
+          onClick={() =>
+            router.push(buildParams(searchParams, { sm: semanticOn ? undefined : "1" }))
+          }
+          title="Toggle semantic (AI) search — meaning-based, needs embeddings"
+          className={`absolute top-1/2 right-2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+            semanticOn
+              ? "bg-indigo-600 text-white"
+              : "text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+          }`}
+        >
+          ✦ AI
+        </button>
       </form>
       <button
         onClick={() => void syncAllNow()}
