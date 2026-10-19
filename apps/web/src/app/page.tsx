@@ -195,7 +195,7 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
       {/* CSS-only mobile nav drawer — the checkbox state drives the
           sidebar slide-in on small screens without any client JS. */}
       <input id="nav-toggle" type="checkbox" className="peer hidden" />
-      <div className="fixed inset-y-0 left-0 z-40 -translate-x-full bg-white transition-transform duration-200 peer-checked:translate-x-0 md:static md:z-auto md:translate-x-0 md:transition-none dark:bg-zinc-950">
+      <div className="fixed inset-y-0 left-0 z-40 h-full -translate-x-full bg-white transition-transform duration-200 peer-checked:translate-x-0 md:static md:z-auto md:h-auto md:translate-x-0 md:transition-none dark:bg-zinc-950">
         <Suspense
           fallback={
             <aside className="w-56 shrink-0 animate-pulse border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950" />
@@ -210,7 +210,7 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
         className="fixed inset-0 z-30 hidden bg-black/40 peer-checked:block md:hidden"
       />
       <section
-        className={`${paneOpen ? "hidden md:flex" : "flex"} w-full flex-col border-r border-zinc-200 sm:w-[380px] sm:shrink-0 dark:border-zinc-800`}
+        className={`${paneOpen ? "hidden md:flex" : "flex"} min-h-0 w-full flex-col overflow-hidden border-r border-zinc-200 sm:w-[380px] sm:shrink-0 dark:border-zinc-800`}
       >
         <Suspense
           fallback={
@@ -228,7 +228,7 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
         </Suspense>
       </section>
       <section
-        className={`${paneOpen ? "flex" : "hidden md:flex"} fixed inset-0 z-30 min-w-0 flex-1 flex-col bg-white md:static md:z-auto md:bg-zinc-50/40 dark:bg-zinc-950 md:dark:bg-black/20`}
+        className={`${paneOpen ? "flex" : "hidden md:flex"} fixed inset-0 z-30 min-h-0 min-w-0 flex-1 flex-col bg-white md:static md:z-auto md:bg-zinc-50/40 dark:bg-zinc-950 md:dark:bg-black/20`}
       >
         <Suspense
           fallback={
@@ -251,7 +251,9 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
 
 export default function Home(props: PageProps<"/">) {
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950">
+    // h-dvh pins the app shell to the viewport so each pane scrolls
+    // internally (Gmail-style) instead of the whole page scrolling.
+    <div className="flex h-dvh flex-col overflow-hidden bg-white dark:bg-zinc-950">
       <Suspense
         fallback={<header className="h-[46px] border-b border-zinc-200 dark:border-zinc-800" />}
       >

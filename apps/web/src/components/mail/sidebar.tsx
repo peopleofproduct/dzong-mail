@@ -45,7 +45,7 @@ function viewHref(view: string, q?: string): string {
 
 export function Sidebar({ data, activeView, activeLabel, query }: SidebarProps) {
   return (
-    <aside className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-zinc-200 bg-zinc-50/50 px-3 py-4 dark:border-zinc-800 dark:bg-zinc-950">
+    <aside className="flex h-full w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-zinc-200 bg-zinc-50/50 px-3 py-4 dark:border-zinc-800 dark:bg-zinc-950">
       <Link
         href="/"
         className="mb-3 flex items-center gap-2 px-2 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
