@@ -15,11 +15,13 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
-    "db:push": "turbo db:push"
+    "db:push": "turbo db:push",
+    "db:seed": "tsx scripts/seed-demo.ts"
   },
   "devDependencies": {
     "prettier": "^3.3.3",
     "prettier-plugin-tailwindcss": "^0.6.8",
+    "tsx": "^4.23.15",
     "turbo": "^2.1.3"
   },
   "engines": {

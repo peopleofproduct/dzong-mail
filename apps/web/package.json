@@ -12,6 +12,7 @@
   "dependencies": {
     "@unwalled/ai-engine": "*",
     "@unwalled/database": "*",
+    "@unwalled/sync-engine": "*",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"

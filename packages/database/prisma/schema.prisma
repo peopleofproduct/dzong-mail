@@ -172,6 +172,7 @@ enum MailProvider {
   GOOGLE
   MICROSOFT
   IMAP_SMTP
+  MOCK
 }
 
 enum EncryptionType {

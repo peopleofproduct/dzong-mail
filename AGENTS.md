@@ -15,6 +15,12 @@ npm workspaces orchestrated by Turborepo:
 - `packages/ai-engine` — `@unwalled/ai-engine`. Provider abstraction
   (`AIProvider` interface) routing completions/embeddings/classification to
   Ollama (local, default `http://localhost:11434`) or OpenAI/Anthropic stubs.
+- `packages/sync-engine` — `@unwalled/sync-engine`. `MailSyncProvider`
+  strategies (IMAP via imapflow/mailparser, Gmail history API, Graph delta,
+  deterministic Mock), OAuth helpers for Google/Microsoft BYOK flows,
+  AES-256-GCM secret encryption, and the `syncAccount`/`syncAllAccounts`
+  orchestrator that upserts `Message` rows and advances each account's
+  `syncToken`.
 
 ## Commands
 
@@ -26,9 +32,22 @@ Run from the repo root:
 - `npm run db:generate` — regenerate Prisma client
 - `npm run db:migrate` — `prisma migrate dev` (requires local Postgres)
 - `npm run db:push` — push schema without migration history
+- `npm run db:seed` — create demo user + MOCK account and sync a batch of
+  generated messages
 
 Database connection: `DATABASE_URL` in `packages/database/.env`
 (default `postgresql://postgres:postgres@localhost:5432/unwalled_mail`).
+Local Postgres is installed via Homebrew (`postgresql@17`, `brew services
+start postgresql@17`) with a `postgres` superuser for the default URL.
+
+Secrets at rest are AES-256-GCM encrypted with a key derived from
+`UNWALLED_SECRET_KEY`; a built-in dev key is used when unset (a warning is
+logged). Set it before storing real credentials.
+
+OAuth flows: connect forms store BYOK client credentials, then server actions
+redirect to the provider; callbacks live at
+`apps/web/src/app/api/oauth/{google,microsoft}/callback/route.ts` and persist
+encrypted tokens on the `EmailAccount` row.
 
 ## Conventions
 
