@@ -27,6 +27,7 @@ import {
 } from "@unwalled/sync-engine";
 import type { GeneratedRule, RuleAction, RuleCondition, SendAttachment } from "@unwalled/sync-engine";
 import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@unwalled/sync-engine";
+import { snapshotInboxZero } from "@/lib/achievements";
 import type { Prisma } from "@unwalled/database";
 
 const DEMO_USER_EMAIL = "me@unwalled.local";
@@ -221,6 +222,7 @@ export async function archiveMessages(ids: string[]) {
     where: { id: { in: ids } },
     data: { isArchived: true },
   });
+  await snapshotInboxZero();
   revalidatePath("/");
 }
 
@@ -231,6 +233,7 @@ export async function archiveThreadNow(threadId: string) {
     where: { threadId, isDraft: false },
     data: { isArchived: true },
   });
+  await snapshotInboxZero();
   revalidatePath("/");
 }
 
@@ -264,6 +267,7 @@ export async function moveMessages(ids: string[], target: "inbox" | "archive" | 
       data: { isArchived: true, folder: "Trash" },
     });
   }
+  await snapshotInboxZero();
   revalidatePath("/");
 }
 

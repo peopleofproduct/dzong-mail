@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { ArrowLeft } from "lucide-react";
-import { getAnalyticsData } from "@/lib/queries";
+import { getAnalyticsData, getAccounts } from "@/lib/queries";
+import { getAchievementStats, snapshotInboxZero } from "@/lib/achievements";
+import { AchievementCard } from "@/components/achievement-card";
 
 function Stat({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
@@ -17,12 +19,20 @@ function Stat({ label, value, hint }: { label: string; value: number; hint?: str
 async function AnalyticsBody() {
   await connection();
   const data = await getAnalyticsData(14);
+  // Visiting analytics counts as a checkpoint for the inbox-zero streak.
+  await snapshotInboxZero();
+  const [achievements, accounts] = await Promise.all([getAchievementStats(), getAccounts()]);
+  const name =
+    accounts.find((a) => a.displayName)?.displayName ??
+    accounts[0]?.emailAddress.split("@")[0] ??
+    "You";
   const maxDay = Math.max(1, ...data.daily.map((d) => d.count));
   const maxLabel = Math.max(1, ...data.labelCounts.map((l) => l.count));
   const maxSender = Math.max(1, ...data.topSenders.map((s) => s.count));
 
   return (
     <div className="flex flex-col gap-8">
+      <AchievementCard stats={achievements} name={name} />
       <section>
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
           At a glance

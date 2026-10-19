@@ -168,6 +168,15 @@ model AISettings {
   updatedAt DateTime @updatedAt
 }
 
+// ─── Achievements ─────────────────────────────────────────────────────────────
+
+// One row per local day the inbox was seen fully clear. Streaks are computed
+// from consecutive day keys - history before tracking started is unknowable.
+model InboxZeroDay {
+  date      String   @id // YYYY-MM-DD (local day)
+  createdAt DateTime @default(now())
+}
+
 // ─── User-defined automation ──────────────────────────────────────────────────
 
 model AutomationRule {
