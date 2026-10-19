@@ -47,6 +47,7 @@ async function SidebarSection({ searchParams }: { searchParams: SearchParams }) 
       data={data}
       activeView={parseView(str(params, "view"))}
       activeLabel={str(params, "label")}
+      activeFolder={str(params, "folder")}
       query={str(params, "q")}
     />
   );
