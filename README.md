@@ -18,44 +18,86 @@ Free. Open source. MIT. Yours.
 
 ---
 
-## What it does
+## What nobody else does
 
-- **A real email client** — three-pane inbox, threads, composer,
-  send/reply/forward, drafts, snooze, archive, trash, search, and a full
-  keyboard map (press `?` in the app to see every shortcut).
+Plenty of products say "AI email" now. Here's what's different about ours —
+and why it stays that way.
+
+- **It writes like you write to *them*, not like you in general.**
+  Other tools learn "your voice" as one global style. Unwalled builds a
+  per-recipient profile from your actual shared history — the greeting
+  you use with Sam, the sign-off you use with your lawyer, how short you
+  keep it with your team — and drafts to match. Open any sender's
+  dossier page and you can see exactly what it inferred. Nobody else
+  shows you the math.
+- **Every AI action explains itself — and asks first when unsure.**
+  Each label, draft, and rule application carries a written "why" and a
+  confidence score. Below your threshold it queues for your approval
+  instead of firing. A cloud service can't do this honestly without
+  leaking their model internals; our pipeline is yours.
+- **Everything is undoable.** Every automated action is logged in a
+  local audit trail with a one-click undo. Trust isn't a marketing
+  word here — it's a column in a table you can open.
+- **"Ask my inbox" answers on your hardware, with receipts.** Ask a
+  question in plain words and get a streamed answer grounded in cited
+  mail — plus findings you can act on (mark all read, archive all, jump
+  to the sender). With Ollama it works on a plane. Competitors can't do
+  this without shipping your inbox to their cloud.
+- **It works offline, for real.** Turn on airplane mode: search, ask,
+  drafts, summaries, labels — all still running, because the model is
+  local too. Not an offline "mode." There is no server to be offline
+  from.
+- **Your mail, portable.** One click exports any account as standard
+  mbox — readable by Thunderbird and everything else. The only email
+  product with an incentive to make leaving easy.
+
+## The daily-driver stuff (that you'd pay $30/month for elsewhere)
+
+- **A real email client** — three-pane inbox, threads, composer with
+  rich text and snippets, send/reply/forward, drafts, snooze, send
+  later, undo send, archive, trash, and a full keyboard map (press `?`).
+  Installable as an app (PWA) on desktop and mobile.
 - **AI triage** — incoming mail gets labeled automatically (newsletters,
   receipts, notifications, cold pitches, plus any custom labels you
   invent). Split inbox separates signal from noise.
-- **AI that writes for you** — reply drafts matched to the tone of the
-  thread, one-click thread summaries, and a "Write with AI" composer.
+- **AI that writes for you** — reply drafts in the recipient's voice
+  profile, three variants to pick from, one-click thread summaries, and
+  a "Write with AI" composer.
 - **Rules in plain English** — type "archive newsletters from noreply
-  senders" and get a real automation rule, with dry-run before it touches
-  anything.
-- **Cold-email blocker** — one click to auto-archive pitches from
-  strangers.
-- **Bulk unsubscribe** — see every sender spamming you, ranked, with
+  senders" and get a real automation rule, with dry-run before it
+  touches anything.
+- **Cold-email blocker + bulk unsubscribe** — one click to auto-archive
+  pitches from strangers; every sender spamming you, ranked, with
   one-click unsubscribe-and-archive.
-- **Semantic search + "Ask my inbox"** — meaning-based search (toggle the
-  ✦ AI chip next to search) and a chat panel (⌘K → "Ask my inbox") that
-  answers questions with citations from your actual mail. All local —
-  competitors can't do this without shipping your inbox to a cloud.
-- **Digest view** — the week's newsletters and bulk mail rolled up per
-  sender, with a one-click AI digest and per-sender cleanup.
-- **Draft review** — AI- and human-written drafts get a first-class queue:
-  open one, send it as-is, or edit-then-send.
-- **Attachments, stored locally** — files land on your disk
-  (`~/.unwalled-mail/attachments`), show up in the thread, and download
-  straight from the app.
-- **A local HTTP API + MCP server** — `/api/v1/*` endpoints ([docs/API.md](docs/API.md))
-  and an MCP server ([docs/MCP.md](docs/MCP.md)) so Claude Desktop, Cursor, or
-  your own agents can search, ask, triage, and send — all on your machine.
-- **Follow-up tracking** — "needs reply" and "awaiting response" views so
-  nothing slips.
-- **Analytics** — volume, top senders, label breakdown, all computed
-  locally.
-- **100% local** — Postgres on your machine, bodies on your disk, secrets
-  encrypted with a key you hold. Turn on airplane mode: everything still
-  works except sync and send.
+- **Search that finds mail by meaning** — type a question in the search
+  bar and the assistant takes over; type keywords and the instant index
+  answers. Powered by a local meaning index (pgvector-accelerated when
+  available), honest keyword fallback when not.
+- **Follow-ups that don't slip** — "needs reply" / "awaiting response"
+  views, timed nudges, and auto-follow-ups that send at the hour each
+  recipient actually tends to reply.
+- **Relationship dossiers** — click any sender: exchange counts, reply
+  speed both ways, open loops, files exchanged, upcoming meetings with
+  them.
+- **Calendar-aware** — `.ics` invites land on a local calendar with
+  attendees and recurrences; send-at-a-meeting conflicts get flagged.
+- **Digest view** — the week's newsletters rolled up per sender, with a
+  one-click AI digest and per-sender cleanup.
+- **Draft review** — AI- and human-written drafts get a first-class
+  queue: open one, send it as-is, or edit-then-send.
+- **Attachment intelligence** — files land on your disk, get indexed by
+  content (search `file:contract`), and duplicates get deduped.
+- **Honest read receipts** — opt-in `Return-Receipt-To` headers, inbound
+  MDN detection marks your sent mail as opened. No tracking pixels.
+- **A local HTTP API + MCP server** — `/api/v1/*` endpoints
+  ([docs/API.md](docs/API.md)) and an MCP server ([docs/MCP.md](docs/MCP.md))
+  so Claude Desktop, Cursor, or your own agents can search, ask, triage,
+  and send — all on your machine.
+- **Analytics + an inbox energy budget** — volume, top senders, health
+  score, and a "this inbox costs you ~40 min today — here's the 12-min
+  subset" card.
+- **100% local** — Postgres on your machine, bodies on your disk,
+  secrets encrypted with a key you hold.
 
 ## What it needs (system requirements)
 
@@ -131,9 +173,10 @@ Save**. Every AI feature now runs offline, free, forever.
 
 **Option B — bring your own key:** Settings → AI engine → pick OpenAI or
 Anthropic, paste your API key (encrypted at rest, never leaves your
-machine), choose a model, enable. Note: Anthropic doesn't offer
-embeddings, so if future semantic-search features matter, pick OpenAI or
-Ollama for the embedding slot.
+machine), choose a model, enable. Note: Anthropic can't index your mail,
+so we quietly pair it with your local Ollama for search and answers —
+if Ollama isn't running, search falls back to keyword matching and says
+so.
 
 ## Connect a real account
 
@@ -195,12 +238,15 @@ Everything runs via `npm run dev` (Turborepo). Checks:
 
 Working today: everything above, plus the `npm run worker` background
 loop (scheduled sends, snooze returns, periodic sync + AI classify +
-embedding), **IMAP IDLE watchers for near-instant new-mail delivery**
+indexing), **IMAP IDLE watchers for near-instant new-mail delivery**
 for IMAP accounts while the worker runs, and a local HTTP API for
 scripts and agents.
-Coming next (roughly in order): real-mailbox hardening on more providers,
-and a mobile story via an optional encrypted relay (the one thing
-local-first can't do alone — it'll be self-hostable too).
+Coming next (roughly in order): real-mailbox hardening on more
+providers, meeting briefs built from the sender dossiers we already
+keep, assistant actions you confirm before they run, a companion
+browser extension, and a mobile story via an optional encrypted relay
+(the one thing local-first can't do alone — it'll be self-hostable
+too).
 
 ## Contributing
 
