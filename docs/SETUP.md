@@ -129,12 +129,22 @@ UNWALLED_API_TOKEN=some-long-random-string
 
 ## 3. Connecting real email accounts
 
-All of this happens in **Settings → Accounts**.
+All of this happens in **Settings → Accounts**. The connect cards do the
+fiddly parts for you:
+
+- **Gmail** — type your address + an app password, everything else is
+  prefilled (the card walks you through getting one).
+- **Another email provider** — pick iCloud, Fastmail, Yahoo, Zoho, or
+  Proton Bridge and the server settings fill in automatically; choose
+  "Other (manual)" for anything else.
+- **Advanced: Google / Microsoft OAuth** — your own OAuth app for the
+  Gmail API or Microsoft Graph path (Option B below).
 
 ### Option A — IMAP/SMTP (the universal path)
 
 Works with Fastmail, Zoho, iCloud, Gmail (app password), Yahoo,
 self-hosted Dovecot, Proton Mail Bridge — basically everything.
+If you pick "Other (manual)" the fields you need are:
 
 | Field    | What goes in it                                                            |
 | -------- | -------------------------------------------------------------------------- |

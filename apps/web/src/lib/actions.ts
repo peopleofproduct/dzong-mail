@@ -88,7 +88,8 @@ export async function connectImapAccount(formData: FormData) {
       imapSecurity: (get("imapSecurity") || "SSL_TLS") as "SSL_TLS" | "STARTTLS" | "NONE",
       smtpHost: get("smtpHost") || null,
       smtpPort: Number.isFinite(smtpPort) ? smtpPort : null,
-      username: get("username") || null,
+      smtpSecurity: (get("smtpSecurity") || null) as "SSL_TLS" | "STARTTLS" | "NONE" | null,
+      username: get("username") || get("emailAddress"),
       passwordEncrypted: password ? encryptSecret(password) : null,
     },
   });
