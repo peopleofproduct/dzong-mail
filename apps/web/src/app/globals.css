@@ -35,6 +35,9 @@ body {
   font-size: 0.875rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
+  /* Senders ship fixed-width tables and negative margins; anything that
+     still escapes gets clipped at the card edge instead of leaking. */
+  overflow-x: clip;
 }
 .email-body :is(h1, h2, h3, h4, h5, h6, p) {
   margin-top: 0.5em;
@@ -59,4 +62,5 @@ body {
 }
 .email-body table {
   border-collapse: collapse;
+  max-width: 100%;
 }
