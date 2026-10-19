@@ -21,6 +21,7 @@ import { DigestList } from "@/components/mail/digest-list";
 import { DigestPanel } from "@/components/mail/digest-panel";
 import { IconRail } from "@/components/mail/icon-rail";
 import { ReplyQueuePanel } from "@/components/mail/reply-queue-panel";
+import { ResizableListPane } from "@/components/mail/resizable-list-pane";
 import { serializeMessage } from "@/components/mail/types";
 import type { MailItem } from "@/components/mail/types";
 import { CommandPalette } from "@/components/mail/command-palette";
@@ -265,9 +266,7 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
           <SidebarSection searchParams={searchParams} />
         </Suspense>
       </IconRail>
-      <section
-        className={`${paneOpen ? "hidden md:flex" : "flex"} min-h-0 w-full flex-col overflow-hidden border-r border-zinc-200 sm:w-[380px] sm:shrink-0 dark:border-zinc-800`}
-      >
+      <ResizableListPane paneOpen={paneOpen}>
         <Suspense
           fallback={
             <div className="flex-1 space-y-2 p-3">
@@ -282,7 +281,7 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
         >
           <ListSection searchParams={searchParams} />
         </Suspense>
-      </section>
+      </ResizableListPane>
       <section
         className={`${paneOpen ? "flex" : "hidden md:flex"} fixed inset-0 z-30 min-h-0 min-w-0 flex-1 flex-col bg-white md:static md:z-auto md:bg-zinc-50/40 dark:bg-zinc-950 md:dark:bg-black/20`}
       >

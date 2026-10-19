@@ -1,10 +1,11 @@
 "use client";
 
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Inbox, PanelLeft, Settings, Sparkles } from "lucide-react";
+import { ResizeHandle, usePaneWidth } from "./resize";
 
 const EVENT = "unwalled-sidebar-change";
 
@@ -21,25 +22,7 @@ function subscribe(cb: () => void) {
   };
 }
 
-const WIDTH_EVENT = "unwalled-sidebar-width";
-const WIDTH_KEY = "unwalled-sidebar-width";
 const DEFAULT_WIDTH = 224; // w-56
-const MIN_WIDTH = 160;
-const MAX_WIDTH = 400;
-
-function sidebarWidth(): number {
-  const v = Number(localStorage.getItem(WIDTH_KEY));
-  return Number.isFinite(v) && v >= MIN_WIDTH && v <= MAX_WIDTH ? v : DEFAULT_WIDTH;
-}
-
-function subscribeWidth(cb: () => void) {
-  window.addEventListener(WIDTH_EVENT, cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener(WIDTH_EVENT, cb);
-    window.removeEventListener("storage", cb);
-  };
-}
 
 const btn =
   "flex items-center justify-center rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
@@ -57,34 +40,9 @@ const btnActive =
  */
 export function IconRail({ pending, children }: { pending: number; children: ReactNode }) {
   const collapsed = useSyncExternalStore(subscribe, isCollapsed, () => false);
-  const width = useSyncExternalStore(subscribeWidth, sidebarWidth, () => DEFAULT_WIDTH);
+  const { width, setWidth, startDrag } = usePaneWidth("unwalled-sidebar-width", DEFAULT_WIDTH, 160, 400);
   const searchParams = useSearchParams();
   const view = searchParams.get("view") ?? "inbox";
-
-  const setWidth = (w: number) => {
-    localStorage.setItem(
-      WIDTH_KEY,
-      String(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(w)))),
-    );
-    window.dispatchEvent(new Event(WIDTH_EVENT));
-  };
-
-  const startDrag = (e: ReactPointerEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = width;
-    const move = (ev: PointerEvent) => setWidth(startW + ev.clientX - startX);
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
 
   // Keep the DOM drawer state in sync when hydration restores a saved
   // collapse preference.
@@ -148,18 +106,7 @@ export function IconRail({ pending, children }: { pending: number; children: Rea
         style={{ "--sidebar-w": `${width}px` } as CSSProperties}
       >
         {children}
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize sidebar"
-          title="Drag to resize · double-click to reset"
-          onPointerDown={startDrag}
-          onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
-          className="group absolute inset-y-0 right-0 z-10 hidden w-3 cursor-col-resize items-center justify-center hover:bg-indigo-200/50 active:bg-indigo-300/50 md:flex dark:hover:bg-indigo-800/50 dark:active:bg-indigo-700/50"
-        >
-          {/* Always-visible grip so the handle is discoverable. */}
-          <span className="h-8 w-1 rounded-full bg-zinc-300 transition-colors group-hover:bg-indigo-500 group-active:bg-indigo-600 dark:bg-zinc-600" />
-        </div>
+        <ResizeHandle onPointerDown={startDrag} onDoubleClick={() => setWidth(DEFAULT_WIDTH)} />
       </div>
       <label
         htmlFor="nav-toggle"
