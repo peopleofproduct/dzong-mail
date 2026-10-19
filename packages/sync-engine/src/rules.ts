@@ -1,5 +1,5 @@
 import { prisma } from "@unwalled/database";
-import type { AutomationRule, Message, PrismaClient } from "@unwalled/database";
+import type { AutomationRule, Message, PrismaClient, RuleTrigger } from "@unwalled/database";
 import { createDraftRow, draftAiReply } from "./drafts";
 
 export interface RuleCondition {
@@ -142,7 +142,7 @@ async function applyAction(
 export async function applyAutomationRules(
   accountId: string,
   db: PrismaClient = prisma,
-  options: { messageIds?: string[]; dryRun?: boolean } = {},
+  options: { messageIds?: string[]; dryRun?: boolean; trigger?: RuleTrigger } = {},
 ): Promise<RuleEvalResult[]> {
   const account = await db.emailAccount.findUniqueOrThrow({
     where: { id: accountId },
@@ -154,6 +154,7 @@ export async function applyAutomationRules(
       userId: account.userId,
       isEnabled: true,
       OR: [{ emailAccountId: accountId }, { emailAccountId: null }],
+      ...(options.trigger ? { trigger: options.trigger } : {}),
     },
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
   });

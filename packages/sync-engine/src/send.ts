@@ -15,7 +15,7 @@ export interface SendInput {
   /** Provider thread to reply within (sets In-Reply-To where applicable). */
   threadId?: string;
   inReplyToHeader?: string;
-  /** When set, the message is stored as a scheduled draft — dispatch is a future worker. */
+  /** When set, the message is stored as a scheduled draft for the worker to dispatch. */
   scheduledAt?: Date;
 }
 
@@ -90,12 +90,11 @@ async function sendViaMock(
   return { providerMessageId, messageRowId, scheduled: Boolean(input.scheduledAt) };
 }
 
-async function sendViaSmtp(
-  db: PrismaClient,
+async function deliverViaSmtp(
   account: EmailAccount,
   input: SendInput,
   password: string | undefined,
-): Promise<SendResult> {
+): Promise<string> {
   if (!account.smtpHost || !account.username || !password) {
     throw new Error(`SMTP account ${account.id} is missing host, username, or password`);
   }
@@ -115,17 +114,25 @@ async function sendViaSmtp(
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
   });
-  const providerMessageId = info.messageId ?? `smtp-${crypto.randomUUID()}`;
+  return info.messageId ?? `smtp-${crypto.randomUUID()}`;
+}
+
+async function sendViaSmtp(
+  db: PrismaClient,
+  account: EmailAccount,
+  input: SendInput,
+  password: string | undefined,
+): Promise<SendResult> {
+  const providerMessageId = await deliverViaSmtp(account, input, password);
   const messageRowId = await recordSent(db, account, input, providerMessageId);
   return { providerMessageId, messageRowId, scheduled: false };
 }
 
-async function sendViaGmail(
-  db: PrismaClient,
+async function deliverViaGmail(
   account: EmailAccount,
   input: SendInput,
   accessToken: string,
-): Promise<SendResult> {
+): Promise<{ id: string; threadId?: string }> {
   const raw = encodeRawMime(buildMime(account.emailAddress, input));
   const res = await fetch(`${GMAIL_API}/messages/send`, {
     method: "POST",
@@ -136,7 +143,16 @@ async function sendViaGmail(
     body: JSON.stringify({ raw, threadId: input.threadId }),
   });
   if (!res.ok) throw new Error(`Gmail send failed: ${res.status} ${await res.text()}`);
-  const data = (await res.json()) as { id: string; threadId?: string };
+  return (await res.json()) as { id: string; threadId?: string };
+}
+
+async function sendViaGmail(
+  db: PrismaClient,
+  account: EmailAccount,
+  input: SendInput,
+  accessToken: string,
+): Promise<SendResult> {
+  const data = await deliverViaGmail(account, input, accessToken);
   const messageRowId = await recordSent(
     db,
     account,
@@ -146,12 +162,11 @@ async function sendViaGmail(
   return { providerMessageId: data.id, messageRowId, scheduled: false };
 }
 
-async function sendViaGraph(
-  db: PrismaClient,
+async function deliverViaGraph(
   account: EmailAccount,
   input: SendInput,
   accessToken: string,
-): Promise<SendResult> {
+): Promise<string> {
   const toRecipient = (address: string) => ({ emailAddress: { address } });
   const res = await fetch(`${GRAPH_API}/me/sendMail`, {
     method: "POST",
@@ -172,14 +187,96 @@ async function sendViaGraph(
   });
   if (!res.ok) throw new Error(`Graph sendMail failed: ${res.status} ${await res.text()}`);
   // sendMail returns 202 with no body; the sent copy arrives via next delta sync.
-  const providerMessageId = `graph-sent-${crypto.randomUUID()}`;
+  return `graph-sent-${crypto.randomUUID()}`;
+}
+
+async function sendViaGraph(
+  db: PrismaClient,
+  account: EmailAccount,
+  input: SendInput,
+  accessToken: string,
+): Promise<SendResult> {
+  const providerMessageId = await deliverViaGraph(account, input, accessToken);
   const messageRowId = await recordSent(db, account, input, providerMessageId);
   return { providerMessageId, messageRowId, scheduled: false };
 }
 
+/** Deliver a SendInput through the account's provider; returns the provider message id. */
+async function deliver(
+  account: EmailAccount,
+  input: SendInput,
+): Promise<{ providerMessageId: string; threadId?: string }> {
+  switch (account.provider) {
+    case "MOCK":
+      return { providerMessageId: `mock-sent-${crypto.randomUUID()}` };
+    case "IMAP_SMTP":
+      return {
+        providerMessageId: await deliverViaSmtp(
+          account,
+          input,
+          decryptIfPresent(account.passwordEncrypted),
+        ),
+      };
+    case "GOOGLE": {
+      const token = decryptIfPresent(account.oauthAccessToken);
+      if (!token) throw new Error(`Account ${account.id} has no access token — reconnect`);
+      const data = await deliverViaGmail(account, input, token);
+      return { providerMessageId: data.id, threadId: data.threadId };
+    }
+    case "MICROSOFT": {
+      const token = decryptIfPresent(account.oauthAccessToken);
+      if (!token) throw new Error(`Account ${account.id} has no access token — reconnect`);
+      return { providerMessageId: await deliverViaGraph(account, input, token) };
+    }
+    default: {
+      const exhaustive: never = account.provider;
+      throw new Error(`No sender for provider ${String(exhaustive)}`);
+    }
+  }
+}
+
+/**
+ * Dispatch a previously scheduled draft: deliver it through the account's
+ * real provider and flip the existing row from Drafts to Sent.
+ */
+export async function dispatchScheduledDraft(
+  messageId: string,
+  db: PrismaClient = prisma,
+): Promise<void> {
+  const message = await db.message.findUniqueOrThrow({
+    where: { id: messageId },
+    include: { emailAccount: true },
+  });
+  if (!message.isDraft || !message.scheduledAt) return;
+
+  const input: SendInput = {
+    to: message.toAddresses,
+    cc: message.ccAddresses,
+    bcc: message.bccAddresses,
+    subject: message.subject ?? "",
+    bodyText: message.bodyText ?? message.snippet ?? "",
+    threadId: message.threadId ?? undefined,
+  };
+
+  const { providerMessageId, threadId } = await deliver(message.emailAccount, input);
+  await db.message.update({
+    where: { id: message.id },
+    data: {
+      folder: "Sent",
+      isDraft: false,
+      scheduledAt: null,
+      providerMessageId,
+      providerLabels: ["SENT"],
+      receivedAt: new Date(),
+      ...(threadId && !message.threadId ? { threadId } : {}),
+    },
+  });
+}
+
 /**
  * Send (or schedule) an email through the account's provider.
- * Scheduled messages are persisted as drafts; dispatch is a future worker.
+ * Scheduled messages are persisted as drafts; the worker dispatches them
+ * via dispatchScheduledDraft when they come due.
  */
 export async function sendEmail(
   accountId: string,

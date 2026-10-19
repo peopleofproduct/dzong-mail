@@ -226,6 +226,9 @@ npx tsx scripts/enable-ai.ts   # enables AI for the local user and
 npm run db:migrate     # apply migrations
 npm run db:seed        # demo user/account + mock mail
 npm run dev            # everything (web + watchers)
+npm run worker         # background loop: scheduled sends, snooze returns,
+                       # periodic sync + AI classification (env knobs:
+                       # WORKER_TICK_MS, WORKER_SYNC_INTERVAL_MS)
 npm run typecheck      # strict TS across workspaces
 npm run lint           # eslint
 npm run build          # production build

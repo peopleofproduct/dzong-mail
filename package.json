@@ -16,7 +16,8 @@
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
     "db:push": "turbo db:push",
-    "db:seed": "tsx scripts/seed-demo.ts"
+    "db:seed": "tsx scripts/seed-demo.ts",
+    "worker": "tsx packages/sync-engine/src/worker.ts"
   },
   "devDependencies": {
     "prettier": "^3.3.3",

@@ -99,6 +99,7 @@ export async function syncAccount(
     try {
       await applyAutomationRules(account.id, db, {
         messageIds: inserted.map((m) => m.id),
+        trigger: "ON_MESSAGE_SYNC",
       });
     } catch (err) {
       console.error(`[sync] rule evaluation failed for ${account.id}:`, err);

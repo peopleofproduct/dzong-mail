@@ -76,11 +76,17 @@ npm run db:seed
 
 # 5. Run it
 npm run dev
+
+# 6. (Optional) the background worker — run in a second terminal
+#    Dispatches scheduled sends, returns snoozed mail, and syncs all
+#    accounts every 5 minutes + classifies new mail with AI.
+npm run worker
 ```
 
 Open **http://localhost:3000** — you'll see a demo inbox with real
 (fake) mail, AI-ready. Try the keys: `j`/`k` to move, `⌘K` for the
-command palette, `e` to archive, `r` to reply.
+command palette, `e` to archive, `r` to reply. Without the worker, sync
+happens when you hit Sync in the UI and scheduled sends wait in Drafts.
 
 ## Turn on the AI (optional, recommended)
 
@@ -161,11 +167,13 @@ Everything runs via `npm run dev` (Turborepo). Checks:
 
 ## Roadmap — where we're headed
 
-Working today: everything above. Coming next (roughly in order): real-
-mailbox hardening, attachments, semantic search + "ask my inbox" chat,
-digests, scheduled-send worker, mobile story via an optional encrypted
-relay (the one thing local-first can't do alone — it'll be self-hostable
-too), and a local API/MCP so other agents can drive your inbox.
+Working today: everything above, plus the `npm run worker` background
+loop (scheduled sends, snooze returns, periodic sync + AI classify).
+Coming next (roughly in order): real-mailbox hardening, attachments,
+semantic search + "ask my inbox" chat, digests, a mobile story via an
+optional encrypted relay (the one thing local-first can't do alone —
+it'll be self-hostable too), and a local API/MCP so other agents can
+drive your inbox.
 
 ## Contributing
 

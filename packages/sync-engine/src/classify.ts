@@ -8,6 +8,8 @@ export interface ClassifyOutcome {
   accountId: string;
   classified: number;
   skipped: number;
+  /** Ids of messages that received at least one label this pass. */
+  labeledIds: string[];
   reason?: string;
 }
 
@@ -23,7 +25,13 @@ export async function classifyAccountMessages(
 ): Promise<ClassifyOutcome> {
   const ai = await resolveAIForAccount(accountId, db);
   if (!ai) {
-    return { accountId, classified: 0, skipped: 0, reason: "AI disabled or unreachable" };
+    return {
+      accountId,
+      classified: 0,
+      skipped: 0,
+      labeledIds: [],
+      reason: "AI disabled or unreachable",
+    };
   }
   const { provider, candidateLabels } = ai;
 
@@ -34,6 +42,7 @@ export async function classifyAccountMessages(
   });
 
   let classified = 0;
+  const labeledIds: string[] = [];
   for (const message of pending) {
     const text = [
       `Subject: ${message.subject ?? ""}`,
@@ -47,6 +56,7 @@ export async function classifyAccountMessages(
           where: { id: message.id },
           data: { aiLabels: labels },
         });
+        labeledIds.push(message.id);
       }
       classified++;
     } catch {
@@ -54,5 +64,5 @@ export async function classifyAccountMessages(
     }
   }
 
-  return { accountId, classified, skipped: pending.length - classified };
+  return { accountId, classified, skipped: pending.length - classified, labeledIds };
 }
