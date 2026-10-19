@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
-import { Coffee, X } from "lucide-react";
+import { ArrowRight, Coffee, X } from "lucide-react";
 
 const DISMISS_KEY = "unwalled-briefing-dismissed";
 
@@ -44,9 +45,17 @@ export function MorningBriefingCard({ stats, dateKey }: { stats: BriefingStats; 
   ].filter(Boolean) as string[];
 
   const pending = [
-    stats.draftsWaiting > 0 && `${stats.draftsWaiting} AI draft${stats.draftsWaiting === 1 ? "" : "s"} waiting for review`,
-    stats.followUpsWaiting > 0 && `${stats.followUpsWaiting} thread${stats.followUpsWaiting === 1 ? "" : "s"} still awaiting replies`,
-  ].filter(Boolean) as string[];
+    stats.draftsWaiting > 0 && {
+      text: `${stats.draftsWaiting} AI draft${stats.draftsWaiting === 1 ? "" : "s"} waiting for review`,
+      href: "/?view=reply-queue",
+      cta: "Review drafts",
+    },
+    stats.followUpsWaiting > 0 && {
+      text: `${stats.followUpsWaiting} thread${stats.followUpsWaiting === 1 ? "" : "s"} still awaiting replies`,
+      href: "/?view=awaiting",
+      cta: "Check follow-ups",
+    },
+  ].filter(Boolean) as { text: string; href: string; cta: string }[];
 
   return (
     <div className="mx-3 mt-3 flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
@@ -59,9 +68,20 @@ export function MorningBriefingCard({ stats, dateKey }: { stats: BriefingStats; 
           {parts.length > 0 ? parts.join(" · ") : "Quiet night — no new mail activity."}
         </p>
         {pending.length > 0 && (
-          <p className="mt-1 text-xs font-medium text-indigo-800 dark:text-indigo-200">
-            Waiting on you: {pending.join(" · ")}
-          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+            {pending.map((p) => (
+              <Link
+                key={p.href}
+                href={p.href}
+                className="group inline-flex items-center gap-1 text-xs font-medium text-indigo-800 hover:underline dark:text-indigo-200"
+              >
+                {p.text}
+                <span className="inline-flex items-center gap-0.5 text-indigo-500 group-hover:underline dark:text-indigo-400">
+                  {p.cta} <ArrowRight size={11} />
+                </span>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
       <button
