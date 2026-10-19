@@ -97,6 +97,24 @@ export function CommandPalette() {
               >
                 Open settings
               </Command.Item>
+              <Command.Item
+                onSelect={() => {
+                  router.push("/analytics");
+                  setOpen(false);
+                }}
+                className="cursor-pointer rounded-md px-2 py-2 text-sm aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800"
+              >
+                Open analytics
+              </Command.Item>
+              <Command.Item
+                onSelect={() => {
+                  setOpen(false);
+                  window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
+                }}
+                className="cursor-pointer rounded-md px-2 py-2 text-sm aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800"
+              >
+                Keyboard shortcuts <span className="float-right text-zinc-400">?</span>
+              </Command.Item>
             </Command.Group>
             <Command.Group
               heading="Views"

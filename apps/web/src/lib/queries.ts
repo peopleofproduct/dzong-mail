@@ -255,6 +255,128 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
   return [...senders.values()].sort((a, b) => b.count - a.count);
 }
 
+const BULK_LABELS = new Set(["NEWSLETTER", "MARKETING", "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL"]);
+
+/** Group serialized inbox items into split-inbox sections (Superhuman-style):
+ *  Priority → Newsletters & bulk → Everything else. */
+export function splitInboxGroups(
+  items: {
+    id: string;
+    isRead: boolean;
+    isStarred: boolean;
+    aiLabels: string[];
+    providerLabels: string[];
+  }[],
+): { title: string; ids: string[] }[] {
+  const priority: string[] = [];
+  const bulk: string[] = [];
+  const rest: string[] = [];
+  for (const m of items) {
+    const isBulk =
+      m.aiLabels.some((l) => l === "NEWSLETTER" || l === "MARKETING") ||
+      m.providerLabels.some((l) => BULK_LABELS.has(l));
+    if (m.isStarred || (!isBulk && !m.isRead)) priority.push(m.id);
+    else if (isBulk) bulk.push(m.id);
+    else rest.push(m.id);
+  }
+  return [
+    { title: "Priority", ids: priority },
+    { title: "Newsletters & bulk", ids: bulk },
+    { title: "Everything else", ids: rest },
+  ].filter((s) => s.ids.length > 0);
+}
+
+export interface AnalyticsData {
+  total: number;
+  unread: number;
+  needsReply: number;
+  awaiting: number;
+  snoozed: number;
+  drafts: number;
+  aiDrafts: number;
+  daily: { date: string; count: number }[];
+  topSenders: { address: string; name: string | null; count: number }[];
+  labelCounts: { label: string; count: number; ai: boolean }[];
+}
+
+/** Aggregate local stats for the analytics dashboard — all from local data. */
+export async function getAnalyticsData(days = 14): Promise<AnalyticsData> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const [total, unread, snoozed, drafts, aiDrafts, recent, senders, labelRows] = await Promise.all([
+    prisma.message.count({ where: { isDraft: false } }),
+    prisma.message.count({ where: { isRead: false, isDraft: false, isArchived: false } }),
+    prisma.message.count({ where: { snoozedUntil: { gt: new Date() } } }),
+    prisma.message.count({ where: { isDraft: true } }),
+    prisma.message.count({ where: { providerLabels: { has: "AI_DRAFT" } } }),
+    prisma.message.findMany({
+      where: { receivedAt: { gte: since }, isDraft: false },
+      select: { receivedAt: true },
+    }),
+    prisma.message.groupBy({
+      by: ["fromAddress", "fromName"],
+      where: { isDraft: false },
+      _count: { _all: true },
+      orderBy: { _count: { fromAddress: "desc" } },
+      take: 8,
+    }),
+    prisma.message.findMany({
+      where: { isDraft: false },
+      select: { labels: true, aiLabels: true },
+      take: 2000,
+    }),
+  ]);
+
+  const perDay = new Map<string, number>();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(since.getTime() + i * 24 * 60 * 60 * 1000);
+    perDay.set(d.toISOString().slice(0, 10), 0);
+  }
+  for (const m of recent) {
+    const key = m.receivedAt.toISOString().slice(0, 10);
+    if (perDay.has(key)) perDay.set(key, perDay.get(key)! + 1);
+  }
+
+  const labelMap = new Map<string, { count: number; ai: boolean }>();
+  for (const row of labelRows) {
+    for (const l of row.labels) {
+      const e = labelMap.get(l) ?? { count: 0, ai: false };
+      e.count++;
+      labelMap.set(l, e);
+    }
+    for (const l of row.aiLabels) {
+      const e = labelMap.get(l) ?? { count: 0, ai: true };
+      e.count++;
+      e.ai = true;
+      labelMap.set(l, e);
+    }
+  }
+
+  const [needsReplyThreads, awaitingThreads] = await Promise.all([
+    getFollowUpThreads("needs-reply"),
+    getFollowUpThreads("awaiting"),
+  ]);
+
+  return {
+    total,
+    unread,
+    needsReply: needsReplyThreads.length,
+    awaiting: awaitingThreads.length,
+    snoozed,
+    drafts,
+    aiDrafts,
+    daily: [...perDay.entries()].map(([date, count]) => ({ date, count })),
+    topSenders: senders.map((s) => ({
+      address: s.fromAddress,
+      name: s.fromName,
+      count: s._count._all,
+    })),
+    labelCounts: [...labelMap.entries()]
+      .map(([label, v]) => ({ label, count: v.count, ai: v.ai }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12),
+  };
+}
+
 export async function getRules() {
   return prisma.automationRule.findMany({
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],

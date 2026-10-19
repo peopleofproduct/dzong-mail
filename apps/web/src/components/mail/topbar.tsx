@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PenSquare, RefreshCw, Search } from "lucide-react";
+import { BarChart3, Keyboard, PenSquare, RefreshCw, Search } from "lucide-react";
 import { syncAllNow } from "@/lib/actions";
 import { buildParams } from "./params";
 
@@ -54,6 +54,20 @@ export function Topbar() {
         className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
       >
         <RefreshCw size={15} />
+      </button>
+      <button
+        onClick={() => router.push("/analytics")}
+        title="Analytics"
+        className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      >
+        <BarChart3 size={15} />
+      </button>
+      <button
+        onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }))}
+        title="Keyboard shortcuts ( ? )"
+        className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      >
+        <Keyboard size={15} />
       </button>
       <button
         onClick={() => router.push(buildParams(searchParams, { compose: "new" }))}

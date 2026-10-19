@@ -8,11 +8,13 @@ import {
   getMessagesForView,
   getSidebarData,
   parseView,
+  splitInboxGroups,
 } from "@/lib/queries";
 import { serializeMessage } from "@/components/mail/types";
 import type { MailItem } from "@/components/mail/types";
 import { CommandPalette } from "@/components/mail/command-palette";
 import { Composer } from "@/components/mail/composer";
+import { KeyboardShortcuts } from "@/components/mail/keyboard-shortcuts";
 import { MessageList } from "@/components/mail/message-list";
 import { NoticeBanner } from "@/components/notice-banner";
 import { Sidebar } from "@/components/mail/sidebar";
@@ -58,11 +60,17 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     items = (await getMessagesForView(view, q)).map(serializeMessage);
   }
 
+  // Superhuman-style split inbox: only on the plain inbox view, not
+  // searches/labels/folders where grouping would hide ordering.
+  const sections =
+    view === "inbox" && !q && !label && !folder ? splitInboxGroups(items) : undefined;
+
   return (
     <MessageList
       messages={items}
       selectedId={str(params, "selected")}
       threadId={str(params, "thread")}
+      sections={sections}
     />
   );
 }
@@ -171,6 +179,9 @@ export default function Home(props: PageProps<"/">) {
       </Suspense>
       <Suspense fallback={null}>
         <CommandPalette />
+      </Suspense>
+      <Suspense fallback={null}>
+        <KeyboardShortcuts />
       </Suspense>
     </div>
   );

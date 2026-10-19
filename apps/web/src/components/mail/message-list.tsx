@@ -15,16 +15,24 @@ import {
 import { buildParams } from "./params";
 import type { MailItem } from "./types";
 
+export interface ListSection {
+  title: string;
+  ids: string[];
+}
+
 interface MessageListProps {
   messages: MailItem[];
   selectedId?: string;
   threadId?: string;
+  /** Optional split-inbox groupings — renders collapsible headers between groups. */
+  sections?: ListSection[];
 }
 
-export function MessageList({ messages, selectedId, threadId }: MessageListProps) {
+export function MessageList({ messages, selectedId, threadId, sections }: MessageListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["Newsletters & bulk"]));
 
   const currentIndex = useMemo(
     () => messages.findIndex((m) => m.id === selectedId),
@@ -115,6 +123,189 @@ export function MessageList({ messages, selectedId, threadId }: MessageListProps
     return () => window.removeEventListener("keydown", handler);
   }, [messages, currentIndex, selectedId, move, openThread, targets, router, searchParams]);
 
+  const toggleSection = (title: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  };
+
+  const renderRow = (m: MailItem) => {
+    const isSelected = m.id === selectedId;
+    const isChecked = checked.has(m.id);
+    const isOpen = m.threadId ? m.threadId === threadId : false;
+    return (
+      <li
+        key={m.id}
+        onClick={() => {
+          select(m.id);
+          openThread(m);
+        }}
+        className={`group flex cursor-pointer items-start gap-2 px-3 py-2.5 ${
+          isSelected || isOpen
+            ? "bg-indigo-50/60 dark:bg-indigo-950/30"
+            : "hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onChange={() => {
+            setChecked((prev) => {
+              const next = new Set(prev);
+              if (next.has(m.id)) next.delete(m.id);
+              else next.add(m.id);
+              return next;
+            });
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-1.5 h-3.5 w-3.5 accent-indigo-600"
+          aria-label="Select message"
+        />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void toggleMessageFlag(m.id, "isStarred");
+          }}
+          aria-label="Star"
+          className={`mt-1 shrink-0 ${
+            m.isStarred
+              ? "text-amber-500"
+              : "text-zinc-300 group-hover:text-zinc-400 dark:text-zinc-600"
+          }`}
+        >
+          <Star size={14} fill={m.isStarred ? "currentColor" : "none"} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span
+              className={`truncate text-[13px] ${
+                m.isRead
+                  ? "text-zinc-500 dark:text-zinc-400"
+                  : "font-semibold text-zinc-900 dark:text-zinc-50"
+              }`}
+            >
+              {m.fromName ?? m.fromAddress}
+            </span>
+            {m.snoozedUntil && (
+              <span title={`Snoozed until ${new Date(m.snoozedUntil).toLocaleString()}`}>
+                <BellOff size={11} className="shrink-0 text-zinc-400" />
+              </span>
+            )}
+            <span className="ml-auto shrink-0 text-[11px] text-zinc-400">
+              {new Date(m.receivedAt).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          </div>
+          <p
+            className={`truncate text-[13px] ${
+              m.isRead
+                ? "text-zinc-500 dark:text-zinc-400"
+                : "font-medium text-zinc-800 dark:text-zinc-200"
+            }`}
+          >
+            {m.subject ?? "(no subject)"}
+          </p>
+          <p className="truncate text-xs text-zinc-400 dark:text-zinc-500">{m.snippet}</p>
+          {(m.aiLabels.length > 0 || m.labels.length > 0) && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {m.aiLabels.map((l) => (
+                <span
+                  key={l}
+                  className="rounded bg-indigo-100 px-1 py-px text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                >
+                  {l}
+                </span>
+              ))}
+              {m.labels.map((l) => (
+                <span
+                  key={l}
+                  className="rounded bg-emerald-100 px-1 py-px text-[10px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                >
+                  {l}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="hidden shrink-0 items-center gap-1 group-hover:flex">
+          {m.isArchived ? (
+            <button
+              title="Unarchive"
+              onClick={(e) => {
+                e.stopPropagation();
+                void unarchiveMessage(m.id);
+              }}
+              className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            >
+              <ArchiveRestore size={14} />
+            </button>
+          ) : (
+            <button
+              title="Archive (e)"
+              onClick={(e) => {
+                e.stopPropagation();
+                void archiveMessages([m.id]);
+              }}
+              className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            >
+              <Archive size={14} />
+            </button>
+          )}
+          {m.snoozedUntil ? (
+            <button
+              title="Unsnooze"
+              onClick={(e) => {
+                e.stopPropagation();
+                void unsnoozeMessage(m.id);
+              }}
+              className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            >
+              <BellOff size={14} />
+            </button>
+          ) : (
+            <button
+              title="Snooze 24h (h)"
+              onClick={(e) => {
+                e.stopPropagation();
+                void snoozeMessage(m.id, 24);
+              }}
+              className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            >
+              <BellOff size={14} />
+            </button>
+          )}
+          <button
+            title={m.isRead ? "Mark unread (u)" : "Mark read (u)"}
+            onClick={(e) => {
+              e.stopPropagation();
+              void toggleMessageFlag(m.id, "isRead");
+            }}
+            className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <CheckCheck size={14} />
+          </button>
+          {m.hasUnsubscribe && (
+            <button
+              title="Unsubscribe"
+              onClick={(e) => {
+                e.stopPropagation();
+                void unsubscribeFromMessage(m.id);
+              }}
+              className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </li>
+    );
+  };
+
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-sm text-zinc-400">
@@ -123,6 +314,8 @@ export function MessageList({ messages, selectedId, threadId }: MessageListProps
       </div>
     );
   }
+
+  const byId = new Map(messages.map((m) => [m.id, m]));
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -151,181 +344,35 @@ export function MessageList({ messages, selectedId, threadId }: MessageListProps
           </button>
         </div>
       )}
-      <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-        {messages.map((m) => {
-          const isSelected = m.id === selectedId;
-          const isChecked = checked.has(m.id);
-          const isOpen = m.threadId ? m.threadId === threadId : false;
+      {sections && sections.length > 0 ? (
+        sections.map((section) => {
+          const isCollapsed = collapsed.has(section.title);
+          const items = section.ids
+            .map((id) => byId.get(id))
+            .filter((m): m is MailItem => Boolean(m));
           return (
-            <li
-              key={m.id}
-              onClick={() => {
-                select(m.id);
-                openThread(m);
-              }}
-              className={`group flex cursor-pointer items-start gap-2 px-3 py-2.5 ${
-                isSelected || isOpen
-                  ? "bg-indigo-50/60 dark:bg-indigo-950/30"
-                  : "hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={isChecked}
-                onChange={() => {
-                  setChecked((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(m.id)) next.delete(m.id);
-                    else next.add(m.id);
-                    return next;
-                  });
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="mt-1.5 h-3.5 w-3.5 accent-indigo-600"
-                aria-label="Select message"
-              />
+            <div key={section.title} className="border-b border-zinc-200 dark:border-zinc-800">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void toggleMessageFlag(m.id, "isStarred");
-                }}
-                aria-label="Star"
-                className={`mt-1 shrink-0 ${
-                  m.isStarred
-                    ? "text-amber-500"
-                    : "text-zinc-300 group-hover:text-zinc-400 dark:text-zinc-600"
-                }`}
+                onClick={() => toggleSection(section.title)}
+                className="sticky top-0 z-[5] flex w-full items-center gap-2 bg-zinc-50/95 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-400"
               >
-                <Star size={14} fill={m.isStarred ? "currentColor" : "none"} />
+                <span className={`transition-transform ${isCollapsed ? "-rotate-90" : ""}`}>▾</span>
+                {section.title}
+                <span className="text-zinc-400 normal-case">({items.length})</span>
               </button>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span
-                    className={`truncate text-[13px] ${
-                      m.isRead
-                        ? "text-zinc-500 dark:text-zinc-400"
-                        : "font-semibold text-zinc-900 dark:text-zinc-50"
-                    }`}
-                  >
-                    {m.fromName ?? m.fromAddress}
-                  </span>
-                  {m.snoozedUntil && (
-                    <span title={`Snoozed until ${new Date(m.snoozedUntil).toLocaleString()}`}>
-                      <BellOff size={11} className="shrink-0 text-zinc-400" />
-                    </span>
-                  )}
-                  <span className="ml-auto shrink-0 text-[11px] text-zinc-400">
-                    {new Date(m.receivedAt).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-                <p
-                  className={`truncate text-[13px] ${
-                    m.isRead
-                      ? "text-zinc-500 dark:text-zinc-400"
-                      : "font-medium text-zinc-800 dark:text-zinc-200"
-                  }`}
-                >
-                  {m.subject ?? "(no subject)"}
-                </p>
-                <p className="truncate text-xs text-zinc-400 dark:text-zinc-500">{m.snippet}</p>
-                {(m.aiLabels.length > 0 || m.labels.length > 0) && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {m.aiLabels.map((l) => (
-                      <span
-                        key={l}
-                        className="rounded bg-indigo-100 px-1 py-px text-[10px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-                      >
-                        {l}
-                      </span>
-                    ))}
-                    {m.labels.map((l) => (
-                      <span
-                        key={l}
-                        className="rounded bg-emerald-100 px-1 py-px text-[10px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                      >
-                        {l}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="hidden shrink-0 items-center gap-1 group-hover:flex">
-                {m.isArchived ? (
-                  <button
-                    title="Unarchive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void unarchiveMessage(m.id);
-                    }}
-                    className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                  >
-                    <ArchiveRestore size={14} />
-                  </button>
-                ) : (
-                  <button
-                    title="Archive (e)"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void archiveMessages([m.id]);
-                    }}
-                    className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                  >
-                    <Archive size={14} />
-                  </button>
-                )}
-                {m.snoozedUntil ? (
-                  <button
-                    title="Unsnooze"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void unsnoozeMessage(m.id);
-                    }}
-                    className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                  >
-                    <BellOff size={14} />
-                  </button>
-                ) : (
-                  <button
-                    title="Snooze 24h (h)"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void snoozeMessage(m.id, 24);
-                    }}
-                    className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                  >
-                    <BellOff size={14} />
-                  </button>
-                )}
-                <button
-                  title={m.isRead ? "Mark unread (u)" : "Mark read (u)"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void toggleMessageFlag(m.id, "isRead");
-                  }}
-                  className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                >
-                  <CheckCheck size={14} />
-                </button>
-                {m.hasUnsubscribe && (
-                  <button
-                    title="Unsubscribe"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void unsubscribeFromMessage(m.id);
-                    }}
-                    className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </li>
+              {!isCollapsed && (
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  {items.map(renderRow)}
+                </ul>
+              )}
+            </div>
           );
-        })}
-      </ul>
+        })
+      ) : (
+        <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+          {messages.map(renderRow)}
+        </ul>
+      )}
     </div>
   );
 }
