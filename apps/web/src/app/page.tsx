@@ -259,7 +259,7 @@ async function MailPanes({ searchParams }: { searchParams: SearchParams }) {
       <IconRail pending={pendingReplies}>
         <Suspense
           fallback={
-            <aside className="h-full w-56 shrink-0 animate-pulse border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950" />
+            <aside className="h-full w-full shrink-0 animate-pulse border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950" />
           }
         >
           <SidebarSection searchParams={searchParams} />
