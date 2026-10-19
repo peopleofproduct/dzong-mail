@@ -27,6 +27,8 @@ export interface AskResult {
   sources?: SemanticHit[];
   /** "semantic" = embedding-ranked; "lexical" = keyword fallback. */
   retrieval?: "semantic" | "lexical";
+  /** Why lexical was used - lets the UI handhold instead of guess. */
+  retrievalReason?: string;
   reason?: string;
 }
 
@@ -321,6 +323,16 @@ export async function askInbox(
 
   // Retrieve: semantic first, keyword fallback when nothing can embed.
   const search = await semanticSearchMessages(userId, question, db, { limit: ASK_TOP_K });
+  let retrievalReason = search.reason;
+  if (search.ok && search.hits.length === 0 && !retrievalReason) {
+    // Zero semantic hits: either nothing is embedded yet or nothing
+    // matched - the distinction changes the guidance we show.
+    const embeddedCount = await db.message.count({
+      where: { emailAccount: { userId }, embedding: { isEmpty: false } },
+    });
+    retrievalReason =
+      embeddedCount === 0 ? "inbox not embedded yet" : "no messages matched semantically";
+  }
   const retrieval = search.ok && search.hits.length > 0 ? "semantic" : "lexical";
   const hits =
     retrieval === "semantic"
@@ -374,5 +386,11 @@ export async function askInbox(
       ? await ai.provider.stream(askRequest, options.onToken)
       : await ai.provider.complete(askRequest);
 
-  return { ok: true, answer: completion.text, sources: hits, retrieval };
+  return {
+    ok: true,
+    answer: completion.text,
+    sources: hits,
+    retrieval,
+    retrievalReason: retrieval === "lexical" ? retrievalReason : undefined,
+  };
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Archive, ArrowRight, CheckCheck, Loader2 } from "lucide-react";
+import { Archive, ArrowRight, CheckCheck, Loader2, Sparkles } from "lucide-react";
 import { archiveMessages, markMessagesRead } from "@/lib/actions";
 
 interface Source {
@@ -18,6 +18,32 @@ interface Source {
 }
 
 type Phase = "thinking" | "streaming" | "done" | "error";
+
+/** Turn a lexical-retrieval reason into concrete next-step guidance. */
+function guidanceFor(reason: string | undefined) {
+  if (!reason) return null;
+  if (reason.includes("embedding") || reason.includes("AI disabled")) {
+    return {
+      title: "Answers are keyword-only right now",
+      body: reason.includes("AI disabled")
+        ? "AI is off or unreachable - enable it for semantic answers."
+        : "Run a local embedding model for semantic answers - your mail still never leaves this machine.",
+      command: reason.includes("AI disabled") ? null : "ollama pull nomic-embed-text",
+      href: "/settings",
+      hrefLabel: "Open AI settings",
+    };
+  }
+  if (reason.includes("not embedded")) {
+    return {
+      title: "Still indexing your inbox",
+      body: "Embeddings build automatically during sync - semantic answers kick in once the first pass finishes.",
+      command: null,
+      href: null,
+      hrefLabel: null,
+    };
+  }
+  return null; // "no messages matched" - the badge alone is honest enough
+}
 
 /** Next steps computed from what the answer was grounded on. */
 function recommendations(sources: Source[]) {
@@ -54,6 +80,8 @@ export function AssistantStream({ question }: { question: string }) {
   const [sources, setSources] = useState<Source[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [retrieval, setRetrieval] = useState<"semantic" | "lexical">("semantic");
+  const [retrievalReason, setRetrievalReason] = useState<string | undefined>();
+  const [copied, setCopied] = useState(false);
   const answerRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
@@ -91,7 +119,13 @@ export function AssistantStream({ question }: { question: string }) {
                 | { type: "status"; stage: string }
                 | { type: "sources"; sources: Source[] }
                 | { type: "token"; text: string }
-                | { type: "done"; answer: string; sources: Source[]; retrieval: string }
+                | {
+                    type: "done";
+                    answer: string;
+                    sources: Source[];
+                    retrieval: string;
+                    retrievalReason?: string;
+                  }
                 | { type: "error"; reason: string };
               if (cancelled) return;
               if (evt.type === "sources") {
@@ -103,6 +137,7 @@ export function AssistantStream({ question }: { question: string }) {
               } else if (evt.type === "done") {
                 setSources(evt.sources);
                 setRetrieval(evt.retrieval === "lexical" ? "lexical" : "semantic");
+                setRetrievalReason(evt.retrievalReason);
                 setPhase("done");
               } else if (evt.type === "error") {
                 setError(evt.reason);
@@ -134,6 +169,7 @@ export function AssistantStream({ question }: { question: string }) {
   const unread = sources.filter((s) => !s.isRead).map((s) => s.messageId);
   const archivable = sources.filter((s) => !s.isArchived).map((s) => s.messageId);
   const recs = recommendations(sources);
+  const guide = phase === "done" ? guidanceFor(retrievalReason) : null;
 
   return (
     <div className="space-y-5">
@@ -162,7 +198,10 @@ export function AssistantStream({ question }: { question: string }) {
 
       {phase === "error" && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-          {error ?? "Could not answer - is AI enabled in Settings?"}
+          {error ?? "Could not answer"}{" "}
+          <Link href="/settings" className="font-medium underline underline-offset-2">
+            Check AI settings
+          </Link>
         </p>
       )}
 
@@ -220,6 +259,47 @@ export function AssistantStream({ question }: { question: string }) {
               </Link>
             ))}
           </div>
+        </div>
+      )}
+
+      {guide && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+            <Sparkles size={13} /> {guide.title}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+            {guide.body}
+          </p>
+          {(guide.command || guide.href) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {guide.command && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cmd = guide.command;
+                    if (!cmd) return;
+                    navigator.clipboard.writeText(cmd).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1500);
+                    });
+                  }}
+                  title="Copy to clipboard"
+                  className="rounded bg-zinc-900 px-2 py-1 font-mono text-[11px] text-zinc-100 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  {copied ? "Copied" : guide.command}
+                </button>
+              )}
+              {guide.href && (
+                <Link
+                  href={guide.href}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 underline underline-offset-2 dark:text-amber-200"
+                >
+                  {guide.hrefLabel}
+                  <ArrowRight size={11} />
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       )}
 

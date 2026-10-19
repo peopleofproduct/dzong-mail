@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
               type: "done",
               answer: result.answer,
               retrieval: result.retrieval ?? "semantic",
+              retrievalReason: result.retrievalReason,
               sources: (result.sources ?? []).map(serializeHit),
             });
         } catch (err) {
