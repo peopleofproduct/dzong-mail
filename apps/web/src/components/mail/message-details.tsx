@@ -11,6 +11,10 @@ export interface MessageDetailsData {
   mailedBy: string | null;
   signedBy: string | null;
   security: string | null;
+  /** Local read receipt - when the user first opened the message. */
+  openedAt?: string | null;
+  /** The message was sent asking recipients for an MDN receipt. */
+  receiptRequested?: boolean;
 }
 
 /**
@@ -46,6 +50,11 @@ export function MessageDetails({ to, details }: { to: string; details: MessageDe
     ["mailed-by:", details.mailedBy],
     ["signed-by:", details.signedBy],
     ["security:", details.security],
+    ["opened:", details.openedAt ?? null],
+    [
+      "receipt:",
+      details.receiptRequested ? "read receipt requested - notified when it arrives" : null,
+    ],
   ];
 
   return (

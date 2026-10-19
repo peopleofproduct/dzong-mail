@@ -1,6 +1,13 @@
 import { connection } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
-import { getFollowUpDays, getSplitLabels, getUndoSendSeconds } from "@/lib/settings";
+import {
+  getAutoFollowUp,
+  getFollowUpDays,
+  getRequestReadReceipts,
+  getSplitLabels,
+  getUndoSendSeconds,
+} from "@/lib/settings";
 import {
   deleteSnippet,
   importMailAction,
@@ -22,9 +29,19 @@ const h3 = "text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:tex
  */
 export async function WorkspaceSection() {
   await connection();
-  const [undoSendSeconds, followUpDays, activeSplits, snippets, labelRows] = await Promise.all([
+  const [
+    undoSendSeconds,
+    followUpDays,
+    autoFollowUp,
+    requestReceipts,
+    activeSplits,
+    snippets,
+    labelRows,
+  ] = await Promise.all([
     getUndoSendSeconds(),
     getFollowUpDays(),
+    getAutoFollowUp(),
+    getRequestReadReceipts(),
     getSplitLabels(),
     prisma.snippet.findMany({ orderBy: { name: "asc" } }),
     prisma.message.findMany({
@@ -35,6 +52,10 @@ export async function WorkspaceSection() {
     }),
   ]);
   const knownLabels = [...new Set(labelRows.flatMap((r) => r.labels))].sort();
+  const density =
+    (await cookies()).get("unwalled-density")?.value === "compact"
+      ? "compact"
+      : "comfortable";
 
   return (
     <section className="flex flex-col gap-6">
@@ -67,6 +88,30 @@ export async function WorkspaceSection() {
               defaultValue={followUpDays}
               className={inputClass}
             />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-zinc-500">
+            Auto follow-up
+            <select name="autoFollowUp" defaultValue={autoFollowUp} className={inputClass}>
+              <option value="off">Remind only</option>
+              <option value="draft">Draft a nudge for review</option>
+              <option value="send">Send automatically (undo window applies)</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-zinc-500">
+            List density
+            <select name="density" defaultValue={density} className={inputClass}>
+              <option value="comfortable">Comfortable</option>
+              <option value="compact">Compact</option>
+            </select>
+          </label>
+          <label className="flex items-end gap-2 pb-2 text-xs text-zinc-600 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              name="requestReadReceipts"
+              defaultChecked={requestReceipts}
+              className="accent-indigo-600"
+            />
+            Request read receipts on outgoing mail
           </label>
           <div className="flex items-end">
             <button className={btnClass}>Save preferences</button>

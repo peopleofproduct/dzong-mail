@@ -222,6 +222,8 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
                         to: m.toAddresses.join(", ") || me,
                         date: m.receivedAt.toLocaleString(),
                         subject: m.subject ?? "(no subject)",
+                        openedAt: m.readAt ? m.readAt.toLocaleString() : null,
+                        receiptRequested: m.receiptRequested,
                         ...t,
                       }}
                     />

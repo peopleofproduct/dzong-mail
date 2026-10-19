@@ -291,7 +291,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           select(m.id);
           openThread(m);
         }}
-        className={`group flex cursor-pointer items-start gap-2 px-3 py-2.5 ${
+        className={`mail-row group flex cursor-pointer items-start gap-2 px-3 py-2.5 ${
           isSelected || isOpen
             ? "bg-indigo-50/60 dark:bg-indigo-950/30"
             : m.isRead
@@ -340,7 +340,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               />
             )}
             <span
-              className={`truncate text-[13px] ${
+              className={`row-primary truncate text-[13px] ${
                 m.isRead
                   ? "text-zinc-400 dark:text-zinc-500"
                   : "font-bold text-zinc-900 dark:text-zinc-50"
@@ -372,7 +372,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             </span>
           </div>
           <p
-            className={`truncate text-[13px] ${
+            className={`row-primary truncate text-[13px] ${
               m.isRead
                 ? "text-zinc-400 dark:text-zinc-500"
                 : "font-semibold text-zinc-800 dark:text-zinc-100"
@@ -380,7 +380,9 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           >
             {m.subject ?? "(no subject)"}
           </p>
-          <p className="truncate text-xs text-zinc-400 dark:text-zinc-500">{m.snippet}</p>
+          <p className="row-snippet truncate text-xs text-zinc-400 dark:text-zinc-500">
+            {m.snippet}
+          </p>
           {(m.aiLabels.length > 0 || m.labels.length > 0) && (
             <div className="mt-1 flex flex-wrap gap-1">
               {m.aiLabels.map((l) => (

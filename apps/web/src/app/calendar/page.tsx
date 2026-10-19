@@ -8,10 +8,12 @@ import { deleteTask, saveTask, toggleTask } from "@/lib/actions";
 interface CalEvent {
   id: string;
   day: number;
-  kind: "send" | "snooze" | "task" | "follow-up";
+  kind: "send" | "snooze" | "task" | "follow-up" | "event";
   label: string;
   sub?: string;
   done?: boolean;
+  cancelled?: boolean;
+  threadId?: string | null;
 }
 
 const KIND_STYLE: Record<CalEvent["kind"], string> = {
@@ -19,6 +21,7 @@ const KIND_STYLE: Record<CalEvent["kind"], string> = {
   snooze: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
   task: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
   "follow-up": "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+  event: "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300",
 };
 
 const KIND_LABEL: Record<CalEvent["kind"], string> = {
@@ -26,6 +29,7 @@ const KIND_LABEL: Record<CalEvent["kind"], string> = {
   snooze: "Snooze returns",
   task: "To-do",
   "follow-up": "Follow-up reminder",
+  event: "Invite",
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -51,7 +55,7 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 1);
 
-  const [scheduled, snoozed, tasks, reminders] = await Promise.all([
+  const [scheduled, snoozed, tasks, reminders, invites] = await Promise.all([
     prisma.message.findMany({
       where: { isDraft: true, scheduledAt: { gte: monthStart, lt: monthEnd } },
       select: { id: true, subject: true, scheduledAt: true, toAddresses: true },
@@ -67,6 +71,19 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
     prisma.notification.findMany({
       where: { kind: "follow-up", createdAt: { gte: monthStart, lt: monthEnd } },
       select: { id: true, title: true, createdAt: true },
+    }),
+    prisma.calendarEvent.findMany({
+      where: { startsAt: { gte: monthStart, lt: monthEnd } },
+      select: {
+        id: true,
+        summary: true,
+        location: true,
+        organizer: true,
+        startsAt: true,
+        status: true,
+        messageId: true,
+        message: { select: { threadId: true } },
+      },
     }),
   ]);
 
@@ -103,6 +120,15 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
       day: n.createdAt.getDate(),
       kind: "follow-up" as const,
       label: n.title,
+    })),
+    ...invites.map((e) => ({
+      id: `ev-${e.id}`,
+      day: e.startsAt.getDate(),
+      kind: "event" as const,
+      label: e.summary ?? "(untitled invite)",
+      sub: [e.organizer, e.location].filter(Boolean).join(" - ") || undefined,
+      cancelled: e.status === "CANCELLED",
+      threadId: e.message?.threadId ?? null,
     })),
   ];
 
@@ -205,9 +231,9 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
                         <span
                           key={e.id}
                           className={`truncate rounded px-1 text-[10px] ${KIND_STYLE[e.kind]} ${
-                            e.done ? "line-through opacity-60" : ""
+                            e.done || e.cancelled ? "line-through opacity-60" : ""
                           }`}
-                          title={`${KIND_LABEL[e.kind]}: ${e.label}`}
+                          title={`${KIND_LABEL[e.kind]}: ${e.label}${e.cancelled ? " (cancelled)" : ""}`}
                         >
                           {e.label}
                         </span>
@@ -244,21 +270,33 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
               <p className="mt-2 text-xs text-zinc-400">Nothing scheduled.</p>
             ) : (
               <ul className="mt-2 flex flex-col gap-1.5">
-                {dayEvents.map((e) => (
-                  <li key={e.id} className="flex flex-col">
+                {dayEvents.map((e) => {
+                  const label = (
                     <span
                       className={`w-fit rounded px-1.5 py-0.5 text-[11px] ${KIND_STYLE[e.kind]} ${
-                        e.done ? "line-through opacity-60" : ""
+                        e.done || e.cancelled ? "line-through opacity-60" : ""
                       }`}
                     >
                       {e.label}
                     </span>
-                    <span className="mt-0.5 text-[10px] text-zinc-400">
-                      {KIND_LABEL[e.kind]}
-                      {e.sub ? ` - ${e.sub}` : ""}
-                    </span>
-                  </li>
-                ))}
+                  );
+                  return (
+                    <li key={e.id} className="flex flex-col">
+                      {e.threadId ? (
+                        <Link href={`/?thread=${encodeURIComponent(e.threadId)}`} className="w-fit hover:opacity-80">
+                          {label}
+                        </Link>
+                      ) : (
+                        label
+                      )}
+                      <span className="mt-0.5 text-[10px] text-zinc-400">
+                        {KIND_LABEL[e.kind]}
+                        {e.cancelled ? " - cancelled" : ""}
+                        {e.sub ? ` - ${e.sub}` : ""}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

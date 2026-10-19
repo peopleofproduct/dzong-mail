@@ -24,3 +24,10 @@ export const getFollowUpDays = () => getSetting<number>("followUpDays", 3);
 
 /** Labels the user pinned as their own inbox sections; empty = defaults. */
 export const getSplitLabels = () => getSetting<string[]>("inboxSplitLabels", []);
+
+/** Request MDN read receipts on outgoing mail. */
+export const getRequestReadReceipts = () => getSetting<boolean>("requestReadReceipts", false);
+
+/** Follow-up automation: "off" reminds only, "draft" prepares a nudge,
+ *  "send" queues it through the undo window. */
+export const getAutoFollowUp = () => getSetting<string>("autoFollowUp", "off");

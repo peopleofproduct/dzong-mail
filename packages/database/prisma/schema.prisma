@@ -63,6 +63,7 @@ model EmailAccount {
   isActive            Boolean  @default(true)
 
   messages        Message[]
+  calendarEvents  CalendarEvent[]
   automationRules AutomationRule[]
 
   createdAt DateTime @default(now())
@@ -99,11 +100,13 @@ model Message {
 
   receivedAt   DateTime
   isRead       Boolean    @default(false)
+  readAt       DateTime? // when the user first opened it (local read receipt)
   isStarred    Boolean    @default(false)
   isDraft      Boolean    @default(false)
   isArchived   Boolean    @default(false)
   snoozedUntil DateTime?
   scheduledAt  DateTime? // send-later for drafts
+  receiptRequested Boolean @default(false) // sent with an MDN read-receipt request
 
   providerLabels String[] @default([])
   aiLabels       String[] @default([])
@@ -112,6 +115,7 @@ model Message {
 
   hasAttachment Boolean      @default(false)
   attachments   Attachment[]
+  calendarEvents CalendarEvent[]
 
   // Semantic-search vector — brute-force cosine at local scale, no pgvector needed.
   embedding      Float[] @default([])
@@ -266,6 +270,28 @@ model AgentRun {
   ranAt   DateTime @default(now())
 
   @@index([ranAt])
+}
+
+// Calendar events parsed out of inbound mail (.ics invites / text/calendar
+// attachments). Local-only - rendered on /calendar, never synced back.
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  emailAccountId String
+  message     Message?  @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  messageId   String?
+  uid         String // iCal UID - dedupes updates to the same invite
+  summary     String?
+  description String?
+  location    String?
+  organizer   String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  status      String    @default("CONFIRMED") // CONFIRMED | TENTATIVE | CANCELLED
+  createdAt   DateTime  @default(now())
+
+  @@unique([emailAccountId, uid])
+  @@index([startsAt])
 }
 
 // Key-value store for user preferences that are not AI settings:

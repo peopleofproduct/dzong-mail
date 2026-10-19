@@ -24,6 +24,8 @@ const themeInit = `
     var dark = pref === "dark" || (pref === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
+    var density = (document.cookie.match(/(?:^|;\s*)unwalled-density=(\w+)/) || [])[1];
+    document.documentElement.classList.toggle("density-compact", density === "compact");
   } catch (e) {}
 })();
 `;

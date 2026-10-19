@@ -1,5 +1,17 @@
 import { prisma } from "@unwalled/database";
 import type { PrismaClient } from "@unwalled/database";
+import { draftAiReply } from "./drafts";
+
+async function readSetting<T>(
+  db: PrismaClient,
+  key: string,
+  fallback: T,
+): Promise<T> {
+  const row = await db.appSetting
+    .findUnique({ where: { key } })
+    .catch(() => null);
+  return row !== null && row.value !== null ? (row.value as T) : fallback;
+}
 
 /**
  * Local notification log — the worker and send pipeline write rows here,
@@ -9,7 +21,7 @@ import type { PrismaClient } from "@unwalled/database";
  */
 export async function emit(
   input: {
-    kind: "new-mail" | "follow-up" | "send" | "agent" | "system";
+    kind: "new-mail" | "follow-up" | "send" | "agent" | "system" | "read-receipt";
     title: string;
     body?: string;
     messageId?: string;
@@ -74,6 +86,11 @@ export async function checkFollowUpReminders(
     }
   }
   const cutoff = new Date(Date.now() - effectiveDays * 86400000);
+  // autoFollowUp: "off" just reminds (default), "draft" prepares an AI
+  // nudge, "send" queues the nudge through the undo window.
+  const autoMode = await readSetting<string>(db, "autoFollowUp", "off");
+  const undoSeconds =
+    autoMode === "send" ? await readSetting<number>(db, "undoSendSeconds", 15) : 0;
   const accounts = await db.emailAccount.findMany({
     select: { id: true, emailAddress: true },
   });
@@ -122,6 +139,39 @@ export async function checkFollowUpReminders(
       dedupeKey: `followup:${m.threadId}:${dayKey(new Date())}`,
     }, db);
     nudged++;
+
+    // Auto follow-up: draft (or queue) exactly one nudge per thread, ever.
+    if (autoMode === "off") continue;
+    const marker = await db.notification.findUnique({
+      where: { dedupeKey: `autofu:${m.threadId}` },
+    });
+    if (marker) continue;
+    try {
+      const draft = await draftAiReply(m.id, db);
+      if (!draft.ok || !draft.draftId) continue;
+      if (autoMode === "send") {
+        await db.message.update({
+          where: { id: draft.draftId },
+          data: { scheduledAt: new Date(Date.now() + undoSeconds * 1000) },
+        });
+      }
+      await emit(
+        {
+          kind: "follow-up",
+          title:
+            autoMode === "send"
+              ? "Follow-up queued - undo window applies"
+              : "Follow-up draft ready",
+          body: m.subject ?? "(no subject)",
+          messageId: draft.draftId,
+          threadId: m.threadId,
+          dedupeKey: `autofu:${m.threadId}`,
+        },
+        db,
+      );
+    } catch (err) {
+      console.error(`[follow-up] auto-draft failed for ${m.threadId}:`, err);
+    }
   }
   return nudged;
 }

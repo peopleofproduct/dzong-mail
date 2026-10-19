@@ -62,6 +62,9 @@ async function parseOne(source: Buffer): Promise<RawMessage | null> {
         "message-id": String(p.messageId ?? ""),
         "return-path": String(p.headers.get("return-path") ?? ""),
         "authentication-results": String(p.headers.get("authentication-results") ?? ""),
+        "content-type": String(p.headers.get("content-type") ?? ""),
+        "auto-submitted": String(p.headers.get("auto-submitted") ?? ""),
+        "original-subject": String(p.headers.get("original-subject") ?? ""),
       },
       bodyText: p.text ?? undefined,
       bodyHtml: typeof p.html === "string" ? p.html : undefined,
@@ -72,7 +75,7 @@ async function parseOne(source: Buffer): Promise<RawMessage | null> {
       isDraft: false,
       providerLabels: [],
       attachments: (p.attachments ?? []).map((a) => ({
-        filename: a.filename ?? "attachment",
+        filename: a.filename ?? (a.contentType === "text/calendar" ? "invite.ics" : "attachment"),
         mimeType: a.contentType,
         sizeBytes: a.size,
         content: a.content,

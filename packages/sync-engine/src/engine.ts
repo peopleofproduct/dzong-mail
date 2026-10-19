@@ -1,6 +1,7 @@
 import { prisma } from "@unwalled/database";
 import type { EmailAccount, PrismaClient } from "@unwalled/database";
 import { persistAttachments } from "./attachments";
+import { flagReadReceipts, ingestCalendarEvents } from "./ingest-extras";
 import { decryptIfPresent, decryptSecret, encryptSecret } from "./crypto";
 import { refreshGoogleAccessToken } from "./oauth/google";
 import { refreshMicrosoftAccessToken } from "./oauth/microsoft";
@@ -138,6 +139,14 @@ export async function syncAccount(
   const fresh = incoming.filter((m) => !known.has(m.providerMessageId));
   const stale = incoming.filter((m) => known.has(m.providerMessageId));
 
+  // Read receipts are machine mail: flag them read before insert so they
+  // don't pollute the unread count, and surface each as a notification.
+  try {
+    await flagReadReceipts(fresh, db);
+  } catch (err) {
+    console.error(`[sync] receipt detection failed for ${account.id}:`, err);
+  }
+
   await db.message.createMany({
     data: fresh.map((m) => toCreateInput(account.id, m)),
     skipDuplicates: true,
@@ -157,6 +166,11 @@ export async function syncAccount(
       await persistAttachments(fresh, idByProviderId, db);
     } catch (err) {
       console.error(`[sync] attachment persistence failed for ${account.id}:`, err);
+    }
+    try {
+      await ingestCalendarEvents(account.id, fresh, idByProviderId, db);
+    } catch (err) {
+      console.error(`[sync] calendar ingest failed for ${account.id}:`, err);
     }
     try {
       await applyAutomationRules(account.id, db, {

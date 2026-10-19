@@ -113,7 +113,9 @@ export class ImapSyncProvider implements MailSyncProvider {
               bodyText: parsed.text ?? undefined,
               bodyHtml: parsed.html || undefined,
               attachments: (parsed.attachments ?? []).map((a) => ({
-                filename: a.filename ?? "attachment",
+                // mailparser marks every non-text part an attachment, so
+                // inline text/calendar invites arrive here too.
+                filename: a.filename ?? (a.contentType === "text/calendar" ? "invite.ics" : "attachment"),
                 mimeType: a.contentType,
                 sizeBytes: a.size,
                 contentId: a.cid,

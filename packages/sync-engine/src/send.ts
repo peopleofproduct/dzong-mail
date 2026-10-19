@@ -29,6 +29,8 @@ export interface SendInput {
   inReplyToHeader?: string;
   /** When set, the message is stored as a scheduled draft for the worker to dispatch. */
   scheduledAt?: Date;
+  /** Ask the recipient's client for an MDN read receipt (honored at their discretion). */
+  requestReceipt?: boolean;
 }
 
 export interface SendResult {
@@ -64,6 +66,12 @@ function buildMime(from: string, input: SendInput): Promise<Buffer> {
     html: input.bodyHtml,
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
+    headers: input.requestReceipt
+      ? {
+          "Disposition-Notification-To": from,
+          "Return-Receipt-To": from,
+        }
+      : undefined,
     attachments: input.attachments?.map((a) => ({
       filename: a.filename,
       content: a.content,
@@ -99,6 +107,7 @@ async function recordSent(
       isRead: true,
       isDraft: Boolean(input.scheduledAt),
       scheduledAt: input.scheduledAt,
+      receiptRequested: input.requestReceipt ?? false,
       hasAttachment: Boolean(input.attachments?.length),
       providerLabels: input.scheduledAt ? ["DRAFT"] : ["SENT"],
     },
@@ -157,6 +166,12 @@ async function deliverViaSmtp(
     html: input.bodyHtml,
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
+    headers: input.requestReceipt
+      ? {
+          "Disposition-Notification-To": formattedFrom(account),
+          "Return-Receipt-To": formattedFrom(account),
+        }
+      : undefined,
     attachments: input.attachments?.map((a) => ({
       filename: a.filename,
       content: a.content,
@@ -233,6 +248,12 @@ async function deliverViaGraph(
         toRecipients: input.to.map(toRecipient),
         ccRecipients: (input.cc ?? []).map(toRecipient),
         bccRecipients: (input.bcc ?? []).map(toRecipient),
+        internetMessageHeaders: input.requestReceipt
+          ? [
+              { name: "Disposition-Notification-To", value: formattedFrom(account) },
+              { name: "Return-Receipt-To", value: formattedFrom(account) },
+            ]
+          : undefined,
         attachments: (input.attachments ?? []).map((a) => ({
           "@odata.type": "#microsoft.graph.fileAttachment",
           name: a.filename,
@@ -334,6 +355,7 @@ export async function dispatchScheduledDraft(
     bodyHtml: message.bodyHtml ?? undefined,
     attachments: attachments.length ? attachments : undefined,
     threadId: message.threadId ?? undefined,
+    requestReceipt: message.receiptRequested,
   };
 
   const { providerMessageId, threadId } = await deliver(message.emailAccount, input);

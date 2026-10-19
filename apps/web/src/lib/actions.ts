@@ -2,7 +2,7 @@
 
 import { join } from "node:path";
 import { readFile, rm } from "node:fs/promises";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -30,7 +30,7 @@ import {
 import type { GeneratedRule, RuleAction, RuleCondition, SendAttachment } from "@unwalled/sync-engine";
 import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@unwalled/sync-engine";
 import { snapshotInboxZero } from "@/lib/achievements";
-import { getUndoSendSeconds, setSetting } from "@/lib/settings";
+import { getRequestReadReceipts, getUndoSendSeconds, setSetting } from "@/lib/settings";
 import type { Prisma } from "@unwalled/database";
 
 const DEMO_USER_EMAIL = "me@unwalled.local";
@@ -214,7 +214,13 @@ export async function toggleMessageFlag(messageId: string, flag: "isRead" | "isS
   const message = await prisma.message.findUniqueOrThrow({ where: { id: messageId } });
   await prisma.message.update({
     where: { id: messageId },
-    data: { [flag]: !message[flag] },
+    data: {
+      [flag]: !message[flag],
+      // Stamp the first-open time for the local read receipt.
+      ...(flag === "isRead" && !message.isRead && !message.readAt
+        ? { readAt: new Date() }
+        : {}),
+    },
   });
   revalidatePath("/");
 }
@@ -276,7 +282,15 @@ export async function moveMessages(ids: string[], target: "inbox" | "archive" | 
 
 export async function markMessagesRead(ids: string[], read = true) {
   if (ids.length === 0) return;
-  await prisma.message.updateMany({ where: { id: { in: ids } }, data: { isRead: read } });
+  // First open stamps readAt; unread clears neither flag nor the record.
+  await prisma.message.updateMany({
+    where: { id: { in: ids }, readAt: null },
+    data: { isRead: read, readAt: read ? new Date() : null },
+  });
+  await prisma.message.updateMany({
+    where: { id: { in: ids }, readAt: { not: null } },
+    data: { isRead: read },
+  });
   revalidatePath("/");
 }
 
@@ -412,6 +426,7 @@ export async function sendEmailAction(formData: FormData) {
       threadId: get("threadId") || undefined,
       inReplyToHeader: get("inReplyTo") || undefined,
       scheduledAt,
+      requestReceipt: await getRequestReadReceipts(),
     });
     rowId = result.messageRowId;
   } catch (err) {
@@ -765,6 +780,21 @@ export async function savePrefs(formData: FormData) {
   const get = (key: string) => String(formData.get(key) ?? "").trim();
   await setSetting("undoSendSeconds", Math.max(0, Number(get("undoSendSeconds")) || 0));
   await setSetting("followUpDays", Math.max(1, Number(get("followUpDays")) || 3));
+  const autoFollowUp = get("autoFollowUp");
+  await setSetting(
+    "autoFollowUp",
+    autoFollowUp === "draft" || autoFollowUp === "send" ? autoFollowUp : "off",
+  );
+  await setSetting("requestReadReceipts", get("requestReadReceipts") === "on");
+  // Density rides in a cookie (not AppSetting) so the layout-init script can
+  // apply it before first paint without making the root layout dynamic.
+  const cookieStore = await cookies();
+  const density = get("density") === "compact" ? "compact" : "comfortable";
+  cookieStore.set("unwalled-density", density, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
   revalidatePath("/settings");
   safeRedirect("/settings", { notice: "Preferences saved" });
 }
