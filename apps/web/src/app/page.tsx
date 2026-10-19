@@ -105,9 +105,9 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
       ? accounts.find((a) => a.id === accountId)?.emailAddress
       : undefined;
     items = accountEmail ? result.hits.filter((h) => h.accountEmail === accountEmail) : result.hits;
-    if (!result.ok) semanticNote = result.reason ?? "semantic search unavailable";
+    if (!result.ok) semanticNote = result.reason ?? "AI search isn't available right now";
     else if (result.hits.length === 0)
-      semanticNote = "No semantic matches — run the worker once to embed your mail";
+      semanticNote = "No AI matches yet - your inbox is still being indexed (it happens during sync)";
   } else {
     items = (await getMessagesForView(view, q, 100, accountId)).map(serializeMessage);
   }

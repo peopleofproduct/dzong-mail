@@ -149,9 +149,9 @@ export async function AISettingsSection() {
       <p className="text-xs text-zinc-400">
         Keys stay on this machine — AES-256-GCM encrypted with your local UNWALLED_SECRET_KEY. With
         Ollama selected, no data leaves localhost. OpenAI and Anthropic are supported as optional
-        BYOK providers. Anthropic has no embeddings API, so when it is selected we pair it with your
-        local Ollama for semantic search — embeddings always stay on this machine, and the assistant
-        falls back to keyword matching if no embedding model is reachable.
+        BYOK providers. Anthropic can't index your mail, so when it's selected we quietly use your
+        local Ollama for search and answers — everything still stays on this machine. If no local
+        model is running, the assistant falls back to plain keyword matching.
       </p>
     </section>
   );

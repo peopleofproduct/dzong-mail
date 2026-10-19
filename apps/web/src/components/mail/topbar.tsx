@@ -94,7 +94,7 @@ export function Topbar() {
           onClick={() =>
             router.push(buildParams(searchParams, { sm: semanticOn ? undefined : "1" }))
           }
-          title="Toggle semantic (AI) search — meaning-based, needs embeddings"
+          title="AI search - finds mail by meaning, not just keywords"
           className={`absolute top-1/2 right-2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
             semanticOn
               ? "bg-indigo-600 text-white"

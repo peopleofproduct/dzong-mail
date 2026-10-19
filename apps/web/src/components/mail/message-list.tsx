@@ -358,7 +358,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             )}
             {m.score !== undefined && (
               <span
-                title="Semantic match score"
+                title="AI match score"
                 className="shrink-0 rounded bg-indigo-50 px-1 text-[10px] font-medium text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
               >
                 ✦ {m.score.toFixed(2)}

@@ -19,7 +19,7 @@ const features = [
   {
     icon: Search,
     title: "Search that understands",
-    body: "Semantic search finds mail by meaning — “weekend plans” finds the hiking thread — plus an Ask-my-inbox Q&A that cites its sources.",
+    body: "Search finds mail by meaning — “weekend plans” finds the hiking thread — plus an Ask-my-inbox Q&A that cites its sources.",
   },
   {
     icon: Workflow,

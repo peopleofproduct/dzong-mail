@@ -26,8 +26,8 @@ function guidanceFor(reason: string | undefined) {
     return {
       title: "Answers are keyword-only right now",
       body: reason.includes("AI disabled")
-        ? "AI is off or unreachable - enable it for semantic answers."
-        : "Run a local embedding model for semantic answers - your mail still never leaves this machine.",
+        ? "AI is off or unreachable - turn it on for smarter answers."
+        : "Add a small local model and answers get much smarter - everything still stays on this machine.",
       command: reason.includes("AI disabled") ? null : "ollama pull nomic-embed-text",
       href: "/settings",
       hrefLabel: "Open AI settings",
@@ -36,7 +36,7 @@ function guidanceFor(reason: string | undefined) {
   if (reason.includes("not embedded")) {
     return {
       title: "Still indexing your inbox",
-      body: "Embeddings build automatically during sync - semantic answers kick in once the first pass finishes.",
+      body: "Your inbox is being indexed in the background - answers get smarter once the first pass finishes.",
       command: null,
       href: null,
       hrefLabel: null,
