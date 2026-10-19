@@ -1,21 +1,7 @@
 import { connection } from "next/server";
 import { getAccounts, getRules } from "@/lib/queries";
-import { deleteRule, runRulesNow, saveRule } from "@/lib/actions";
-
-const inputClass =
-  "w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-black placeholder-zinc-400 focus:border-indigo-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
-
-const CONDITION_FIELDS = ["from", "to", "subject", "snippet", "folder", "aiLabel", "providerLabel"];
-const OPERATORS = ["contains", "not_contains", "equals", "startsWith"];
-const ACTION_TYPES = [
-  "ARCHIVE",
-  "ADD_LABEL",
-  "MARK_READ",
-  "STAR",
-  "MOVE_FOLDER",
-  "DRAFT_REPLY",
-  "DELETE",
-];
+import { createColdEmailPreset, deleteRule, runRulesNow } from "@/lib/actions";
+import { NewRuleForm } from "./new-rule-form";
 
 function describeConditions(json: unknown): string {
   if (!Array.isArray(json)) return "—";
@@ -56,6 +42,11 @@ export async function RulesSection() {
           <form action={runRulesNow.bind(null, undefined, false)}>
             <button className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300">
               Run rules now
+            </button>
+          </form>
+          <form action={createColdEmailPreset}>
+            <button className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
+              + Cold email blocker
             </button>
           </form>
         </div>
@@ -107,63 +98,7 @@ export async function RulesSection() {
         <summary className="cursor-pointer text-sm font-medium text-black dark:text-zinc-100">
           New rule
         </summary>
-        <form action={saveRule} className="mt-3 grid grid-cols-2 gap-2">
-          <input name="name" placeholder="Rule name" required className={inputClass} />
-          <input name="description" placeholder="Description (optional)" className={inputClass} />
-          <select name="emailAccountId" className={inputClass} defaultValue="">
-            <option value="">All accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.emailAddress}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <select name="matchMode" className={inputClass} defaultValue="ALL">
-              <option value="ALL">Match ALL</option>
-              <option value="ANY">Match ANY</option>
-            </select>
-            <select name="trigger" className={inputClass} defaultValue="ON_MESSAGE_SYNC">
-              <option value="ON_MESSAGE_SYNC">On sync</option>
-              <option value="ON_AI_CLASSIFICATION">On AI classify</option>
-              <option value="MANUAL">Manual</option>
-            </select>
-          </div>
-          <input
-            name="priority"
-            type="number"
-            placeholder="Priority (higher runs first)"
-            className={inputClass}
-          />
-          <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-            <input type="checkbox" name="isEnabled" defaultChecked className="accent-indigo-600" />
-            Enabled
-          </label>
-
-          <p className="col-span-2 mt-1 text-xs font-medium text-zinc-500">
-            Condition (JSON array)
-          </p>
-          <textarea
-            name="conditions"
-            rows={2}
-            defaultValue='[{"field":"subject","operator":"contains","value":""}]'
-            className={`${inputClass} col-span-2 font-mono text-xs`}
-          />
-          <p className="col-span-2 text-xs font-medium text-zinc-500">Actions (JSON array)</p>
-          <textarea
-            name="actions"
-            rows={2}
-            defaultValue='[{"type":"ADD_LABEL","value":"IMPORTANT"}]'
-            className={`${inputClass} col-span-2 font-mono text-xs`}
-          />
-          <p className="col-span-2 text-[10px] text-zinc-400">
-            Fields: {CONDITION_FIELDS.join(", ")} · Operators: {OPERATORS.join(", ")} · Actions:{" "}
-            {ACTION_TYPES.join(", ")} (value = label/folder; DRAFT_REPLY uses template)
-          </p>
-          <button className="col-span-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500">
-            Save rule
-          </button>
-        </form>
+        <NewRuleForm accounts={accounts} />
       </details>
     </section>
   );

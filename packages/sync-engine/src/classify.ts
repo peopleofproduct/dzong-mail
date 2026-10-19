@@ -1,23 +1,8 @@
 import { prisma } from "@unwalled/database";
 import type { PrismaClient } from "@unwalled/database";
-import { resolveProvider } from "@unwalled/ai-engine";
-import type { AIProviderConfig } from "@unwalled/ai-engine";
-import { decryptIfPresent } from "./crypto";
+import { DEFAULT_AI_LABELS, resolveAIForAccount } from "./ai";
 
-export const DEFAULT_AI_LABELS = [
-  "NEWSLETTER",
-  "MARKETING",
-  "COLD_PITCH",
-  "RECEIPT",
-  "NOTIFICATION",
-  "SOCIAL",
-  "ACTION_REQUIRED",
-] as const;
-
-interface CustomLabelDef {
-  name: string;
-  prompt?: string;
-}
+export { DEFAULT_AI_LABELS };
 
 export interface ClassifyOutcome {
   accountId: string;
@@ -36,32 +21,11 @@ export async function classifyAccountMessages(
   db: PrismaClient = prisma,
   options: { limit?: number } = {},
 ): Promise<ClassifyOutcome> {
-  const account = await db.emailAccount.findUniqueOrThrow({
-    where: { id: accountId },
-    include: { user: { include: { aiSettings: true } } },
-  });
-
-  const settings = account.user.aiSettings;
-  if (!settings?.enabled) {
-    return { accountId, classified: 0, skipped: 0, reason: "AI disabled" };
+  const ai = await resolveAIForAccount(accountId, db);
+  if (!ai) {
+    return { accountId, classified: 0, skipped: 0, reason: "AI disabled or unreachable" };
   }
-
-  const config: AIProviderConfig = {
-    provider: settings.provider,
-    baseUrl: settings.baseUrl ?? undefined,
-    apiKey: decryptIfPresent(settings.apiKeyEncrypted),
-    model: settings.model,
-    embeddingModel: settings.embeddingModel ?? undefined,
-    temperature: settings.temperature,
-  };
-  const provider = resolveProvider(config);
-
-  if (!(await provider.healthCheck())) {
-    return { accountId, classified: 0, skipped: 0, reason: "Provider unreachable" };
-  }
-
-  const custom = (settings.customLabels as CustomLabelDef[] | null) ?? [];
-  const candidates = [...DEFAULT_AI_LABELS, ...custom.map((c) => c.name).filter(Boolean)];
+  const { provider, candidateLabels } = ai;
 
   const pending = await db.message.findMany({
     where: { emailAccountId: accountId, aiLabels: { isEmpty: true }, isDraft: false },
@@ -77,7 +41,7 @@ export async function classifyAccountMessages(
       `Snippet: ${message.snippet ?? ""}`,
     ].join("\n");
     try {
-      const { labels } = await provider.classify(text, candidates);
+      const { labels } = await provider.classify(text, candidateLabels);
       if (labels.length > 0) {
         await db.message.update({
           where: { id: message.id },

@@ -1,5 +1,6 @@
 import { prisma } from "@unwalled/database";
 import type { AutomationRule, Message, PrismaClient } from "@unwalled/database";
+import { createDraftRow, draftAiReply } from "./drafts";
 
 export interface RuleCondition {
   field: "from" | "to" | "subject" | "snippet" | "aiLabel" | "providerLabel" | "folder";
@@ -112,24 +113,23 @@ async function applyAction(
       await db.message.delete({ where: { id: message.id } });
       break;
     case "DRAFT_REPLY":
-      await db.message.create({
-        data: {
-          emailAccountId: message.emailAccountId,
-          providerMessageId: `draft-${crypto.randomUUID()}`,
-          threadId: message.threadId,
-          folder: "Drafts",
-          subject: `Re: ${message.subject ?? ""}`,
-          snippet: action.template?.slice(0, 200),
-          fromAddress: accountEmail,
-          toAddresses: [message.fromAddress],
-          bodyText: (action.template ?? "")
-            .replaceAll("{{from_name}}", message.fromName ?? message.fromAddress)
-            .replaceAll("{{subject}}", message.subject ?? ""),
-          receivedAt: new Date(),
-          isRead: true,
-          isDraft: true,
-          providerLabels: ["DRAFT"],
-        },
+      if (!action.template) {
+        // No template → generate the reply with the user's AI provider.
+        const result = await draftAiReply(message.id, db);
+        if (!result.ok) {
+          throw new Error(result.reason ?? "AI draft failed");
+        }
+        break;
+      }
+      await createDraftRow(db, {
+        emailAccountId: message.emailAccountId,
+        threadId: message.threadId,
+        subject: `Re: ${message.subject ?? ""}`,
+        fromAddress: accountEmail,
+        toAddresses: [message.fromAddress],
+        bodyText: action.template
+          .replaceAll("{{from_name}}", message.fromName ?? message.fromAddress)
+          .replaceAll("{{subject}}", message.subject ?? ""),
       });
       break;
   }

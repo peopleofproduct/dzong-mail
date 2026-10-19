@@ -9,12 +9,17 @@ import {
   buildGoogleAuthorizationUrl,
   buildMicrosoftAuthorizationUrl,
   classifyAccountMessages,
+  composeWithAI,
+  draftAiReply,
   encryptSecret,
+  generateRuleFromPrompt,
   sendEmail,
+  summarizeThread,
   syncAccount,
   unsubscribeMessage,
+  unsubscribeSender,
 } from "@unwalled/sync-engine";
-import type { RuleAction, RuleCondition } from "@unwalled/sync-engine";
+import type { GeneratedRule, RuleAction, RuleCondition } from "@unwalled/sync-engine";
 import type { Prisma } from "@unwalled/database";
 
 const DEMO_USER_EMAIL = "me@unwalled.local";
@@ -239,8 +244,80 @@ export async function sendEmailAction(formData: FormData) {
   } catch (err) {
     safeRedirect("/", { error: String(err) });
   }
+  // If this send originated from an existing draft row, consume it.
+  const draftId = get("draftId");
+  if (draftId) {
+    await prisma.message.delete({ where: { id: draftId } }).catch(() => {});
+  }
   revalidatePath("/");
   safeRedirect("/", { notice: scheduledAt ? "Send scheduled" : "Message sent" });
+}
+
+// ─── AI features ────────────────────────────────────────────────────────────
+
+export async function draftAiReplyNow(messageId: string) {
+  const result = await draftAiReply(messageId);
+  revalidatePath("/");
+  safeRedirect("/", result.ok ? { notice: "Draft ready in Drafts" } : { error: result.reason! });
+}
+
+export async function summarizeThreadNow(threadId: string) {
+  const result = await summarizeThread(threadId);
+  revalidatePath("/");
+  if (!result.ok) safeRedirect("/", { error: result.reason! });
+}
+
+export async function generateRuleJson(
+  prompt: string,
+): Promise<{ ok: true; rule: GeneratedRule } | { ok: false; reason: string }> {
+  const user = await getOrCreateLocalUser();
+  const result = await generateRuleFromPrompt(user.id, prompt);
+  if (result.ok && result.rule) return { ok: true, rule: result.rule };
+  return { ok: false, reason: result.reason ?? "Generation failed" };
+}
+
+export async function composeBodyWithAI(input: {
+  to?: string;
+  subject?: string;
+  instructions?: string;
+}): Promise<{ ok: boolean; body?: string; reason?: string }> {
+  const user = await getOrCreateLocalUser();
+  return composeWithAI(user.id, input);
+}
+
+export async function unsubscribeSenderNow(fromAddress: string) {
+  const result = await unsubscribeSender(fromAddress);
+  revalidatePath("/");
+  revalidatePath("/settings");
+  if (result.method === "https-link" || result.method === "mailto") {
+    redirect(result.target!);
+  }
+  safeRedirect(
+    "/settings",
+    result.ok
+      ? { notice: `Unsubscribed — archived ${result.archived} message(s)` }
+      : { error: `Unsubscribe failed: ${result.note ?? "no target"}` },
+  );
+}
+
+export async function createColdEmailPreset() {
+  const user = await getOrCreateLocalUser();
+  await prisma.automationRule.upsert({
+    where: { id: "preset-cold-email" },
+    update: {},
+    create: {
+      id: "preset-cold-email",
+      userId: user.id,
+      name: "Cold email blocker",
+      description: "AI-flagged cold pitches are labelled and archived out of the inbox.",
+      trigger: "ON_AI_CLASSIFICATION",
+      matchMode: "ALL",
+      conditions: [{ field: "aiLabel", operator: "contains", value: "COLD_PITCH" }],
+      actions: [{ type: "ADD_LABEL", value: "COLD_EMAIL" }, { type: "ARCHIVE" }],
+    },
+  });
+  revalidatePath("/settings");
+  safeRedirect("/settings", { notice: "Cold email blocker rule created — enable AI to use it" });
 }
 
 // ─── Automation rules ──────────────────────────────────────────────────────

@@ -20,8 +20,18 @@ export {
 export type { RuleAction, RuleActionType, RuleCondition, RuleEvalResult } from "./rules";
 export { classifyAccountMessages, DEFAULT_AI_LABELS } from "./classify";
 export type { ClassifyOutcome } from "./classify";
-export { unsubscribeMessage } from "./unsubscribe";
-export type { UnsubscribeResult } from "./unsubscribe";
+export { attemptUnsubscribe, unsubscribeMessage, unsubscribeSender } from "./unsubscribe";
+export type { SenderUnsubscribeResult, UnsubscribeResult } from "./unsubscribe";
+export { resolveAIForAccount, resolveAIForUser } from "./ai";
+export type { ResolvedAI } from "./ai";
+export {
+  composeWithAI,
+  createDraftRow,
+  draftAiReply,
+  generateRuleFromPrompt,
+  summarizeThread,
+} from "./drafts";
+export type { DraftResult, GeneratedRule } from "./drafts";
 export {
   buildGoogleAuthorizationUrl,
   exchangeGoogleCode,

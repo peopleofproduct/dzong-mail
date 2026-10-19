@@ -201,6 +201,60 @@ export async function getSidebarData(): Promise<SidebarData> {
   };
 }
 
+export interface SubscriptionSummary {
+  fromAddress: string;
+  fromName: string | null;
+  count: number;
+  unread: number;
+  canUnsubscribe: boolean;
+  unsubscribed: boolean;
+}
+
+/** Group bulk senders (newsletters/promotions/List-Unsubscribe mail) for the
+ *  subscriptions manager — the bulk-unsubscribe surface. */
+export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
+  const messages = await prisma.message.findMany({
+    where: { isDraft: false },
+    orderBy: { receivedAt: "desc" },
+    take: 1000,
+    select: {
+      fromAddress: true,
+      fromName: true,
+      isRead: true,
+      headers: true,
+      labels: true,
+      aiLabels: true,
+      providerLabels: true,
+    },
+  });
+
+  const senders = new Map<string, SubscriptionSummary>();
+  for (const m of messages) {
+    const h = (m.headers ?? {}) as Record<string, string>;
+    const hasUnsubHeader = Boolean(h["List-Unsubscribe"] ?? h["list-unsubscribe"]);
+    const isBulk =
+      hasUnsubHeader ||
+      m.aiLabels.some((l) => l === "NEWSLETTER" || l === "MARKETING") ||
+      m.providerLabels.some((l) => l === "NEWSLETTER" || l === "CATEGORY_PROMOTIONS");
+    if (!isBulk) continue;
+
+    const s = senders.get(m.fromAddress) ?? {
+      fromAddress: m.fromAddress,
+      fromName: m.fromName,
+      count: 0,
+      unread: 0,
+      canUnsubscribe: false,
+      unsubscribed: false,
+    };
+    s.count++;
+    if (!m.isRead) s.unread++;
+    if (hasUnsubHeader) s.canUnsubscribe = true;
+    if (m.labels.includes("UNSUBSCRIBED")) s.unsubscribed = true;
+    senders.set(m.fromAddress, s);
+  }
+  return [...senders.values()].sort((a, b) => b.count - a.count);
+}
+
 export async function getRules() {
   return prisma.automationRule.findMany({
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
