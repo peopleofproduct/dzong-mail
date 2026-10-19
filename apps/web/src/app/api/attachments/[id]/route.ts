@@ -26,7 +26,7 @@ export async function GET(_request: Request, context: RouteContext) {
     headers: {
       "Content-Type": attachment.mimeType ?? "application/octet-stream",
       "Content-Length": String(content.length),
-      "Content-Disposition": `attachment; filename="${attachment.filename.replace(/"/g, "")}"`,
+      "Content-Disposition": `${attachment.mimeType?.startsWith("image/") ? "inline" : "attachment"}; filename="${attachment.filename.replace(/"/g, "")}"`,
     },
   });
 }

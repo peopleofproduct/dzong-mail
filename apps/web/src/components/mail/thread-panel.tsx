@@ -13,6 +13,16 @@ interface ThreadPanelProps {
   baseParams: string;
 }
 
+/** Map inline-attachment Content-IDs to attachment ids so cid: images in
+ *  the body resolve to the locally stored file. */
+function cidMapFor(attachments: { id: string; contentId: string | null; storagePath: string | null }[]) {
+  const map = new Map<string, string>();
+  for (const a of attachments) {
+    if (a.contentId && a.storagePath) map.set(a.contentId.replace(/[<>]/g, "").trim(), a.id);
+  }
+  return map;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -141,7 +151,7 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
             </header>
             <p className="mb-3 text-xs text-zinc-400">to {m.toAddresses.join(", ") || "me"}</p>
             <MessageBody
-              html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml) : null}
+              html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml, cidMapFor(m.attachments)) : null}
               text={m.bodyText}
               fallback={m.snippet ?? "No content synced."}
             />
