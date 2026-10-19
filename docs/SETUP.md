@@ -72,7 +72,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 Then pull a model:
 
 ```bash
-ollama pull llama3.2:3b   # ~2 GB, good starter — fast, decent
+ollama pull llama3.2:3b        # ~2 GB, good starter — fast, decent
+ollama pull nomic-embed-text   # ~274 MB — powers semantic search / Ask
 # beefier: ollama pull llama3.1:8b / qwen2.5:7b (better drafts, slower)
 ```
 

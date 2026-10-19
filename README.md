@@ -35,6 +35,10 @@ Free. Open source. MIT. Yours.
   strangers.
 - **Bulk unsubscribe** — see every sender spamming you, ranked, with
   one-click unsubscribe-and-archive.
+- **Semantic search + "Ask my inbox"** — meaning-based search (toggle the
+  ✦ AI chip next to search) and a chat panel (⌘K → "Ask my inbox") that
+  answers questions with citations from your actual mail. All local —
+  competitors can't do this without shipping your inbox to a cloud.
 - **Follow-up tracking** — "needs reply" and "awaiting response" views so
   nothing slips.
 - **Analytics** — volume, top senders, label breakdown, all computed
