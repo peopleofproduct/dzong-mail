@@ -1,6 +1,7 @@
 import { CheckCheck, ExternalLink, Pencil, Send, Sparkles, X } from "lucide-react";
 import { getReplyQueue } from "@/lib/queries";
 import { archiveThreadNow, draftAiReplyNow, sendDraftNow } from "@/lib/actions";
+import { SenderAvatar } from "./sender-avatar";
 
 const cardBtn =
   "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium";
@@ -40,7 +41,8 @@ export async function ReplyQueuePanel() {
               key={thread.threadId}
               className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60"
             >
-              <header className="flex items-baseline gap-2">
+              <header className="flex items-center gap-2">
+                <SenderAvatar email={m.fromAddress} name={m.fromName} size={30} />
                 <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
                   {m.fromName ?? m.fromAddress}
                 </span>

@@ -25,6 +25,7 @@ import {
   unsubscribeFromMessage,
 } from "@/lib/actions";
 import { buildParams } from "./params";
+import { SenderAvatar } from "./sender-avatar";
 import type { MailItem } from "./types";
 
 export interface ListSection {
@@ -261,6 +262,9 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
         >
           <Star size={14} fill={m.isStarred ? "currentColor" : "none"} />
         </button>
+        <span className="mt-0.5 hidden sm:block">
+          <SenderAvatar email={m.fromAddress} name={m.fromName} size={30} />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span

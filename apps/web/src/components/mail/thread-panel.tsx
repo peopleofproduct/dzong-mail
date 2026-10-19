@@ -5,6 +5,7 @@ import { cleanEmailHtml } from "@/lib/email-html";
 import { draftAiReplyNow, markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/actions";
 import { MarkReadOnMount } from "./mark-read-on-mount";
 import { MessageBody } from "./message-body";
+import { SenderAvatar } from "./sender-avatar";
 
 interface ThreadPanelProps {
   threadId: string;
@@ -125,7 +126,8 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
       <div className="flex flex-1 flex-col divide-y divide-zinc-100 dark:divide-zinc-800/60">
         {messages.map((m) => (
           <article key={m.id} className="px-5 py-4" id={m.id}>
-            <header className="mb-2 flex items-baseline gap-2">
+            <header className="mb-2 flex items-center gap-2">
+              <SenderAvatar email={m.fromAddress} name={m.fromName} size={36} />
               <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                 {m.fromName ?? m.fromAddress}
               </span>
