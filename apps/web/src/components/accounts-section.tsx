@@ -101,23 +101,27 @@ export async function AccountsSection() {
           <OtherProviderCard connectedEmails={accounts.map((a) => a.emailAddress)} />
 
           <div className="flex flex-col gap-3">
-            <form
-              action={connectMockAccount}
-              className="flex flex-1 flex-col justify-between gap-3 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700"
-            >
-              <div>
-                <p className="text-sm font-medium text-black dark:text-zinc-100">Demo inbox</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Just exploring? A pretend mailbox — no credentials, nothing leaves the machine.
-                </p>
-              </div>
-              <button
-                type="submit"
-                className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
+            {/* Demo is first-run education only — once a real provider is
+                connected it would just pollute the inbox with fake mail. */}
+            {!accounts.some((a) => a.provider !== "MOCK") && (
+              <form
+                action={connectMockAccount}
+                className="flex flex-1 flex-col justify-between gap-3 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700"
               >
-                Add demo account
-              </button>
-            </form>
+                <div>
+                  <p className="text-sm font-medium text-black dark:text-zinc-100">Demo inbox</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Just exploring? A pretend mailbox — no credentials, nothing leaves the machine.
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
+                >
+                  Add demo account
+                </button>
+              </form>
+            )}
 
             <details className="rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
               <summary className="cursor-pointer text-sm font-medium text-black dark:text-zinc-100">

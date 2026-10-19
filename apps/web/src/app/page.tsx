@@ -253,6 +253,15 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
   );
 }
 
+/** Server wrapper: the demo-account command only exists while the user has
+ *  no real provider connected — it's for first-run education, not an
+ *  everyday action. */
+async function CommandPaletteSection() {
+  await connection();
+  const accounts = await getAccounts();
+  return <CommandPalette showDemo={!accounts.some((a) => a.provider !== "MOCK")} />;
+}
+
 /** Everything dynamic about the main shell — the first-run redirect and the
  *  mobile pane visibility — lives inside one Suspense boundary so the outer
  *  page stays prerenderable. */
@@ -341,7 +350,7 @@ export default function Home(props: PageProps<"/">) {
         <ComposerSection searchParams={props.searchParams} />
       </Suspense>
       <Suspense fallback={null}>
-        <CommandPalette />
+        <CommandPaletteSection />
       </Suspense>
       <Suspense fallback={null}>
         <KeyboardShortcuts />

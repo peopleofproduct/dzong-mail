@@ -18,7 +18,7 @@ const NAV_ITEMS: Array<{ label: string; view: string }> = [
   { label: "Go to Archive", view: "archive" },
 ];
 
-export function CommandPalette() {
+export function CommandPalette({ showDemo }: { showDemo: boolean }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,15 +88,17 @@ export function CommandPalette() {
               >
                 Sync all accounts
               </Command.Item>
-              <Command.Item
-                onSelect={() => {
-                  void connectMockAccount();
-                  setOpen(false);
-                }}
-                className="cursor-pointer rounded-md px-2 py-2 text-sm aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800"
-              >
-                Add demo account & sync
-              </Command.Item>
+              {showDemo && (
+                <Command.Item
+                  onSelect={() => {
+                    void connectMockAccount();
+                    setOpen(false);
+                  }}
+                  className="cursor-pointer rounded-md px-2 py-2 text-sm aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800"
+                >
+                  Add demo account & sync
+                </Command.Item>
+              )}
               <Command.Item
                 onSelect={() => {
                   router.push("/settings");
