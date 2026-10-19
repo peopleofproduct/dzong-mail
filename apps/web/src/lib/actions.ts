@@ -169,6 +169,14 @@ export async function syncAllNow() {
   revalidatePath("/");
 }
 
+export async function updateAccountDisplayName(formData: FormData) {
+  const accountId = String(formData.get("accountId") ?? "");
+  const displayName = String(formData.get("displayName") ?? "").trim() || null;
+  if (!accountId) return;
+  await prisma.emailAccount.update({ where: { id: accountId }, data: { displayName } });
+  revalidatePath("/settings");
+}
+
 export async function removeAccount(accountId: string) {
   // Collect messages with attachment dirs before the cascade delete so the
   // files on disk are removed too — otherwise they orphan forever.
@@ -375,6 +383,7 @@ export async function composeBodyWithAI(input: {
   to?: string;
   subject?: string;
   instructions?: string;
+  accountId?: string;
 }): Promise<{ ok: boolean; body?: string; reason?: string }> {
   const user = await getOrCreateLocalUser();
   return composeWithAI(user.id, input);

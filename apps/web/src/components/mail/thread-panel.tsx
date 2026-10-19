@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { getThread } from "@/lib/queries";
 import { prisma } from "@/lib/db";
@@ -219,12 +220,12 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
                 )}
                 {m.isDraft && (
                   <div className="mt-3 flex items-center gap-2">
-                    <a
+                    <Link
                       href={`/?${draftParams(m, baseParams)}`}
                       className="inline-block rounded-md border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
                     >
                       Edit &amp; send draft →
-                    </a>
+                    </Link>
                     <form action={sendDraftNow.bind(null, m.id)}>
                       <button
                         type="submit"
@@ -242,20 +243,20 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
       </div>
 
       <div className="sticky bottom-0 flex gap-2 border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-        <a
+        <Link
           id="thread-reply"
           href={`/?${replyParams.toString()}`}
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
         >
           ↩ Reply
-        </a>
-        <a
+        </Link>
+        <Link
           id="thread-forward"
           href={`/?${fwdParams.toString()}`}
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
         >
           ↪ Forward
-        </a>
+        </Link>
         {!last.isDraft && (
           <form action={draftAiReplyNow.bind(null, last.id)}>
             <button

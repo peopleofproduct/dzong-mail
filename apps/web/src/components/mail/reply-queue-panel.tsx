@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CheckCheck, ExternalLink, Pencil, Send, Sparkles, X } from "lucide-react";
 import { getReplyQueue } from "@/lib/queries";
 import { archiveThreadNow, draftAiReplyNow, sendDraftNow } from "@/lib/actions";
@@ -78,12 +79,12 @@ export async function ReplyQueuePanel() {
                         <Send size={11} /> Send
                       </button>
                     </form>
-                    <a
+                    <Link
                       href={openHref}
                       className={`${cardBtn} border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}
                     >
                       <Pencil size={11} /> Review / edit
-                    </a>
+                    </Link>
                   </div>
                 </div>
               ) : (
@@ -100,12 +101,12 @@ export async function ReplyQueuePanel() {
               )}
 
               <div className="mt-3 flex items-center gap-3 border-t border-zinc-100 pt-2.5 dark:border-zinc-800">
-                <a
+                <Link
                   href={openHref}
                   className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                 >
                   <ExternalLink size={11} /> Open thread
-                </a>
+                </Link>
                 <form action={archiveThreadNow.bind(null, thread.threadId)} className="ml-auto">
                   <button
                     type="submit"

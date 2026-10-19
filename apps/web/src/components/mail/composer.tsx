@@ -41,6 +41,7 @@ function ComposerInner({ accounts }: ComposerProps) {
   const toRef = useRef<HTMLInputElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const hintRef = useRef<HTMLInputElement>(null);
+  const accountRef = useRef<HTMLSelectElement>(null);
 
   const close = () => router.push(buildParams(searchParams, { compose: undefined }));
   const isReply = mode === "reply";
@@ -80,6 +81,7 @@ function ComposerInner({ accounts }: ComposerProps) {
         to: toRef.current?.value,
         subject: subjectRef.current?.value,
         instructions: hintRef.current?.value,
+        accountId: accountRef.current?.value,
       });
       if (result.ok && result.body) setBody(result.body);
       else setAiError(result.reason ?? "AI failed");
@@ -115,6 +117,7 @@ function ComposerInner({ accounts }: ComposerProps) {
         >
           <select
             name="accountId"
+            ref={accountRef}
             defaultValue={searchParams.get("accountId") ?? accounts[0]?.id}
             className={inputClass}
           >

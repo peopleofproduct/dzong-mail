@@ -1,6 +1,11 @@
 import { connection } from "next/server";
 import { getAccounts } from "@/lib/queries";
-import { connectMockAccount, connectOAuthAccount, syncAccountNow } from "@/lib/actions";
+import {
+  connectMockAccount,
+  connectOAuthAccount,
+  syncAccountNow,
+  updateAccountDisplayName,
+} from "@/lib/actions";
 import { DisconnectButton } from "@/components/disconnect-button";
 import { GmailConnectCard, OtherProviderCard } from "@/components/connect-forms";
 
@@ -62,6 +67,25 @@ export async function AccountsSection() {
                 messageCount={account._count.messages}
                 provider={account.provider}
               />
+              <form
+                action={updateAccountDisplayName}
+                className="flex w-full items-center gap-2"
+                title="Used as your From name and AI sign-off"
+              >
+                <input type="hidden" name="accountId" value={account.id} />
+                <input
+                  name="displayName"
+                  defaultValue={account.displayName ?? ""}
+                  placeholder="Your name (used in sign-offs)"
+                  className={`${inputClass} w-56`}
+                />
+                <button
+                  type="submit"
+                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  Save
+                </button>
+              </form>
             </li>
           ))}
         </ul>

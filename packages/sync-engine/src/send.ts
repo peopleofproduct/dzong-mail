@@ -33,6 +33,12 @@ function encodeRawMime(mime: string): string {
     .replace(/=+$/, "");
 }
 
+/** `"Kapil Pawar" <k@x.com>` when a display name is set, else bare address. */
+function formattedFrom(account: EmailAccount): string {
+  const name = account.displayName?.replace(/["<>]/g, "").trim();
+  return name ? `"${name}" <${account.emailAddress}>` : account.emailAddress;
+}
+
 function buildMime(from: string, input: SendInput): string {
   const lines = [
     `From: ${from}`,
@@ -66,6 +72,7 @@ async function recordSent(
       subject: input.subject,
       snippet: input.bodyText.slice(0, 200),
       fromAddress: account.emailAddress,
+      fromName: account.displayName,
       toAddresses: input.to,
       ccAddresses: input.cc ?? [],
       bccAddresses: input.bcc ?? [],
@@ -105,7 +112,7 @@ async function deliverViaSmtp(
     auth: { user: account.username, pass: password },
   });
   const info = await transporter.sendMail({
-    from: account.emailAddress,
+    from: formattedFrom(account),
     to: input.to.join(", "),
     cc: input.cc?.join(", "),
     bcc: input.bcc?.join(", "),
@@ -133,7 +140,7 @@ async function deliverViaGmail(
   input: SendInput,
   accessToken: string,
 ): Promise<{ id: string; threadId?: string }> {
-  const raw = encodeRawMime(buildMime(account.emailAddress, input));
+  const raw = encodeRawMime(buildMime(formattedFrom(account), input));
   const res = await fetch(`${GMAIL_API}/messages/send`, {
     method: "POST",
     headers: {

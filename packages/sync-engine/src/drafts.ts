@@ -1,5 +1,5 @@
 import { prisma } from "@unwalled/database";
-import type { Message, PrismaClient } from "@unwalled/database";
+import type { EmailAccount, Message, PrismaClient } from "@unwalled/database";
 import type { AIProvider } from "@unwalled/ai-engine";
 import { resolveAIForAccount, resolveAIForUser } from "./ai";
 import type { RuleAction, RuleCondition } from "./rules";
@@ -12,6 +12,31 @@ function threadContext(messages: Message[], maxMessages = 8, maxChars = 4000): s
     out += `---\nFrom: ${m.fromName ?? ""} <${m.fromAddress}>\nDate: ${m.receivedAt.toISOString()}\nSubject: ${m.subject ?? ""}\n\n${body}\n`;
   }
   return out.slice(0, maxChars);
+}
+
+/** The account holder's display name: explicit setting, then the From name
+ *  they actually send as, then a prettified local part of the address. */
+async function senderName(account: EmailAccount, db: PrismaClient): Promise<string> {
+  if (account.displayName) return account.displayName;
+  const sent = await db.message.findFirst({
+    where: { emailAccountId: account.id, folder: "Sent", fromName: { not: null } },
+    orderBy: { receivedAt: "desc" },
+    select: { fromName: true },
+  });
+  if (sent?.fromName) return sent.fromName;
+  const local = account.emailAddress.split("@")[0] ?? account.emailAddress;
+  const pretty = local
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+$/, "")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return pretty || account.emailAddress;
+}
+
+/** Small models still emit "[Your Name]"-style sign-offs sometimes — replace
+ *  them with the resolved name so drafts never ship a placeholder. */
+function fixSignoffPlaceholders(text: string, name: string): string {
+  return text.replace(/\[(?:your|sender'?s?\s|my)?\s?name\]/gi, name);
 }
 
 function stripCodeFences(text: string): string {
@@ -82,16 +107,18 @@ export async function draftAiReply(
       })
     : [message];
 
+  const name = await senderName(message.emailAccount, db);
   const response = await ai.provider.complete({
     messages: [
       {
         role: "system",
         content:
           "You are an email assistant drafting a reply on behalf of " +
-          `${message.emailAccount.displayName ?? message.emailAccount.emailAddress} ` +
-          `(${message.emailAccount.emailAddress}). Write only the reply body — ` +
-          "no subject line, no sign-off preamble like 'Here is a reply'. " +
-          "Match the sender's language, length, and tone. Be concise.",
+          `${name} <${message.emailAccount.emailAddress}>. Write only the reply body — ` +
+          "no subject line, no preamble like 'Here is a reply'. " +
+          `If you sign off, sign off as ${name} — never use placeholders ` +
+          "like '[Your Name]'. Match the sender's language, length, and " +
+          "tone. Be concise.",
       },
       {
         role: "user",
@@ -108,7 +135,7 @@ export async function draftAiReply(
     subject: `Re: ${(message.subject ?? "").replace(/^Re:\s*/i, "")}`,
     fromAddress: message.emailAccount.emailAddress,
     toAddresses: [message.fromAddress],
-    bodyText: response.text.trim(),
+    bodyText: fixSignoffPlaceholders(response.text.trim(), name),
     aiGenerated: true,
   });
   return { ok: true, draftId: draft.id };
@@ -220,11 +247,18 @@ export async function generateRuleFromPrompt(
  */
 export async function composeWithAI(
   userId: string,
-  input: { to?: string; subject?: string; instructions?: string },
+  input: { to?: string; subject?: string; instructions?: string; accountId?: string },
   db: PrismaClient = prisma,
 ): Promise<{ ok: boolean; body?: string; reason?: string }> {
   const ai = await resolveAIForUser(userId, db);
   if (!ai) return { ok: false, reason: "AI unavailable — enable AI in settings" };
+
+  // Resolve a sign-off name from the chosen account, else the user's first.
+  const account =
+    (input.accountId
+      ? await db.emailAccount.findUnique({ where: { id: input.accountId } })
+      : null) ?? (await db.emailAccount.findFirst({ where: { userId } }));
+  const name = account ? await senderName(account, db) : null;
 
   const response = await ai.provider.complete({
     messages: [
@@ -232,7 +266,8 @@ export async function composeWithAI(
         role: "system",
         content:
           "You are an email writing assistant. Output only the email body — " +
-          "no subject, no commentary. Keep it natural and concise.",
+          "no subject, no commentary. Keep it natural and concise." +
+          (name ? ` If you sign off, sign off as ${name} — never use placeholders.` : ""),
       },
       {
         role: "user",
@@ -244,7 +279,8 @@ export async function composeWithAI(
     maxTokens: 800,
     temperature: 0.5,
   });
-  return { ok: true, body: response.text.trim() };
+  const body = name ? fixSignoffPlaceholders(response.text.trim(), name) : response.text.trim();
+  return { ok: true, body };
 }
 
 export type { AIProvider };
