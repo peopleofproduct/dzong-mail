@@ -115,6 +115,16 @@ UNWALLED_SECRET_KEY=<the 64-char hex you just generated>
 **Set this before connecting real accounts.** Rotating it later orphans
 previously encrypted secrets.
 
+Two other optional variables go in the same file:
+
+```
+# Where attachment files are stored (default: ~/.unwalled-mail)
+UNWALLED_DATA_DIR=/path/to/data
+
+# Require Bearer auth on the /api/v1/* endpoints (docs/API.md)
+UNWALLED_API_TOKEN=some-long-random-string
+```
+
 ---
 
 ## 3. Connecting real email accounts

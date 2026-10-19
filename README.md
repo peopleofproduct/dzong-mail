@@ -39,6 +39,15 @@ Free. Open source. MIT. Yours.
   ✦ AI chip next to search) and a chat panel (⌘K → "Ask my inbox") that
   answers questions with citations from your actual mail. All local —
   competitors can't do this without shipping your inbox to a cloud.
+- **Digest view** — the week's newsletters and bulk mail rolled up per
+  sender, with a one-click AI digest and per-sender cleanup.
+- **Draft review** — AI- and human-written drafts get a first-class queue:
+  open one, send it as-is, or edit-then-send.
+- **Attachments, stored locally** — files land on your disk
+  (`~/.unwalled-mail/attachments`), show up in the thread, and download
+  straight from the app.
+- **A local HTTP API** — `/api/v1/*` endpoints so scripts and other agents
+  can search, ask, sync, and send. See [docs/API.md](docs/API.md).
 - **Follow-up tracking** — "needs reply" and "awaiting response" views so
   nothing slips.
 - **Analytics** — volume, top senders, label breakdown, all computed
@@ -57,9 +66,21 @@ Free. Open source. MIT. Yours.
 
 ## Quick start — five minutes to a working inbox
 
+**One command** (macOS / Debian — installs Postgres + Ollama if missing,
+creates the DB, migrates, seeds a demo inbox, pulls models):
+
+```bash
+git clone https://github.com/peopleofproduct/unwalled-mail.git
+cd unwalled-mail
+npm run setup        # add --no-ai to skip Ollama
+npm run dev
+```
+
+Or step by step:
+
 ```bash
 # 1. Get the code
-git clone https://github.com/<you>/unwalled-mail.git
+git clone https://github.com/peopleofproduct/unwalled-mail.git
 cd unwalled-mail
 npm install
 
@@ -172,12 +193,11 @@ Everything runs via `npm run dev` (Turborepo). Checks:
 ## Roadmap — where we're headed
 
 Working today: everything above, plus the `npm run worker` background
-loop (scheduled sends, snooze returns, periodic sync + AI classify).
-Coming next (roughly in order): real-mailbox hardening, attachments,
-semantic search + "ask my inbox" chat, digests, a mobile story via an
-optional encrypted relay (the one thing local-first can't do alone —
-it'll be self-hostable too), and a local API/MCP so other agents can
-drive your inbox.
+loop (scheduled sends, snooze returns, periodic sync + AI classify +
+embedding) and a local HTTP API for scripts and agents.
+Coming next (roughly in order): real-mailbox hardening on more providers,
+and a mobile story via an optional encrypted relay (the one thing
+local-first can't do alone — it'll be self-hostable too).
 
 ## Contributing
 
