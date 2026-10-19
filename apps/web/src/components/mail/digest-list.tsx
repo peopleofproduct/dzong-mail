@@ -39,7 +39,7 @@ export function DigestList({ senders }: { senders: DigestSender[] }) {
                   {s.count}×
                 </span>
                 <span className="ml-auto shrink-0 text-[11px] text-zinc-400">
-                  {new Date(s.latestReceivedAt).toLocaleDateString(undefined, {
+                  {new Date(s.latestReceivedAt).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                   })}

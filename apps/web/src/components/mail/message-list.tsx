@@ -349,7 +349,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               {m.fromName ?? m.fromAddress}
             </span>
             {m.snoozedUntil && (
-              <span title={`Snoozed until ${new Date(m.snoozedUntil).toLocaleString()}`}>
+              <span title={`Snoozed until ${new Date(m.snoozedUntil).toLocaleString("en-US")}`}>
                 <BellOff size={11} className="shrink-0 text-zinc-400" />
               </span>
             )}
@@ -365,7 +365,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               </span>
             )}
             <span className="ml-auto shrink-0 text-[11px] text-zinc-400">
-              {new Date(m.receivedAt).toLocaleDateString(undefined, {
+              {new Date(m.receivedAt).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
               })}
