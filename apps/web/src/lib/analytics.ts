@@ -9,11 +9,15 @@ export interface Insights {
   /** 7 days (Mon-Sun) x 24 hours - receivedAt counts, last 90 days. */
   heatmap: number[][];
   categories: { label: string; count: number; pct: number; tone: string }[];
-  topSenders: { name: string; count: number; pct: number }[];
+  topSenders: { name: string; address: string; count: number; pct: number }[];
   flow: { received: number; handled: number; sent: number; periodDays: number };
   replyDebt: { bucket: string; count: number }[];
   replyDebtOldestDays: number;
-  insights: { tone: "good" | "warn" | "alert" | "info"; text: string }[];
+  insights: {
+    tone: "good" | "warn" | "alert" | "info";
+    text: string;
+    cta?: { label: string; href: string };
+  }[];
   totals: {
     total: number;
     unread: number;
@@ -143,6 +147,7 @@ export async function getInsights(): Promise<Insights> {
   const senderTotal = Math.max(1, total);
   const topSenders = senderRows.map((s) => ({
     name: s.fromName ?? s.fromAddress,
+    address: s.fromAddress,
     count: s._count._all,
     pct: Math.round((s._count._all / senderTotal) * 100),
   }));
@@ -219,6 +224,7 @@ export async function getInsights(): Promise<Insights> {
     insights.push({
       tone: "warn",
       text: `${topSenders[0].name} alone sends ${topSenders[0].pct}% of all your mail - consider a rule or digest for it.`,
+      cta: { label: "View their mail", href: `/?q=${encodeURIComponent(topSenders[0].address)}` },
     });
   }
   const bulkPct = categories
@@ -228,17 +234,27 @@ export async function getInsights(): Promise<Insights> {
     insights.push({
       tone: "warn",
       text: `${bulkPct}% of your inbox is bulk mail (newsletters/marketing/pitches) - unsubscribe runs would pay off.`,
+      cta: { label: "Open bulk mail", href: "/?view=newsletters" },
     });
   }
   if (replyDebtOldestDays >= 7) {
     insights.push({
       tone: "alert",
       text: `Your oldest unanswered thread is ${replyDebtOldestDays} days old - it is probably forgotten, not pending.`,
+      cta: { label: "Clear the debt", href: "/?view=needs-reply" },
     });
   } else if (needsReplyThreads.length > 0) {
     insights.push({
       tone: "info",
       text: `${needsReplyThreads.length} thread${needsReplyThreads.length === 1 ? "" : "s"} waiting on your reply, oldest ${replyDebtOldestDays} day${replyDebtOldestDays === 1 ? "" : "s"}.`,
+      cta: { label: "Reply now", href: "/?view=needs-reply" },
+    });
+  }
+  if (unread >= 25) {
+    insights.push({
+      tone: "warn",
+      text: `${unread} unread messages are competing for attention - a focused sweep beats grazing.`,
+      cta: { label: "Sweep unread", href: "/?view=inbox&q=is:unread" },
     });
   }
   if (achievements.currentDays >= 3) {

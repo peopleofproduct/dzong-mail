@@ -1,7 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
-import { ArrowLeft, AlertTriangle, CheckCircle2, Info, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Info,
+  Sparkles,
+} from "lucide-react";
 import { getAccounts } from "@/lib/queries";
 import { getAchievementStats, snapshotInboxZero } from "@/lib/achievements";
 import { getInsights } from "@/lib/analytics";
@@ -67,13 +74,24 @@ async function AnalyticsBody() {
           const s = INSIGHT_STYLES[ins.tone];
           const Icon = s.icon;
           return (
-            <p
+            <div
               key={i}
-              className={`flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed ${s.cls}`}
+              className={`flex items-start justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed ${s.cls}`}
             >
-              <Icon size={14} className="mt-0.5 shrink-0" />
-              {ins.text}
-            </p>
+              <p className="flex items-start gap-2">
+                <Icon size={14} className="mt-0.5 shrink-0" />
+                {ins.text}
+              </p>
+              {ins.cta && (
+                <Link
+                  href={ins.cta.href}
+                  className="flex shrink-0 items-center gap-1 self-center font-semibold whitespace-nowrap underline-offset-2 hover:underline"
+                >
+                  {ins.cta.label}
+                  <ArrowRight size={12} />
+                </Link>
+              )}
+            </div>
           );
         })}
       </div>

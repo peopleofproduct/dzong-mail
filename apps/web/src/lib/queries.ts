@@ -85,6 +85,10 @@ function viewWhere(view: MailView): Prisma.MessageWhereInput {
 }
 
 function searchWhere(q: string): Prisma.MessageWhereInput {
+  const trimmed = q.trim().toLowerCase();
+  if (trimmed === "is:unread") return { isRead: false };
+  if (trimmed === "is:read") return { isRead: true };
+  if (trimmed === "is:starred") return { isStarred: true };
   return {
     OR: [
       { subject: { contains: q, mode: "insensitive" } },
