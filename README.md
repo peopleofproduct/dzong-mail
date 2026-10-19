@@ -23,7 +23,7 @@ Free. Open source. MIT. Yours.
 Plenty of products say "AI email" now. Here's what's different about ours —
 and why it stays that way.
 
-- **It writes like you write to *them*, not like you in general.**
+- **It writes like you write to _them_, not like you in general.**
   Other tools learn "your voice" as one global style. Unwalled builds a
   per-recipient profile from your actual shared history — the greeting
   you use with Sam, the sign-off you use with your lawyer, how short you
@@ -93,6 +93,11 @@ and why it stays that way.
   ([docs/API.md](docs/API.md)) and an MCP server ([docs/MCP.md](docs/MCP.md))
   so Claude Desktop, Cursor, or your own agents can search, ask, triage,
   and send — all on your machine.
+- **A companion browser extension** — unread badge + desktop
+  notifications even when the tab is closed, mailto: links that open
+  our composer, right-click "email this page", and ask/search from any
+  selection. Load `apps/extension` unpacked — see
+  [docs/EXTENSION.md](docs/EXTENSION.md).
 - **Analytics + an inbox energy budget** — volume, top senders, health
   score, and a "this inbox costs you ~40 min today — here's the 12-min
   subset" card.
@@ -216,6 +221,7 @@ From **Settings → Accounts** (or the connect cards on the home page):
 
 ```
 apps/web            Next.js 16 + React 19 + Tailwind — the whole UI, local
+apps/extension      Manifest V3 browser companion — badge, notifications, mailto
 packages/database   Prisma + PostgreSQL — every byte stays on your disk
 packages/sync-engine  Gmail / Graph / IMAP / Mock sync, send pipeline,
                       rules engine, unsubscribe, AI orchestration

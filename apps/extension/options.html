@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Unwalled Mail - Extension settings</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #64748b;
+        --indigo: #6366f1;
+        --line: #e2e8f0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        max-width: 520px;
+        margin: 40px auto;
+        padding: 0 20px;
+        font: 14px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+      }
+      h1 { font-size: 18px; display: flex; align-items: center; gap: 10px; }
+      h1 img { width: 28px; height: 28px; }
+      p.help { color: var(--muted); font-size: 13px; }
+      label { display: block; margin: 16px 0 4px; font-weight: 600; font-size: 13px; }
+      input[type="text"], input[type="password"], input[type="number"] {
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        font: inherit;
+      }
+      .row { display: flex; align-items: center; gap: 8px; margin: 14px 0; }
+      button {
+        font: inherit;
+        padding: 8px 14px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        cursor: pointer;
+      }
+      button.primary { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+      #result { font-size: 13px; margin-top: 8px; }
+      #result.ok { color: #15803d; }
+      #result.err { color: #b91c1c; }
+      code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1><img src="icons/icon-48.png" alt="" /> Unwalled Mail Companion</h1>
+    <p class="help">
+      The extension talks to the Unwalled Mail app running on this machine.
+      Everything stays local - nothing leaves <code>localhost</code>.
+    </p>
+
+    <label for="appUrl">App URL</label>
+    <input id="appUrl" type="text" placeholder="http://localhost:3000" />
+    <p class="help">Where the app runs. Change the port if you run it elsewhere on localhost.</p>
+
+    <label for="apiToken">API token (optional)</label>
+    <input id="apiToken" type="password" placeholder="only if you set UNWALLED_API_TOKEN" />
+    <p class="help">
+      Paste the same value you set as <code>UNWALLED_API_TOKEN</code> in
+      <code>apps/web/.env.local</code>. Leave blank if you didn't set one.
+    </p>
+
+    <label for="pollMinutes">Check for new mail every (minutes)</label>
+    <input id="pollMinutes" type="number" min="0.5" step="0.5" value="1" />
+
+    <div class="row">
+      <input id="notifyEnabled" type="checkbox" checked />
+      <label for="notifyEnabled" style="margin:0;font-weight:400">Show a desktop notification for new mail</label>
+    </div>
+    <div class="row">
+      <input id="interceptMailto" type="checkbox" checked />
+      <label for="interceptMailto" style="margin:0;font-weight:400">Open mailto: links in Unwalled</label>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="save">Save</button>
+      <button id="test">Test connection</button>
+    </div>
+    <div id="result"></div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

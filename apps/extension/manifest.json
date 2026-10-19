@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Unwalled Mail Companion",
+  "version": "0.1.0",
+  "description": "Unread badge, new-mail notifications, mailto handling, and one-click 'email this page' for your local Unwalled Mail instance.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["alarms", "notifications", "contextMenus", "storage", "tabs"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Unwalled Mail",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["mailto.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Unwalled Mail</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #64748b;
+        --indigo: #6366f1;
+        --line: #e2e8f0;
+      }
+      * { box-sizing: border-box; margin: 0; }
+      body {
+        width: 300px;
+        font: 13px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      header img { width: 20px; height: 20px; }
+      header b { font-size: 14px; flex: 1; }
+      #unread {
+        background: var(--indigo);
+        color: #fff;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 1px 8px;
+      }
+      #status {
+        padding: 6px 12px;
+        font-size: 12px;
+        color: var(--muted);
+        border-bottom: 1px solid var(--line);
+      }
+      #status.err { color: #b91c1c; }
+      #items { list-style: none; padding: 4px 0; max-height: 220px; overflow-y: auto; }
+      #items li {
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--line);
+        cursor: pointer;
+      }
+      #items li:hover { background: #f1f5f9; }
+      #items .t { font-weight: 600; display: block; }
+      #items .b { color: var(--muted); font-size: 12px; }
+      nav {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        padding: 10px 12px;
+        border-top: 1px solid var(--line);
+      }
+      button {
+        font: inherit;
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--ink);
+        cursor: pointer;
+      }
+      button:hover { background: #eef2ff; border-color: var(--indigo); }
+      button.primary {
+        background: var(--indigo);
+        border-color: var(--indigo);
+        color: #fff;
+      }
+      button.link { border: 0; color: var(--muted); font-size: 12px; }
+      button.link:hover { background: none; color: var(--indigo); }
+      .foot { display: flex; justify-content: space-between; padding: 0 12px 10px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="icons/icon-48.png" alt="" />
+      <b>Unwalled Mail</b>
+      <span id="unread" hidden></span>
+    </header>
+    <div id="status">Connecting…</div>
+    <ul id="items"></ul>
+    <nav>
+      <button class="primary" id="open">Open inbox</button>
+      <button id="compose">Compose</button>
+      <button id="email-page">Email this page</button>
+      <button id="ask">Ask my inbox</button>
+    </nav>
+    <div class="foot">
+      <button class="link" id="refresh">Refresh</button>
+      <button class="link" id="options">Settings</button>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

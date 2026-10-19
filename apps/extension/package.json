@@ -1,0 +1,6 @@
+{
+  "name": "@unwalled/extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser companion extension for Unwalled Mail (Manifest V3, no build step)"
+}

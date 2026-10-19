@@ -149,7 +149,7 @@ export async function AISettingsSection() {
       <p className="text-xs text-zinc-400">
         Keys stay on this machine — AES-256-GCM encrypted with your local UNWALLED_SECRET_KEY. With
         Ollama selected, no data leaves localhost. OpenAI and Anthropic are supported as optional
-        BYOK providers. Anthropic can't index your mail, so when it's selected we quietly use your
+        BYOK providers. Anthropic can&apos;t index your mail, so when it&apos;s selected we quietly use your
         local Ollama for search and answers — everything still stays on this machine. If no local
         model is running, the assistant falls back to plain keyword matching.
       </p>
