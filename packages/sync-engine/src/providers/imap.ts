@@ -4,6 +4,7 @@ import type { MailSyncProvider, ProviderSyncResult, RawMessage, SyncContext } fr
 
 // syncToken format: "<uidValidity>:<lastUid>" — a mismatch in uidValidity
 // forces a full resync per RFC 3501 semantics.
+const INITIAL_SYNC_LIMIT = 200;
 function parseSyncToken(token: string | null): { uidValidity?: number; lastUid: number } {
   if (!token) return { lastUid: 0 };
   const [validity, uid] = token.split(":");
@@ -39,9 +40,17 @@ export class ImapSyncProvider implements MailSyncProvider {
         const resync = uidValidity !== undefined && uidValidity !== Number(mailbox.uidValidity);
         const sinceUid = resync ? 0 : lastUid;
 
-        const uids = mailbox.exists
+        const found = mailbox.exists
           ? (await client.search({ uid: `${sinceUid + 1}:*` }, { uid: true })) || []
           : [];
+        // On a first/forced resync, a real mailbox can hold tens of thousands
+        // of messages — fetching full source for all of them would melt the
+        // first connect. Bound it to the newest N; the token advances past
+        // the skipped range so they can be backfilled later by design.
+        const uids =
+          sinceUid === 0 && found.length > INITIAL_SYNC_LIMIT
+            ? found.slice(-INITIAL_SYNC_LIMIT)
+            : found;
         const messages: RawMessage[] = [];
         let maxUid = sinceUid;
 
