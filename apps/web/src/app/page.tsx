@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   getAccounts,
@@ -63,24 +64,47 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     return <DigestList senders={await getDigestSenders()} />;
   }
 
+  // Per-account filter: ?account=<id> scopes every list source. Only honored
+  // when it matches a real account — a stale/foreign id falls back to "All".
+  const accounts = await getAccounts();
+  const accountParam = str(params, "account");
+  const accountId = accounts.some((a) => a.id === accountParam) ? accountParam : undefined;
+  const accountHref = (id?: string) => {
+    const p = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => typeof v === "string")) as Record<
+        string,
+        string
+      >,
+    );
+    if (id) p.set("account", id);
+    else p.delete("account");
+    return `/?${p.toString()}`;
+  };
+
   const semantic = str(params, "sm") === "1";
   let semanticNote: string | undefined;
   let items: MailItem[];
   if (label) {
-    items = (await getMessagesForLabel(label)).map(serializeMessage);
+    items = (await getMessagesForLabel(label, 100, accountId)).map(serializeMessage);
   } else if (folder) {
-    items = (await getMessagesForFolder(folder)).map(serializeMessage);
+    items = (await getMessagesForFolder(folder, 100, accountId)).map(serializeMessage);
   } else if (view === "needs-reply" || view === "awaiting" || view === "reply-queue") {
-    const threads = await getFollowUpThreads(view === "awaiting" ? "awaiting" : "needs-reply");
+    const threads = await getFollowUpThreads(
+      view === "awaiting" ? "awaiting" : "needs-reply",
+      accountId,
+    );
     items = threads.map((t) => serializeMessage(t.latest));
   } else if (semantic && q) {
     const result = await searchMessagesSemantic(q);
-    items = result.hits;
+    const accountEmail = accountId
+      ? accounts.find((a) => a.id === accountId)?.emailAddress
+      : undefined;
+    items = accountEmail ? result.hits.filter((h) => h.accountEmail === accountEmail) : result.hits;
     if (!result.ok) semanticNote = result.reason ?? "semantic search unavailable";
     else if (result.hits.length === 0)
       semanticNote = "No semantic matches — run the worker once to embed your mail";
   } else {
-    items = (await getMessagesForView(view, q)).map(serializeMessage);
+    items = (await getMessagesForView(view, q, 100, accountId)).map(serializeMessage);
   }
 
   // Superhuman-style split inbox: only on the plain inbox view, not
@@ -90,6 +114,33 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
 
   return (
     <>
+      {accounts.length > 1 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+          <Link
+            href={accountHref()}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+              !accountId
+                ? "bg-indigo-600 text-white"
+                : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            }`}
+          >
+            All
+          </Link>
+          {accounts.map((a) => (
+            <Link
+              key={a.id}
+              href={accountHref(a.id)}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                accountId === a.id
+                  ? "bg-indigo-600 text-white"
+                  : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              }`}
+            >
+              {a.displayName ?? a.emailAddress}
+            </Link>
+          ))}
+        </div>
+      )}
       {semanticNote && (
         <p className="border-b border-zinc-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-zinc-800 dark:bg-amber-950/40 dark:text-amber-300">
           {semanticNote}

@@ -46,17 +46,35 @@ export async function GET(request: NextRequest) {
     // Keep the placeholder address — the account can be renamed later.
   }
 
+  const tokenData = {
+    oauthAccessToken: encryptSecret(tokens.accessToken),
+    oauthRefreshToken: tokens.refreshToken
+      ? encryptSecret(tokens.refreshToken)
+      : account.oauthRefreshToken,
+    oauthTokenExpiresAt: tokens.expiresAt,
+    oauthScopes: tokens.scope?.split(" ") ?? [],
+  };
+
+  // If this address is already connected, refresh that account's tokens and
+  // drop the pending row instead of colliding on the unique key.
+  const existing = await prisma.emailAccount.findUnique({
+    where: { userId_emailAddress: { userId: account.userId, emailAddress } },
+  });
+  if (existing && existing.id !== accountId) {
+    await prisma.emailAccount.update({ where: { id: existing.id }, data: tokenData });
+    await prisma.emailAccount.delete({ where: { id: accountId } });
+    return NextResponse.redirect(
+      new URL(
+        "/?notice=" +
+          encodeURIComponent(`${emailAddress} is already connected — credentials refreshed`),
+        url.origin,
+      ),
+    );
+  }
+
   await prisma.emailAccount.update({
     where: { id: accountId },
-    data: {
-      emailAddress,
-      oauthAccessToken: encryptSecret(tokens.accessToken),
-      oauthRefreshToken: tokens.refreshToken
-        ? encryptSecret(tokens.refreshToken)
-        : account.oauthRefreshToken,
-      oauthTokenExpiresAt: tokens.expiresAt,
-      oauthScopes: tokens.scope?.split(" ") ?? [],
-    },
+    data: { emailAddress, ...tokenData },
   });
 
   return NextResponse.redirect(new URL("/?notice=Google%20account%20connected", url.origin));

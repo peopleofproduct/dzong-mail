@@ -67,65 +67,71 @@ export async function AccountsSection() {
         </ul>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <GmailConnectCard />
-        <OtherProviderCard />
+      <details className="group" open={accounts.length === 0}>
+        <summary className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-indigo-600 marker:hidden hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+          <span className="text-base leading-none">＋</span>
+          {accounts.length === 0 ? "Connect an email account" : "Add another email account"}
+        </summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <GmailConnectCard connectedEmails={accounts.map((a) => a.emailAddress)} />
+          <OtherProviderCard connectedEmails={accounts.map((a) => a.emailAddress)} />
 
-        <div className="flex flex-col gap-3">
-          <form
-            action={connectMockAccount}
-            className="flex flex-1 flex-col justify-between gap-3 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700"
-          >
-            <div>
-              <p className="text-sm font-medium text-black dark:text-zinc-100">Demo inbox</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Just exploring? A pretend mailbox — no credentials, nothing leaves the machine.
-              </p>
-            </div>
-            <button
-              type="submit"
-              className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
+          <div className="flex flex-col gap-3">
+            <form
+              action={connectMockAccount}
+              className="flex flex-1 flex-col justify-between gap-3 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700"
             >
-              Add demo account
-            </button>
-          </form>
-
-          <details className="rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
-            <summary className="cursor-pointer text-sm font-medium text-black dark:text-zinc-100">
-              Advanced: Google / Microsoft OAuth
-            </summary>
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              Uses the Gmail / Microsoft Graph APIs instead of IMAP. Requires your own OAuth app
-              credentials — see docs/SETUP.md.
-            </p>
-            <form action={connectOAuthAccount} className="mt-3 flex flex-col gap-2">
-              <select name="provider" className={inputClass} defaultValue="GOOGLE">
-                <option value="GOOGLE">Google</option>
-                <option value="MICROSOFT">Microsoft</option>
-              </select>
-              <input
-                name="clientId"
-                placeholder="OAuth client ID"
-                required
-                className={inputClass}
-              />
-              <input
-                name="clientSecret"
-                placeholder="OAuth client secret"
-                type="password"
-                required
-                className={inputClass}
-              />
+              <div>
+                <p className="text-sm font-medium text-black dark:text-zinc-100">Demo inbox</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Just exploring? A pretend mailbox — no credentials, nothing leaves the machine.
+                </p>
+              </div>
               <button
                 type="submit"
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
               >
-                Connect via OAuth
+                Add demo account
               </button>
             </form>
-          </details>
+
+            <details className="rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
+              <summary className="cursor-pointer text-sm font-medium text-black dark:text-zinc-100">
+                Advanced: Google / Microsoft OAuth
+              </summary>
+              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Uses the Gmail / Microsoft Graph APIs instead of IMAP. Requires your own OAuth app
+                credentials — see docs/SETUP.md.
+              </p>
+              <form action={connectOAuthAccount} className="mt-3 flex flex-col gap-2">
+                <select name="provider" className={inputClass} defaultValue="GOOGLE">
+                  <option value="GOOGLE">Google</option>
+                  <option value="MICROSOFT">Microsoft</option>
+                </select>
+                <input
+                  name="clientId"
+                  placeholder="OAuth client ID"
+                  required
+                  className={inputClass}
+                />
+                <input
+                  name="clientSecret"
+                  placeholder="OAuth client secret"
+                  type="password"
+                  required
+                  className={inputClass}
+                />
+                <button
+                  type="submit"
+                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  Connect via OAuth
+                </button>
+              </form>
+            </details>
+          </div>
         </div>
-      </div>
+      </details>
     </section>
   );
 }

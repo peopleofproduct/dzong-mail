@@ -96,8 +96,19 @@ function searchWhere(q: string): Prisma.MessageWhereInput {
   };
 }
 
-export async function getMessagesForView(view: MailView, q?: string, take = 100) {
-  const where = { AND: [viewWhere(view), ...(q ? [searchWhere(q)] : [])] };
+export async function getMessagesForView(
+  view: MailView,
+  q?: string,
+  take = 100,
+  accountId?: string,
+) {
+  const where = {
+    AND: [
+      viewWhere(view),
+      ...(q ? [searchWhere(q)] : []),
+      ...(accountId ? [{ emailAccountId: accountId }] : []),
+    ],
+  };
   return prisma.message.findMany({
     where,
     orderBy: { receivedAt: "desc" },
@@ -118,11 +129,12 @@ export async function searchMessagesSemantic(q: string, take = 50) {
   };
 }
 
-export async function getMessagesForLabel(label: string, take = 100) {
+export async function getMessagesForLabel(label: string, take = 100, accountId?: string) {
   return prisma.message.findMany({
     where: {
       OR: [{ labels: { has: label } }, { aiLabels: { has: label } }],
       isDraft: false,
+      ...(accountId ? { emailAccountId: accountId } : {}),
     },
     orderBy: { receivedAt: "desc" },
     take,
@@ -130,9 +142,9 @@ export async function getMessagesForLabel(label: string, take = 100) {
   });
 }
 
-export async function getMessagesForFolder(folder: string, take = 100) {
+export async function getMessagesForFolder(folder: string, take = 100, accountId?: string) {
   return prisma.message.findMany({
-    where: { folder, isDraft: false },
+    where: { folder, isDraft: false, ...(accountId ? { emailAccountId: accountId } : {}) },
     orderBy: { receivedAt: "desc" },
     take,
     include: { emailAccount: { select: { emailAddress: true, provider: true } } },
@@ -208,12 +220,13 @@ export interface ThreadSummary {
 
 /** Group recent messages into threads and return those whose latest message
  *  is (awaiting) or isn't (needs-reply) sent by the account owner. */
-export async function getFollowUpThreads(kind: "awaiting" | "needs-reply") {
+export async function getFollowUpThreads(kind: "awaiting" | "needs-reply", accountId?: string) {
   const messages = await prisma.message.findMany({
     where: {
       isArchived: false,
       isDraft: false,
       threadId: { not: null },
+      ...(accountId ? { emailAccountId: accountId } : {}),
       OR: [{ snoozedUntil: null }, { snoozedUntil: { lt: new Date() } }],
     },
     orderBy: { receivedAt: "desc" },
