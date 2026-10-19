@@ -36,6 +36,7 @@ export type { SenderUnsubscribeResult, UnsubscribeResult } from "./unsubscribe";
 export { resolveAIForAccount, resolveAIForUser } from "./ai";
 export type { ResolvedAI } from "./ai";
 export {
+  composeVariantsWithAI,
   composeWithAI,
   createDraftRow,
   draftAiReply,

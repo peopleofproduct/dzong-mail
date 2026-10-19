@@ -10,7 +10,7 @@ import {
   buildGoogleAuthorizationUrl,
   buildMicrosoftAuthorizationUrl,
   classifyAccountMessages,
-  composeWithAI,
+  composeVariantsWithAI,
   dispatchScheduledDraft,
   draftAiReply,
   encryptSecret,
@@ -398,14 +398,15 @@ export async function generateRuleJson(
   return { ok: false, reason: result.reason ?? "Generation failed" };
 }
 
-export async function composeBodyWithAI(input: {
+/** Three styled compose variants for the composer's "Write with AI" picker. */
+export async function generateComposeVariantsNow(input: {
   to?: string;
   subject?: string;
   instructions?: string;
   accountId?: string;
-}): Promise<{ ok: boolean; body?: string; reason?: string }> {
+}): Promise<{ ok: boolean; variants?: { key: string; body: string }[]; reason?: string }> {
   const user = await getOrCreateLocalUser();
-  return composeWithAI(user.id, input);
+  return composeVariantsWithAI(user.id, input);
 }
 
 export async function unsubscribeSenderNow(fromAddress: string) {

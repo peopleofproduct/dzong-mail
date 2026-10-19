@@ -14,9 +14,15 @@ function threadContext(messages: Message[], maxMessages = 8, maxChars = 4000): s
   return out.slice(0, maxChars);
 }
 
-/** The account holder's display name: explicit setting, then the From name
- *  they actually send as, then a prettified local part of the address. */
+/** The account holder's first name for sign-offs: explicit display name,
+ *  then the From name they actually send as, then a prettified local part
+ *  of the address — reduced to the first word in every case. */
 async function senderName(account: EmailAccount, db: PrismaClient): Promise<string> {
+  const full = await senderFullName(account, db);
+  return full.split(/\s+/)[0] ?? full;
+}
+
+async function senderFullName(account: EmailAccount, db: PrismaClient): Promise<string> {
   if (account.displayName) return account.displayName;
   const sent = await db.message.findFirst({
     where: { emailAccountId: account.id, folder: "Sent", fromName: { not: null } },
@@ -113,10 +119,10 @@ export async function draftAiReply(
 }
 
 /** Style nudge + sampling temperature per generated variant. */
-const REPLY_VARIANT_STYLES = [
+const VARIANT_STYLES = [
   { key: "Concise", hint: "Keep it very short — two to four sentences.", temperature: 0.3 },
   { key: "Warm", hint: "Warm, friendly and personable in tone.", temperature: 0.6 },
-  { key: "Detailed", hint: "Thorough — address every point the sender raised.", temperature: 0.45 },
+  { key: "Detailed", hint: "Thorough — cover everything relevant to the exchange.", temperature: 0.45 },
 ] as const;
 
 export interface ReplyVariant {
@@ -180,7 +186,7 @@ export async function generateReplyVariants(
   if ("reason" in ctx) return { ok: false, reason: ctx.reason };
 
   const results = await Promise.all(
-    REPLY_VARIANT_STYLES.map(async (style) => {
+    VARIANT_STYLES.map(async (style) => {
       const r = await ctx.ai.provider.complete({
         messages: [
           { role: "system", content: `${ctx.systemBase} ${style.hint}` },
@@ -365,6 +371,57 @@ export async function composeWithAI(
   });
   const body = name ? fixSignoffPlaceholders(response.text.trim(), name) : response.text.trim();
   return { ok: true, body };
+}
+
+/**
+ * Compose-assist variants: same input as composeWithAI but three styled
+ * versions for the user to pick between before inserting into the composer.
+ */
+export async function composeVariantsWithAI(
+  userId: string,
+  input: { to?: string; subject?: string; instructions?: string; accountId?: string },
+  db: PrismaClient = prisma,
+): Promise<{ ok: boolean; variants?: ReplyVariant[]; reason?: string }> {
+  const ai = await resolveAIForUser(userId, db);
+  if (!ai) return { ok: false, reason: "AI unavailable — enable AI in settings" };
+
+  const account =
+    (input.accountId
+      ? await db.emailAccount.findUnique({ where: { id: input.accountId } })
+      : null) ?? (await db.emailAccount.findFirst({ where: { userId } }));
+  const name = account ? await senderName(account, db) : null;
+
+  const systemBase =
+    "You are an email writing assistant. Output only the email body — " +
+    "no subject, no commentary. Keep it natural and concise." +
+    (name ? ` If you sign off, sign off as ${name} — never use placeholders.` : "");
+  const userPrompt =
+    `To: ${input.to ?? "unspecified"}\nSubject: ${input.subject ?? "unspecified"}\n` +
+    `Instructions: ${input.instructions?.trim() || "Write an appropriate email for this subject."}`;
+
+  const results = await Promise.all(
+    VARIANT_STYLES.map(async (style) => {
+      const r = await ai.provider.complete({
+        messages: [
+          { role: "system", content: `${systemBase} ${style.hint}` },
+          { role: "user", content: userPrompt },
+        ],
+        maxTokens: 800,
+        temperature: style.temperature,
+      });
+      const body = r.text.trim();
+      return { key: style.key, body: name ? fixSignoffPlaceholders(body, name) : body };
+    }),
+  );
+
+  const seen = new Set<string>();
+  const variants = results.filter((v) => {
+    if (v.body.length === 0 || seen.has(v.body)) return false;
+    seen.add(v.body);
+    return true;
+  });
+  if (variants.length === 0) return { ok: false, reason: "AI returned empty drafts" };
+  return { ok: true, variants };
 }
 
 export type { AIProvider };

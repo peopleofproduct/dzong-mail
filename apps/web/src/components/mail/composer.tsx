@@ -3,8 +3,10 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles, X } from "lucide-react";
-import { composeBodyWithAI, sendEmailAction } from "@/lib/actions";
+import { generateComposeVariantsNow, sendEmailAction } from "@/lib/actions";
 import { buildParams } from "./params";
+import { VariantPicker } from "./variant-picker";
+import type { DraftVariant } from "./variant-picker";
 
 interface AccountOption {
   id: string;
@@ -37,6 +39,7 @@ function ComposerInner({ accounts }: ComposerProps) {
   const mode = searchParams.get("compose")!;
   const [body, setBody] = useState(searchParams.get("body") ?? "");
   const [aiError, setAiError] = useState<string | null>(null);
+  const [variants, setVariants] = useState<DraftVariant[] | null>(null);
   const [pending, startTransition] = useTransition();
   const toRef = useRef<HTMLInputElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -77,14 +80,17 @@ function ComposerInner({ accounts }: ComposerProps) {
   const writeWithAI = () => {
     setAiError(null);
     startTransition(async () => {
-      const result = await composeBodyWithAI({
+      const result = await generateComposeVariantsNow({
         to: toRef.current?.value,
         subject: subjectRef.current?.value,
         instructions: hintRef.current?.value,
         accountId: accountRef.current?.value,
       });
-      if (result.ok && result.body) setBody(result.body);
-      else setAiError(result.reason ?? "AI failed");
+      if (result.ok && result.variants && result.variants.length > 0) {
+        setVariants(result.variants);
+      } else {
+        setAiError(result.reason ?? "AI failed");
+      }
     });
   };
 
@@ -163,7 +169,7 @@ function ComposerInner({ accounts }: ComposerProps) {
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-indigo-300 px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
             >
               <Sparkles size={13} />
-              {pending ? "Writing…" : "Write with AI"}
+              {pending ? "Drafting 3 versions…" : "Write with AI"}
             </button>
           </div>
           {aiError && <p className="text-xs text-red-500">{aiError}</p>}
@@ -197,6 +203,19 @@ function ComposerInner({ accounts }: ComposerProps) {
           </div>
         </form>
       </div>
+      {variants && (
+        <VariantPicker
+          variants={variants}
+          busy={pending}
+          pickLabel="Insert into reply"
+          onPick={(b) => {
+            setBody(b);
+            setVariants(null);
+          }}
+          onRegenerate={writeWithAI}
+          onClose={() => setVariants(null)}
+        />
+      )}
     </div>
   );
 }
