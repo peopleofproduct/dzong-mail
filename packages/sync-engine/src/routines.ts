@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { prisma } from "@unwalled/database";
-import type { Prisma, PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { Prisma, PrismaClient } from "@dzong/database";
 import { askInbox } from "./semantic";
 import { emit, recordAgentRun } from "./notify";
 

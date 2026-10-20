@@ -7,12 +7,14 @@ export type {
   SyncOutcome,
 } from "./types";
 export { encryptSecret, decryptSecret, decryptIfPresent } from "./crypto";
+export { textToHtml } from "./text-html";
 export { syncAccount, syncAllAccounts } from "./engine";
 export { sendEmail, dispatchScheduledDraft } from "./send";
 export type { SendAttachment, SendInput, SendResult } from "./send";
 export { dispatchDueDrafts, returnDueSnoozes, runSyncCycle } from "./worker";
 export { startIdleWatchers } from "./idle";
 export { runPostSync } from "./post-sync";
+export type { PostSyncStats } from "./post-sync";
 export {
   askInbox,
   embedAccountMessages,
@@ -71,12 +73,7 @@ export { GraphSyncProvider } from "./providers/graph";
 export { attachmentFilePath, attachmentsDir, dataDir, storeAttachmentContent } from "./attachments";
 export { getRecipientStyle, stylePromptFragment } from "./style";
 export type { RecipientStyle, SenderCategory } from "./style";
-export {
-  checkFollowUpReminders,
-  emit,
-  notifyNewMail,
-  recordAgentRun,
-} from "./notify";
+export { checkFollowUpReminders, emit, notifyNewMail, recordAgentRun } from "./notify";
 export { importMailFiles, getOrCreateImportAccount } from "./import-mail";
 export type { ImportResult } from "./import-mail";
 export { verifyAccount, verifyAllAccounts } from "./verify";

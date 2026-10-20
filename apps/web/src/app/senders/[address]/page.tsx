@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { prisma } from "@/lib/db";
-import { getRecipientStyle } from "@unwalled/sync-engine";
+import { getRecipientStyle } from "@dzong/sync-engine";
 import { SenderAvatar } from "@/components/mail/sender-avatar";
 import { Paperclip } from "lucide-react";
 
@@ -83,12 +83,12 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
 
   // Reply reciprocity: for threads we both participate in, the median gap
   // between their message and my next reply (and vice versa).
-  const threadIds = new Set([
-    ...fromThem.map((m) => m.threadId),
-    ...toThem.map((m) => m.threadId),
-  ]);
+  const threadIds = new Set([...fromThem.map((m) => m.threadId), ...toThem.map((m) => m.threadId)]);
   const threadMsgs = await prisma.message.findMany({
-    where: { threadId: { in: [...threadIds].filter((t): t is string => Boolean(t)) }, isDraft: false },
+    where: {
+      threadId: { in: [...threadIds].filter((t): t is string => Boolean(t)) },
+      isDraft: false,
+    },
     orderBy: { receivedAt: "asc" },
     select: { threadId: true, fromAddress: true, receivedAt: true },
   });
@@ -154,7 +154,8 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
   const style = bestAccount
     ? await getRecipientStyle(addr, bestAccount.emailAccountId, prisma)
     : null;
-  const card = "rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900";
+  const card =
+    "rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900";
   const stat = "text-2xl font-semibold text-zinc-900 dark:text-zinc-50";
   const lbl = "text-xs text-zinc-400";
 
@@ -212,7 +213,10 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
           </h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             {iOwe > 0 ? (
-              <Link href={`/?q=${encodeURIComponent(addr)}`} className="text-indigo-600 hover:underline dark:text-indigo-400">
+              <Link
+                href={`/?q=${encodeURIComponent(addr)}`}
+                className="text-indigo-600 hover:underline dark:text-indigo-400"
+              >
                 {iOwe} thread{iOwe === 1 ? "" : "s"} waiting on you →
               </Link>
             ) : (
@@ -220,7 +224,9 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
             )}
           </p>
           <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-            {theyOwe > 0 ? `${theyOwe} thread${theyOwe === 1 ? "" : "s"} waiting on them` : "Nothing waiting on them"}
+            {theyOwe > 0
+              ? `${theyOwe} thread${theyOwe === 1 ? "" : "s"} waiting on them`
+              : "Nothing waiting on them"}
           </p>
         </div>
         <div className={card}>
@@ -302,13 +308,19 @@ async function Dossier({ params }: { params: Promise<{ address: string }> }) {
           {fromThem.slice(0, 8).map((m) => (
             <li key={m.id}>
               <Link
-                href={m.threadId ? `/?thread=${encodeURIComponent(m.threadId)}` : `/?q=${encodeURIComponent(addr)}`}
+                href={
+                  m.threadId
+                    ? `/?thread=${encodeURIComponent(m.threadId)}`
+                    : `/?q=${encodeURIComponent(addr)}`
+                }
                 className="flex items-baseline gap-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               >
                 <span className="w-16 shrink-0 text-xs text-zinc-400">
                   {m.receivedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </span>
-                <span className={`min-w-0 truncate text-sm ${m.isRead ? "text-zinc-500" : "font-medium text-zinc-800 dark:text-zinc-200"}`}>
+                <span
+                  className={`min-w-0 truncate text-sm ${m.isRead ? "text-zinc-500" : "font-medium text-zinc-800 dark:text-zinc-200"}`}
+                >
                   {m.subject ?? "(no subject)"}
                 </span>
               </Link>

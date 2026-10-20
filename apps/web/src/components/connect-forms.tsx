@@ -164,7 +164,7 @@ export function GmailConnectCard({ connectedEmails }: { connectedEmails: string[
             </a>
           </li>
           <li>Sign in and turn on 2-Step Verification if asked</li>
-          <li>Create an app password named anything (e.g. “Unwalled”)</li>
+          <li>Create an app password named anything (e.g. “Dzong”)</li>
           <li>Paste the 16-letter password above — it stays on this machine, encrypted</li>
         </ol>
       </details>
@@ -180,8 +180,11 @@ export function GmailConnectCard({ connectedEmails }: { connectedEmails: string[
 /** Other providers, with one-tap presets for the common ones. */
 export function OtherProviderCard({ connectedEmails }: { connectedEmails: string[] }) {
   const [presetKey, setPresetKey] = useState("fastmail");
+  const [imapSec, setImapSec] = useState<Preset["imapSecurity"]>("SSL_TLS");
+  const [smtpSec, setSmtpSec] = useState<Preset["smtpSecurity"]>("SSL_TLS");
   const preset = PRESETS[presetKey];
   const { warning, onSubmit } = useDuplicateGuard(connectedEmails);
+  const plaintext = presetKey === "custom" && (imapSec === "NONE" || smtpSec === "NONE");
 
   return (
     <form
@@ -236,19 +239,31 @@ export function OtherProviderCard({ connectedEmails }: { connectedEmails: string
               defaultValue={preset.imapPort}
               className={inputClass}
             />
-            <select name="imapSecurity" defaultValue={preset.imapSecurity} className={inputClass}>
+            <select
+              name="imapSecurity"
+              value={imapSec}
+              onChange={(e) => setImapSec(e.target.value as Preset["imapSecurity"])}
+              className={inputClass}
+              aria-label="IMAP security"
+            >
               <option value="SSL_TLS">SSL/TLS</option>
-              <option value="STARTTLS">STARTTLS</option>
-              <option value="NONE">None</option>
+              <option value="STARTTLS">STARTTLS (required)</option>
+              <option value="NONE">None - not recommended</option>
             </select>
           </div>
           <input name="smtpHost" placeholder="SMTP server (for sending)" className={inputClass} />
           <div className="flex gap-2">
             <input name="smtpPort" placeholder="465" className={inputClass} />
-            <select name="smtpSecurity" defaultValue={preset.smtpSecurity} className={inputClass}>
+            <select
+              name="smtpSecurity"
+              value={smtpSec}
+              onChange={(e) => setSmtpSec(e.target.value as Preset["smtpSecurity"])}
+              className={inputClass}
+              aria-label="SMTP security"
+            >
               <option value="SSL_TLS">SSL/TLS</option>
-              <option value="STARTTLS">STARTTLS</option>
-              <option value="NONE">None</option>
+              <option value="STARTTLS">STARTTLS (required)</option>
+              <option value="NONE">None - not recommended</option>
             </select>
           </div>
           <input
@@ -256,6 +271,23 @@ export function OtherProviderCard({ connectedEmails }: { connectedEmails: string
             placeholder="Username (only if different from email)"
             className={inputClass}
           />
+          <label
+            className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300"
+            title="Skips TLS certificate validation for self-hosted servers like Proton Bridge. Only enable for a server you control."
+          >
+            <input type="checkbox" name="allowSelfSigned" className="accent-indigo-600" />
+            Allow self-signed certificates (local/self-hosted servers only)
+          </label>
+          {plaintext && (
+            <div
+              role="alert"
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+            >
+              <strong>&quot;None&quot; sends your password and mail unencrypted.</strong> Anyone on
+              the network can read them. Use SSL/TLS or STARTTLS unless this server only listens on
+              localhost.
+            </div>
+          )}
         </>
       )}
       {presetKey !== "custom" && (

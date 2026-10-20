@@ -1,14 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Info,
-  Sparkles,
-} from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Info, Sparkles } from "lucide-react";
 import { getAccounts } from "@/lib/queries";
 import { getAchievementStats, snapshotInboxZero } from "@/lib/achievements";
 import { getInsights } from "@/lib/analytics";
@@ -114,14 +107,16 @@ async function AnalyticsBody() {
                     {p.label}
                     <span className="ml-1.5 font-normal text-zinc-400">· {p.detail}</span>
                   </span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                    {p.score}
-                  </span>
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">{p.score}</span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                   <div
                     className={`h-full rounded-full ${
-                      p.score >= 75 ? "bg-emerald-500" : p.score >= 45 ? "bg-indigo-500" : "bg-amber-500"
+                      p.score >= 75
+                        ? "bg-emerald-500"
+                        : p.score >= 45
+                          ? "bg-indigo-500"
+                          : "bg-amber-500"
                     }`}
                     style={{ width: `${Math.max(2, p.score)}%` }}
                   />
@@ -133,10 +128,7 @@ async function AnalyticsBody() {
       </div>
 
       {/* Volume trend. */}
-      <Card
-        title="Weekly inflow"
-        subtitle="Messages received per week, last 12 weeks"
-      >
+      <Card title="Weekly inflow" subtitle="Messages received per week, last 12 weeks">
         <WeeklyBars weekly={insights.weekly} />
       </Card>
 

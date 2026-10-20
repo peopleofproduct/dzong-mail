@@ -5,10 +5,10 @@ import { Monitor, Moon, Sun } from "lucide-react";
 
 type Pref = "light" | "dark" | "system";
 const ORDER: Pref[] = ["system", "light", "dark"];
-const EVENT = "unwalled-theme-change";
+const EVENT = "dzong-theme-change";
 
 function getPref(): Pref {
-  const v = localStorage.getItem("unwalled-theme");
+  const v = localStorage.getItem("dzong-theme");
   return v === "light" || v === "dark" ? v : "system";
 }
 
@@ -44,7 +44,7 @@ export function ThemeToggle() {
 
   const cycle = () => {
     const next = ORDER[(ORDER.indexOf(pref) + 1) % ORDER.length];
-    localStorage.setItem("unwalled-theme", next);
+    localStorage.setItem("dzong-theme", next);
     apply(next);
     window.dispatchEvent(new Event(EVENT));
   };

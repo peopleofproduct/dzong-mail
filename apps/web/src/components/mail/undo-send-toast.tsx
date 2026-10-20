@@ -53,13 +53,13 @@ export function UndoSendToast({ messageId, subject }: { messageId: string; subje
 
   if (done) {
     return (
-      <div className="anim-toast fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 shadow-2xl dark:bg-zinc-100 dark:text-zinc-900">
+      <div className="anim-toast fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 shadow-2xl dark:bg-zinc-100 dark:text-zinc-900">
         {done}
       </div>
     );
   }
   return (
-    <div className="anim-toast fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-zinc-900 py-2.5 pr-2.5 pl-4 text-sm text-zinc-100 shadow-2xl dark:bg-zinc-100 dark:text-zinc-900">
+    <div className="anim-toast fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-zinc-900 py-2.5 pr-2.5 pl-4 text-sm text-zinc-100 shadow-2xl dark:bg-zinc-100 dark:text-zinc-900">
       <span className="max-w-56 truncate">
         Sending{left !== null ? ` in ${left}s` : "…"} · {subject}
       </span>

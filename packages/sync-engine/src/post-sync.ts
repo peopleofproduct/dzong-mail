@@ -1,5 +1,5 @@
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 import { classifyAccountMessages } from "./classify";
 import { applyAutomationRules } from "./rules";
 import { embedAccountMessages } from "./semantic";
@@ -9,6 +9,10 @@ export interface PostSyncStats {
   classified: number;
   embedded: number;
   rulesApplied: number;
+  /** Why classification/embedding produced nothing (AI off, unreachable, or
+   *  simply nothing pending) — surfaced so the UI can distinguish "AI down"
+   *  from "nothing to index". */
+  reason?: string;
 }
 
 /**
@@ -38,6 +42,7 @@ export async function runPostSync(
   }
   const embedding = await embedAccountMessages(accountId, db);
   stats.embedded = embedding.embedded;
+  stats.reason = embedding.reason ?? classification.reason;
   if (embedding.embedded > 0) {
     console.log(`[post-sync] embedded ${embedding.embedded} message(s) for semantic search`);
   } else if (embedding.reason) {

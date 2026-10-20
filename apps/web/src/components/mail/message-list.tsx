@@ -46,6 +46,8 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
   const searchParams = useSearchParams();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(["Newsletters & bulk"]));
+  // Two-step unsubscribe: first tap arms a confirm, second executes.
+  const [confirmUnsub, setConfirmUnsub] = useState<string | null>(null);
   const lastArchived = useRef<string[]>([]);
   const gPending = useRef(0);
   const vPending = useRef(0);
@@ -269,7 +271,21 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [displayed, currentIndex, selectedId, move, openThread, targets, archive, select, checked, patch, toggleRead, toggleStar, snooze]);
+  }, [
+    displayed,
+    currentIndex,
+    selectedId,
+    move,
+    openThread,
+    targets,
+    archive,
+    select,
+    checked,
+    patch,
+    toggleRead,
+    toggleStar,
+    snooze,
+  ]);
 
   const toggleSection = (title: string) => {
     setCollapsed((prev) => {
@@ -404,7 +420,10 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             </div>
           )}
         </div>
-        <div className="hidden shrink-0 items-center gap-1 group-hover:flex">
+        {/* row-actions: hidden until hover on fine pointers; globals.css
+            shows it always on touch (hover:none) so the actions stay
+            reachable without a hover state. */}
+        <div className="row-actions hidden shrink-0 items-center gap-1 group-hover:flex">
           {m.isDraft && (
             <button
               title="Send now"
@@ -475,18 +494,32 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
           >
             <CheckCheck size={14} />
           </button>
-          {m.hasUnsubscribe && (
-            <button
-              title="Unsubscribe"
-              onClick={(e) => {
-                e.stopPropagation();
-                void unsubscribeFromMessage(m.id);
-              }}
-              className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-            >
-              <X size={14} />
-            </button>
-          )}
+          {m.hasUnsubscribe &&
+            (confirmUnsub === m.id ? (
+              <button
+                title="Confirm unsubscribe"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmUnsub(null);
+                  void unsubscribeFromMessage(m.id);
+                }}
+                className="rounded bg-red-50 px-1.5 py-1 text-[10px] font-semibold text-red-600 hover:bg-red-100 dark:bg-red-950/50 dark:text-red-300"
+              >
+                Sure?
+              </button>
+            ) : (
+              <button
+                title="Unsubscribe"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmUnsub(m.id);
+                  setTimeout(() => setConfirmUnsub((cur) => (cur === m.id ? null : cur)), 3000);
+                }}
+                className="rounded p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+              >
+                <X size={14} />
+              </button>
+            ))}
         </div>
       </li>
     );

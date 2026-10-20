@@ -88,7 +88,7 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
         className="mb-2 flex items-center gap-2 px-2 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
       >
         <Mail size={16} className="text-indigo-500" />
-        Unwalled Mail
+        Dzong Mail
       </Link>
 
       <Link

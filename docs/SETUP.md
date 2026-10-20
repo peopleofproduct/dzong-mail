@@ -1,4 +1,4 @@
-# Unwalled Mail — Full Setup Guide
+# Dzong Mail — Full Setup Guide
 
 Everything you need to go from `git clone` to a working, AI-powered local
 inbox — including the fiddly bits (OAuth apps, app passwords, Postgres
@@ -27,12 +27,12 @@ official installer.
 ```bash
 brew install postgresql@17
 brew services start postgresql@17
-createdb unwalled_mail
+createdb dzong_mail
 ```
 
 Homebrew's Postgres creates a superuser matching your macOS username
 (e.g. `ganesha`), not the conventional `postgres` user. Either adjust
-`DATABASE_URL` to match (`postgresql://ganesha@localhost:5432/unwalled_mail`)
+`DATABASE_URL` to match (`postgresql://ganesha@localhost:5432/dzong_mail`)
 or create the `postgres` role:
 
 ```bash
@@ -45,15 +45,15 @@ psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
 ```bash
 sudo apt install postgresql postgresql-contrib
 sudo systemctl enable --now postgresql
-sudo -u postgres createdb unwalled_mail
+sudo -u postgres createdb dzong_mail
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
 ```
 
 **Docker (any OS):**
 
 ```bash
-docker run -d --name unwalled-pg \
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=unwalled_mail \
+docker run -d --name dzong-pg \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=dzong_mail \
   -p 5432:5432 postgres:17
 ```
 
@@ -85,7 +85,7 @@ your models.
 ## 2. Install & first run
 
 ```bash
-git clone <repo-url> && cd unwalled-mail
+git clone <repo-url> && cd dzong-mail
 npm install
 
 cp packages/database/.env.example packages/database/.env
@@ -109,7 +109,7 @@ openssl rand -hex 32
 Put it in `apps/web/.env.local`:
 
 ```
-UNWALLED_SECRET_KEY=<the 64-char hex you just generated>
+DZONG_SECRET_KEY=<the 64-char hex you just generated>
 ```
 
 **Set this before connecting real accounts.** Rotating it later orphans
@@ -118,11 +118,11 @@ previously encrypted secrets.
 Two other optional variables go in the same file:
 
 ```
-# Where attachment files are stored (default: ~/.unwalled-mail)
-UNWALLED_DATA_DIR=/path/to/data
+# Where attachment files are stored (default: ~/.dzong-mail)
+DZONG_DATA_DIR=/path/to/data
 
 # Require Bearer auth on the /api/v1/* endpoints (docs/API.md)
-UNWALLED_API_TOKEN=some-long-random-string
+DZONG_API_TOKEN=some-long-random-string
 ```
 
 ---
@@ -173,7 +173,7 @@ You create your own OAuth app in Google Cloud — your keys, your consent
 screen, your data. ~5 minutes:
 
 1. [console.cloud.google.com](https://console.cloud.google.com) → new
-   project (name it anything, e.g. "unwalled-mail")
+   project (name it anything, e.g. "dzong-mail")
 2. **APIs & Services → Library** → enable **Gmail API**
 3. **OAuth consent screen** → External → fill in app name + your email →
    add scope `.../auth/gmail.modify` (read/modify/send — needed for
@@ -239,7 +239,7 @@ npx tsx scripts/enable-ai.ts   # enables AI for the local user and
 | OAuth callback error                  | Redirect URI in the Google/Azure app doesn't match `http://localhost:3000/api/oauth/<provider>/callback` exactly                             |
 | IMAP auth failure                     | Using your login password instead of an app-specific password (nearly every provider requires this now)                                      |
 | `Unknown argument isArchived` etc.    | Stale Prisma client in a running dev server — `npm run db:generate` and restart `npm run dev`                                                |
-| `UNWALLED_SECRET_KEY` warnings        | Set a real key in `apps/web/.env.local` (see §2)                                                                                             |
+| `DZONG_SECRET_KEY` warnings        | Set a real key in `apps/web/.env.local` (see §2)                                                                                             |
 
 ## 6. Useful scripts
 

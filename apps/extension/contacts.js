@@ -2,7 +2,7 @@
  * dossier card appears: exchange count, unread mail, open reply loops,
  * last subject. Powered by /api/v1/contacts on the local app. */
 
-const CARD_ID = "unwalled-contact-card";
+const CARD_ID = "dzong-contact-card";
 const cache = new Map(); // email -> {known,...} | "pending"
 let card = null;
 let hoverTimer = null;
@@ -85,12 +85,12 @@ function render(email, data) {
       );
     }
     rows.push(
-      `<div style="margin-top:4px"><a href="#" id="unwalled-dossier" style="color:#4f46e5;text-decoration:none;font-weight:500">Open dossier →</a></div>`
+      `<div style="margin-top:4px"><a href="#" id="dzong-dossier" style="color:#4f46e5;text-decoration:none;font-weight:500">Open dossier →</a></div>`
     );
   }
   el.innerHTML = rows.join("");
   el.style.display = "block";
-  el.querySelector("#unwalled-dossier")?.addEventListener("click", async (e) => {
+  el.querySelector("#dzong-dossier")?.addEventListener("click", async (e) => {
     e.preventDefault();
     const s = await settings();
     chrome.runtime.sendMessage({

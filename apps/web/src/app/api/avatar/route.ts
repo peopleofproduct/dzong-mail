@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { dataDir } from "@unwalled/sync-engine";
+import { dataDir } from "@dzong/sync-engine";
+import { getSetting } from "@/lib/settings";
 
 /** Retry a previously-missed lookup after this long. */
 const MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -56,12 +57,24 @@ async function fetchImage(url: string): Promise<CachedAvatar | null> {
  * favicon for companies (skipped for freemail domains where it would just
  * be the provider's logo). Results are cached on local disk — each address
  * is looked up at most once, so a list render never fans out remote calls.
+ *
+ * Privacy: enabled by default for a complete-looking list — each sender is
+ * looked up at most once and cached on disk. Settings → Workspace →
+ * "Look up sender avatars online" turns it off entirely: nothing is
+ * served, not even cached hits, and initials render in place. Users who
+ * don't want Gravatar or sender domains learning who mails them should
+ * flip it off.
  */
 export async function GET(request: Request) {
   const email = new URL(request.url).searchParams.get("email")?.trim().toLowerCase();
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return NextResponse.json({ error: "email required" }, { status: 400 });
   }
+
+  // The hard gate: when disabled, no remote avatar data is served at all —
+  // initials render in place (SenderAvatar falls back on 404).
+  const enabled = await getSetting<boolean>("avatarsEnabled", true);
+  if (!enabled) return NextResponse.json({ error: "avatars disabled" }, { status: 404 });
 
   const key = createHash("sha256").update(email).digest("hex");
   const dir = path.join(dataDir(), "avatars");
@@ -95,8 +108,10 @@ export async function GET(request: Request) {
 
   const md5 = createHash("md5").update(email).digest("hex");
   const domain = email.split("@")[1];
+  // Only query real public hostnames — never IPs or local names.
+  const publicDomain = /^(?=.*\.)[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain);
   const sources = [`https://www.gravatar.com/avatar/${md5}?d=404&s=128`];
-  if (!FREEMAIL_DOMAINS.has(domain)) {
+  if (publicDomain && !FREEMAIL_DOMAINS.has(domain)) {
     sources.push(`https://${domain}/favicon.ico`, `https://www.${domain}/favicon.ico`);
   }
 

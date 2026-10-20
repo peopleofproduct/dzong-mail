@@ -2,15 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Maximize2,
-  Minimize2,
-  Minus,
-  Paperclip,
-  Sparkles,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Maximize2, Minimize2, Minus, Paperclip, Sparkles, Trash2, X } from "lucide-react";
 import {
   discardComposerDraft,
   generateComposeVariantsNow,
@@ -46,8 +38,12 @@ interface ComposerProps {
   accounts: AccountOption[];
   /** Files already stored on the draft being edited (compose=draft). */
   draftAttachments?: StoredAttachment[];
-  /** Formatted body stored on the draft - restores rich text on reopen. */
-  draftBodyHtml?: string;
+  /** Formatted initial body - draft rich text or a structured forward body,
+   *  built server-side and restored verbatim into the editor. */
+  initialBodyHtml?: string;
+  /** Plain-text initial body - loaded server-side by draftId/fwd instead of
+   *  riding in the URL. */
+  initialBodyText?: string;
   snippets?: SnippetOption[];
 }
 
@@ -63,27 +59,49 @@ function formatBytes(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function Composer({ accounts, draftAttachments, draftBodyHtml, snippets }: ComposerProps) {
+export function Composer({
+  accounts,
+  draftAttachments,
+  initialBodyHtml,
+  initialBodyText,
+  snippets,
+}: ComposerProps) {
   const searchParams = useSearchParams();
   if (!searchParams.get("compose")) return null;
   // Key by the compose-relevant params so each compose session mounts fresh
   // state (prefilled body, draft id) without losing a half-typed email when
   // unrelated params change.
-  const sessionKey = ["compose", "draftId", "to", "subject", "body", "threadId", "accountId"]
+  const sessionKey = [
+    "compose",
+    "draftId",
+    "fwd",
+    "to",
+    "subject",
+    "body",
+    "threadId",
+    "accountId",
+  ]
     .map((k) => `${k}=${searchParams.get(k) ?? ""}`)
     .join("&");
   return (
     <ComposerInner
       accounts={accounts}
       draftAttachments={draftAttachments}
-      draftBodyHtml={draftBodyHtml}
+      initialBodyHtml={initialBodyHtml}
+      initialBodyText={initialBodyText}
       snippets={snippets}
       key={sessionKey}
     />
   );
 }
 
-function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: ComposerProps) {
+function ComposerInner({
+  accounts,
+  draftAttachments,
+  initialBodyHtml,
+  initialBodyText,
+  snippets,
+}: ComposerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get("compose")!;
@@ -92,14 +110,16 @@ function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: 
     cc: searchParams.get("cc") ?? "",
     bcc: searchParams.get("bcc") ?? "",
     subject: searchParams.get("subject") ?? "",
-    body: searchParams.get("body") ?? "",
+    // Draft/forward bodies arrive server-side by draftId/fwd; short reply
+    // prefills may still come through the URL.
+    body: searchParams.get("body") ?? initialBodyText ?? "",
   };
   const [to, setTo] = useState(initial.to);
   const [cc, setCc] = useState(initial.cc);
   const [bcc, setBcc] = useState(initial.bcc);
   const [subject, setSubject] = useState(initial.subject);
   const [body, setBody] = useState(initial.body);
-  const [bodyHtml, setBodyHtml] = useState(() => draftBodyHtml ?? escapeHtml(initial.body));
+  const [bodyHtml, setBodyHtml] = useState(() => initialBodyHtml ?? escapeHtml(initial.body));
   const [files, setFiles] = useState<File[]>([]);
   const [stored, setStored] = useState<StoredAttachment[]>(draftAttachments ?? []);
   const [showCcBcc, setShowCcBcc] = useState(Boolean(initial.cc || initial.bcc));
@@ -180,6 +200,9 @@ function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: 
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        role="dialog"
+        aria-modal="true"
+        aria-label="No mail account connected"
         onClick={navigateClose}
       >
         <div
@@ -228,10 +251,24 @@ function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: 
     : "fixed inset-x-0 bottom-0 z-50 sm:inset-x-auto sm:right-5 sm:w-[30rem]";
 
   return (
-    <div className={shell} onClick={expanded ? close : undefined}>
+    <div
+      className={shell}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={expanded ? close : undefined}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          void close();
+        }
+      }}
+    >
       <div
         className={`anim-rise flex w-full flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-zinc-200 sm:rounded-t-xl dark:bg-zinc-950 dark:ring-zinc-800 ${
-          expanded ? "h-full max-h-[calc(100vh-4rem)] max-w-3xl sm:rounded-xl" : "max-h-[70vh] sm:h-[32rem]"
+          expanded
+            ? "h-full max-h-[calc(100vh-4rem)] max-w-3xl sm:rounded-xl"
+            : "max-h-[70vh] sm:h-[32rem]"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -308,8 +345,20 @@ function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: 
               />
               {!showCcBcc && (
                 <span className="flex shrink-0 gap-2 pr-4 text-xs text-zinc-400">
-                  <button type="button" onClick={() => setShowCcBcc(true)} className="hover:text-zinc-600">Cc</button>
-                  <button type="button" onClick={() => setShowCcBcc(true)} className="hover:text-zinc-600">Bcc</button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCcBcc(true)}
+                    className="hover:text-zinc-600"
+                  >
+                    Cc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCcBcc(true)}
+                    className="hover:text-zinc-600"
+                  >
+                    Bcc
+                  </button>
                 </span>
               )}
             </div>
@@ -363,7 +412,7 @@ function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: 
             <input type="hidden" name="bodyHtml" value={bodyHtml} />
             <RichBody
               ref={bodyRef}
-              initialHtml={draftBodyHtml ?? escapeHtml(initial.body)}
+              initialHtml={initialBodyHtml ?? escapeHtml(initial.body)}
               autoFocus={isReply}
               onTextChange={(text, html) => {
                 setBody(text);
@@ -414,8 +463,9 @@ function ComposerInner({ accounts, draftAttachments, draftBodyHtml, snippets }: 
             )}
 
             {/* Footer toolbar: Send + scheduling on the left, action icons
-                through the middle, discard on the right. */}
-            <div className="flex items-center gap-1 border-t border-zinc-200 px-3 py-2 dark:border-zinc-800">
+                through the middle, discard on the right. Safe-area padding
+                keeps Send clear of the iOS home indicator. */}
+            <div className="flex items-center gap-1 border-t border-zinc-200 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] dark:border-zinc-800">
               <button
                 type="submit"
                 className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"

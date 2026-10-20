@@ -1,9 +1,9 @@
-import { prisma } from "@unwalled/database";
-import type { Message, PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { Message, PrismaClient } from "@dzong/database";
 import { resolveAIForAccount, resolveAIForUser } from "./ai";
 import type { ResolvedAI } from "./ai";
-import { OllamaProvider, OLLAMA_DEFAULT_BASE_URL } from "@unwalled/ai-engine";
-import type { AIProvider } from "@unwalled/ai-engine";
+import { OllamaProvider, OLLAMA_DEFAULT_BASE_URL } from "@dzong/ai-engine";
+import type { AIProvider } from "@dzong/ai-engine";
 import { indexEmbedding, searchIndex, vectorIndexReady } from "./vector-index";
 
 const EMBED_SOURCE_CHARS = 4000;
@@ -176,11 +176,10 @@ export async function semanticSearchMessages(
       include: { emailAccount: { select: { emailAddress: true } } },
     });
     const byId = new Map(messages.map((m) => [m.id, m]));
-    const hits = ranked
-      .flatMap((r) => {
-        const message = byId.get(r.messageId);
-        return message && r.score > 0.3 ? [{ message, score: r.score }] : [];
-      });
+    const hits = ranked.flatMap((r) => {
+      const message = byId.get(r.messageId);
+      return message && r.score > 0.3 ? [{ message, score: r.score }] : [];
+    });
     return { ok: true, hits };
   }
 
@@ -377,12 +376,10 @@ export async function askInbox(
           "\n\n" +
           context,
       },
-      ...(options.history ?? [])
-        .slice(-6)
-        .flatMap((turn) => [
-          { role: "user" as const, content: turn.question },
-          { role: "assistant" as const, content: turn.answer },
-        ]),
+      ...(options.history ?? []).slice(-6).flatMap((turn) => [
+        { role: "user" as const, content: turn.question },
+        { role: "assistant" as const, content: turn.answer },
+      ]),
       { role: "user" as const, content: question },
     ],
     temperature: 0.2,

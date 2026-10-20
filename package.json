@@ -1,5 +1,5 @@
 {
-  "name": "unwalled-mail",
+  "name": "dzong-mail",
   "private": true,
   "packageManager": "npm@11.12.1",
   "workspaces": [
@@ -20,7 +20,7 @@
     "worker": "tsx packages/sync-engine/src/worker.ts",
     "verify:providers": "tsx scripts/verify-providers.ts",
     "setup": "bash scripts/setup.sh",
-    "mcp": "npm run start -w @unwalled/mcp-server"
+    "mcp": "npm run start -w @dzong/mcp-server"
   },
   "devDependencies": {
     "prettier": "^3.3.3",

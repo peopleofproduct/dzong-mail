@@ -3,16 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Archive,
-  ArrowRight,
-  Check,
-  CheckCheck,
-  Loader2,
-  Sparkles,
-  Undo2,
-  X,
-} from "lucide-react";
+import { Archive, ArrowRight, Check, CheckCheck, Loader2, Sparkles, Undo2, X } from "lucide-react";
 import { archiveMessages, markMessagesRead, undoAuditEntry } from "@/lib/actions";
 
 interface Source {
@@ -259,9 +250,7 @@ export function AssistantStream({
     <div className="space-y-5">
       {(phase === "thinking" || phase === "streaming" || phase === "done") && (
         <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-          <p className="text-xs font-medium tracking-wide text-indigo-500 uppercase">
-            {question}
-          </p>
+          <p className="text-xs font-medium tracking-wide text-indigo-500 uppercase">{question}</p>
           {phase === "thinking" ? (
             <p className="mt-2 flex items-center gap-2 text-sm text-zinc-400">
               <Loader2 size={14} className="animate-spin" /> Reading your inbox…
@@ -330,9 +319,7 @@ export function AssistantStream({
                 href={`/?thread=${s.threadId ?? s.messageId}`}
                 className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:border-indigo-300 hover:bg-white dark:border-zinc-800 dark:hover:border-indigo-800 dark:hover:bg-zinc-900"
               >
-                <span className="shrink-0 text-[11px] font-medium text-indigo-500">
-                  [{i + 1}]
-                </span>
+                <span className="shrink-0 text-[11px] font-medium text-indigo-500">[{i + 1}]</span>
                 {!s.isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />}
                 <span className="truncate text-zinc-700 dark:text-zinc-200">
                   {s.subject ?? "(no subject)"}

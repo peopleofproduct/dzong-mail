@@ -1,8 +1,12 @@
-# Unwalled Mail
+# Dzong Mail
 
 **Your messages, your models, your machine — no paywalls, ever.**
 
-Unwalled Mail is an open-source, local-first AI email client. It gives you
+*dzong (རྫོང) — pronounced "jong" — the fortress-monasteries of Bhutan,
+where a district's correspondence and governance were kept behind walls
+the community itself owned.*
+
+Dzong Mail is an open-source, local-first AI email client. It gives you
 the features people pay $30/month for — AI labels, pre-drafted replies,
 cold-email blocking, bulk unsubscribe, follow-up tracking, natural-language
 rules — running entirely on your own computer. Your mail never touches our
@@ -18,13 +22,27 @@ Free. Open source. MIT. Yours.
 
 ---
 
+## Why "Dzong"?
+
+Every mail platform wants you inside *their* walls — their servers, their
+terms, their business model. A dzong is different: it's a fortress its own
+community builds and governs. Dzongs weren't just defenses — they housed
+the district's administration, its records, its correspondence. The word
+for Bhutan's national language, Dzongkha, literally means "the language
+spoken in the dzong."
+
+That's the thesis: walls aren't the problem — *whose* walls is the
+question. Dzong Mail is a fortress for your mail that belongs to you.
+
+---
+
 ## What nobody else does
 
 Plenty of products say "AI email" now. Here's what's different about ours —
 and why it stays that way.
 
 - **It writes like you write to _them_, not like you in general.**
-  Other tools learn "your voice" as one global style. Unwalled builds a
+  Other tools learn "your voice" as one global style. Dzong builds a
   per-recipient profile from your actual shared history — the greeting
   you use with Sam, the sign-off you use with your lawyer, how short you
   keep it with your team — and drafts to match. Open any sender's
@@ -118,8 +136,8 @@ and why it stays that way.
 creates the DB, migrates, seeds a demo inbox, pulls models):
 
 ```bash
-git clone https://github.com/peopleofproduct/unwalled-mail.git
-cd unwalled-mail
+git clone https://github.com/peopleofproduct/dzong-mail.git
+cd dzong-mail
 npm run setup        # add --no-ai to skip Ollama
 npm run dev
 ```
@@ -128,20 +146,20 @@ Or step by step:
 
 ```bash
 # 1. Get the code
-git clone https://github.com/peopleofproduct/unwalled-mail.git
-cd unwalled-mail
+git clone https://github.com/peopleofproduct/dzong-mail.git
+cd dzong-mail
 npm install
 
 # 2. Start PostgreSQL and create the database
 #    macOS (Homebrew):
 brew install postgresql@17 && brew services start postgresql@17
-createdb unwalled_mail
-#    Linux: install postgresql via your package manager, then `createdb unwalled_mail`
+createdb dzong_mail
+#    Linux: install postgresql via your package manager, then `createdb dzong_mail`
 
 # 3. Point the app at your database
 cp packages/database/.env.example packages/database/.env
 #    Edit the file if your Postgres user/password differ.
-#    Default assumes postgresql://postgres:postgres@localhost:5432/unwalled_mail
+#    Default assumes postgresql://postgres:postgres@localhost:5432/dzong_mail
 
 # 4. Create the tables and seed a demo account
 npm run db:migrate
@@ -194,7 +212,7 @@ From **Settings → Accounts** (or the connect cards on the home page):
 - **Gmail OAuth** — create a Google Cloud OAuth client (see
   `docs/SETUP.md` for the 5-minute walkthrough), paste your client
   ID/secret into the connect form, authorize. Same for **Microsoft**.
-- **Demo account** — the seeded `demo@unwalled.local` mock provider emits
+- **Demo account** — the seeded `demo@dzong.local` mock provider emits
   mail on every sync; great for poking around without credentials.
 
 > **Honest status note:** the mock provider and local AI pipeline are
@@ -235,9 +253,14 @@ Everything runs via `npm run dev` (Turborepo). Checks:
 **Config/env vars** (all optional except `DATABASE_URL`):
 
 - `DATABASE_URL` — in `packages/database/.env`, your local Postgres
-- `UNWALLED_SECRET_KEY` — encrypts stored credentials; a dev key is used
-  with a warning if unset. Set a real one: `openssl rand -hex 32` into
-  `apps/web/.env.local`
+- `DZONG_SECRET_KEY` — encrypts stored credentials; when unset a random
+  machine-local key is generated and persisted at
+  `~/.dzong-mail/secret.key` (mode 0600). Set a real one — `openssl rand
+  -hex 32` in `apps/web/.env.local` — to share the key across machines.
+  `UNWALLED_SECRET_KEY`/`UNWALLED_DATA_DIR` from pre-rename installs are
+  still honored.
+- `DZONG_DATA_DIR` — where attachments, avatars, and the generated key
+  live (default `~/.dzong-mail`; legacy `~/.unwalled-mail` is detected)
 - Ollama base URL, model, temperature — all configurable in Settings
 
 ## Roadmap — where we're headed

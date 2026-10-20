@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
-const KEY = "unwalled-sidebar-more";
-const EVENT = "unwalled-sidebar-more-change";
+const KEY = "dzong-sidebar-more";
+const EVENT = "dzong-sidebar-more-change";
 
 function subscribe(cb: () => void) {
   window.addEventListener(EVENT, cb);
@@ -50,7 +50,11 @@ export function SidebarMore({
         aria-expanded={open}
         className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
       >
-        {open ? <ChevronUp size={14} className="shrink-0" /> : <ChevronDown size={14} className="shrink-0" />}
+        {open ? (
+          <ChevronUp size={14} className="shrink-0" />
+        ) : (
+          <ChevronDown size={14} className="shrink-0" />
+        )}
         {open ? "Less" : "More"}
       </button>
       {open && children}

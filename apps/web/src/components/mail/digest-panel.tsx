@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Newspaper, Sparkles } from "lucide-react";
-import { generateDigest } from "@unwalled/sync-engine";
+import { generateDigest } from "@dzong/sync-engine";
 import { getLocalUser } from "@/lib/queries";
 
 export async function DigestPanel({ generated }: { generated: boolean }) {

@@ -1,5 +1,5 @@
 import { getAccounts } from "@/lib/queries";
-import { resolveAIForUser } from "@unwalled/sync-engine";
+import { resolveAIForUser } from "@dzong/sync-engine";
 
 /**
  * Shown when no AI provider is reachable — points non-technical users at the

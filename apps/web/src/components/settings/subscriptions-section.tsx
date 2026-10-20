@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { getSubscriptions } from "@/lib/queries";
 import { unsubscribeSenderNow } from "@/lib/actions";
+import { ConfirmSubmitButton } from "@/components/confirm-submit";
 
 export async function SubscriptionsSection() {
   await connection();
@@ -43,9 +44,12 @@ export async function SubscriptionsSection() {
                 </span>
               ) : s.canUnsubscribe ? (
                 <form action={unsubscribeSenderNow.bind(null, s.fromAddress)}>
-                  <button className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
+                  <ConfirmSubmitButton
+                    message={`Unsubscribe from ${s.fromAddress} and archive their ${s.count} message(s)?`}
+                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
                     Unsubscribe &amp; archive
-                  </button>
+                  </ConfirmSubmitButton>
                 </form>
               ) : (
                 <span className="text-[10px] text-zinc-400">no opt-out link</span>

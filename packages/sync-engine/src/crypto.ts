@@ -1,23 +1,60 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { dataDir } from "./attachments";
 
 // AES-256-GCM envelope for secrets at rest. The master key comes from
-// UNWALLED_SECRET_KEY; a fixed dev key is used when unset so local
-// scaffolding works out of the box. Set the env var for any real deployment.
-const DEV_FALLBACK_SECRET = "unwalled-mail-dev-only-secret";
+// DZONG_SECRET_KEY; when unset, a random key is generated once and
+// persisted under the data dir (mode 0600) so credentials are never
+// encrypted with a shared, public default.
+// The salt must never change — it derives the key that decrypts every
+// stored secret. It keeps the pre-rename value on purpose.
 const KEY_SALT = "unwalled-mail:v1";
 
+let cachedKey: Buffer | null = null;
 let warned = false;
 
-function masterKey(): Buffer {
-  const secret = process.env.UNWALLED_SECRET_KEY;
-  if (!secret && !warned) {
+function keyFilePath(): string {
+  return path.join(dataDir(), "secret.key");
+}
+
+/**
+ * Resolve the master secret: DZONG_SECRET_KEY first (explicit ops
+ * control, shareable across machines), otherwise a machine-local key
+ * generated on first use and stored next to the attachment store.
+ */
+function resolveSecret(): string {
+  const env = process.env.DZONG_SECRET_KEY ?? process.env.UNWALLED_SECRET_KEY;
+  if (env) return env;
+
+  const keyPath = keyFilePath();
+  try {
+    const existing = readFileSync(keyPath, "utf8").trim();
+    if (existing) return existing;
+  } catch {
+    /* first run - generate below */
+  }
+
+  const generated = randomBytes(32).toString("base64url");
+  try {
+    mkdirSync(path.dirname(keyPath), { recursive: true });
+    writeFileSync(keyPath, generated, { mode: 0o600 });
+  } catch (err) {
+    console.error("[dzong] could not persist generated secret key:", err);
+  }
+  if (!warned) {
     console.warn(
-      "[unwalled] UNWALLED_SECRET_KEY not set — using the built-in development key. " +
-        "Set it before storing real credentials.",
+      `[dzong] DZONG_SECRET_KEY not set — generated a machine key at ${keyPath}. ` +
+        "Set the env var to keep the same key across machines.",
     );
     warned = true;
   }
-  return scryptSync(secret ?? DEV_FALLBACK_SECRET, KEY_SALT, 32);
+  return generated;
+}
+
+function masterKey(): Buffer {
+  cachedKey ??= scryptSync(resolveSecret(), KEY_SALT, 32);
+  return cachedKey;
 }
 
 export function encryptSecret(plaintext: string): string {

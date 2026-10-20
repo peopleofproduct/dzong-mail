@@ -15,7 +15,13 @@ interface CollapsibleMessageProps {
 
 /** Gmail-style collapsible message inside a thread — only the latest is
  *  open by default; the header row toggles in both directions. */
-export function CollapsibleMessage({ id, defaultOpen, summary, header, body }: CollapsibleMessageProps) {
+export function CollapsibleMessage({
+  id,
+  defaultOpen,
+  summary,
+  header,
+  body,
+}: CollapsibleMessageProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (

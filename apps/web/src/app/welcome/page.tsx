@@ -54,7 +54,7 @@ export default function WelcomePage() {
         <div className="flex items-center gap-2">
           <Mail size={18} className="text-indigo-600 dark:text-indigo-400" />
           <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-            Unwalled Mail
+            Dzong Mail
           </span>
         </div>
         <ThemeToggle />
@@ -68,7 +68,7 @@ export default function WelcomePage() {
           Your messages, your models, your machine.
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-500 sm:text-base dark:text-zinc-400">
-          Unwalled Mail is an AI email client that runs entirely on your computer. Connect Gmail,
+          Dzong Mail is an AI email client that runs entirely on your computer. Connect Gmail,
           Outlook, or any IMAP provider — sync, search, and send locally, with AI that never sees a
           cloud unless you give it your own key. No paywalls, ever.
         </p>
@@ -116,10 +116,10 @@ export default function WelcomePage() {
       <footer className="border-t border-zinc-200 px-4 py-4 text-center text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
         Free and open source (MIT) ·{" "}
         <a
-          href="https://github.com/peopleofproduct/unwalled-mail"
+          href="https://github.com/peopleofproduct/dzong-mail"
           className="underline hover:text-zinc-600 dark:hover:text-zinc-300"
         >
-          github.com/peopleofproduct/unwalled-mail
+          github.com/peopleofproduct/dzong-mail
         </a>
       </footer>
     </div>

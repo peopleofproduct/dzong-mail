@@ -31,3 +31,18 @@ export const getRequestReadReceipts = () => getSetting<boolean>("requestReadRece
 /** Follow-up automation: "off" reminds only, "draft" prepares a nudge,
  *  "send" queues it through the undo window. */
 export const getAutoFollowUp = () => getSetting<string>("autoFollowUp", "off");
+
+/** Remote avatar lookups (Gravatar + sender-domain favicons) — on by
+ *  default so the list looks complete; the Settings toggle disables them
+ *  for users who don't want sender addresses leaving the machine. */
+export const getAvatarsEnabled = () => getSetting<boolean>("avatarsEnabled", true);
+
+/** Remote images/CSS inside mail bodies — blocked by default so tracking
+ *  pixels can't phone home; the Settings toggle loads them for every
+ *  message without the per-message click. */
+export const getLoadRemoteContent = () => getSetting<boolean>("loadRemoteContent", false);
+
+/** Sender addresses trusted for remote content — images in their mail load
+ *  automatically even when the global toggle is off. */
+export const getTrustedRemoteSenders = () =>
+  getSetting<string[]>("remoteContentSenders", []);

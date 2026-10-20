@@ -1,14 +1,31 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 import type { RawAttachment, RawMessage } from "./types";
 
-/** Root data dir for locally stored blobs. Override with UNWALLED_DATA_DIR. */
+/** Root data dir for locally stored blobs. Override with DZONG_DATA_DIR
+ *  (legacy UNWALLED_DATA_DIR still honoured). Pre-rename installs that
+ *  stored under ~/.unwalled-mail keep reading from there unless the new
+ *  dir already exists. */
 export function dataDir(): string {
-  return process.env.UNWALLED_DATA_DIR ?? path.join(homedir(), ".unwalled-mail");
+  const dir =
+    process.env.DZONG_DATA_DIR ??
+    process.env.UNWALLED_DATA_DIR ??
+    path.join(homedir(), ".dzong-mail");
+  const legacy = path.join(homedir(), ".unwalled-mail");
+  if (
+    !process.env.DZONG_DATA_DIR &&
+    !process.env.UNWALLED_DATA_DIR &&
+    existsSync(legacy) &&
+    !existsSync(dir)
+  ) {
+    return legacy;
+  }
+  return dir;
 }
 
 export function attachmentsDir(): string {
@@ -82,8 +99,10 @@ function extractPdfText(buf: Buffer): string | null {
     const arrRe = /\[((?:\(((?:\\.|[^\\()])*)\)|[^\]])*)\]\s*TJ/g;
     const unescape = (s: string) =>
       s
-        .replace(/\\([nrtbf()\\])/g, (_, c: string) =>
-          ({ n: "\n", r: "\r", t: "\t", b: "", f: "", "(": "(", ")": ")", "\\": "\\" })[c] ?? "",
+        .replace(
+          /\\([nrtbf()\\])/g,
+          (_, c: string) =>
+            ({ n: "\n", r: "\r", t: "\t", b: "", f: "", "(": "(", ")": ")", "\\": "\\" })[c] ?? "",
         )
         .replace(/\\([0-7]{1,3})/g, (_, o: string) => String.fromCharCode(parseInt(o, 8)));
     for (const m of src.matchAll(re)) chunks.push(unescape(m[1]));

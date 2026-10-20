@@ -92,20 +92,45 @@ export const RichBody = forwardRef<RichBodyHandle, RichBodyProps>(function RichB
         <button type="button" className={btn} title="Underline" onClick={() => cmd("underline")}>
           <Underline size={13} />
         </button>
-        <button type="button" className={btn} title="Strikethrough" onClick={() => cmd("strikeThrough")}>
+        <button
+          type="button"
+          className={btn}
+          title="Strikethrough"
+          onClick={() => cmd("strikeThrough")}
+        >
           <Strikethrough size={13} />
         </button>
         <span className="mx-1 h-3.5 w-px bg-zinc-200 dark:bg-zinc-700" />
-        <button type="button" className={btn} title="Bulleted list" onClick={() => cmd("insertUnorderedList")}>
+        <button
+          type="button"
+          className={btn}
+          title="Bulleted list"
+          onClick={() => cmd("insertUnorderedList")}
+        >
           <List size={13} />
         </button>
-        <button type="button" className={btn} title="Numbered list" onClick={() => cmd("insertOrderedList")}>
+        <button
+          type="button"
+          className={btn}
+          title="Numbered list"
+          onClick={() => cmd("insertOrderedList")}
+        >
           <ListOrdered size={13} />
         </button>
-        <button type="button" className={btn} title="Insert link" onClick={() => setShowLink((v) => !v)}>
+        <button
+          type="button"
+          className={btn}
+          title="Insert link"
+          onClick={() => setShowLink((v) => !v)}
+        >
           <LinkIcon size={13} />
         </button>
-        <button type="button" className={btn} title="Clear formatting" onClick={() => cmd("removeFormat")}>
+        <button
+          type="button"
+          className={btn}
+          title="Clear formatting"
+          onClick={() => cmd("removeFormat")}
+        >
           <RemoveFormatting size={13} />
         </button>
         {showLink && (
@@ -133,7 +158,7 @@ export const RichBody = forwardRef<RichBodyHandle, RichBodyProps>(function RichB
         aria-label="Message body"
         data-placeholder="Write your message…"
         onInput={sync}
-        className="composer-rich min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm text-black focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] dark:text-zinc-100"
+        className="composer-rich min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm text-black empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] focus:outline-none dark:text-zinc-100"
       />
     </div>
   );

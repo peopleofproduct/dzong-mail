@@ -1,11 +1,11 @@
-import { prisma } from "@unwalled/database";
+import { prisma } from "@dzong/database";
 import {
   classifyAccountMessages,
   draftAiReply,
   generateRuleFromPrompt,
   summarizeThread,
   applyAutomationRules,
-} from "@unwalled/sync-engine";
+} from "@dzong/sync-engine";
 
 async function main() {
   const user = await prisma.user.findFirstOrThrow();

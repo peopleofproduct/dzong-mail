@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { askInbox, proposeActions } from "@unwalled/sync-engine";
-import type { SemanticHit } from "@unwalled/sync-engine";
+import { askInbox, proposeActions } from "@dzong/sync-engine";
+import type { SemanticHit } from "@dzong/sync-engine";
 import { getLocalUser } from "@/lib/queries";
 import { apiGuard, badRequest } from "../_lib";
 

@@ -33,8 +33,7 @@ export function AiDecisionCard({ decision }: { decision: DecisionView }) {
       }
     });
 
-  const pct =
-    decision.confidence !== null ? Math.round(decision.confidence * 100) : null;
+  const pct = decision.confidence !== null ? Math.round(decision.confidence * 100) : null;
 
   return (
     <div className="mx-5 mb-3 flex items-start gap-2 rounded-md border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-xs dark:border-indigo-900 dark:bg-indigo-950/30">

@@ -38,7 +38,13 @@ export function Topbar() {
   useEffect(() => {
     const onWindowKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
-      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) return;
+      if (
+        el.tagName === "INPUT" ||
+        el.tagName === "TEXTAREA" ||
+        el.tagName === "SELECT" ||
+        el.isContentEditable
+      )
+        return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "/") {
         e.preventDefault();
@@ -83,6 +89,7 @@ export function Topbar() {
         <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-zinc-400" />
         <input
           ref={inputRef}
+          key={searchParams.get("q") ?? ""}
           name="q"
           type="search"
           defaultValue={searchParams.get("q") ?? ""}

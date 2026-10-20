@@ -133,7 +133,10 @@ export async function getInsights(): Promise<Insights> {
     if (names.size === 0) names.add("Uncategorized");
     for (const n of names) catMap.set(n, (catMap.get(n) ?? 0) + 1);
   }
-  const catTotal = Math.max(1, [...catMap.values()].reduce((a, b) => a + b, 0));
+  const catTotal = Math.max(
+    1,
+    [...catMap.values()].reduce((a, b) => a + b, 0),
+  );
   const categories = [...catMap.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 7)
@@ -199,9 +202,7 @@ export async function getInsights(): Promise<Insights> {
       detail: `${achievements.currentDays} day streak`,
     },
   ];
-  const healthScore = Math.round(
-    healthParts.reduce((a, p) => a + p.score * p.weight, 0),
-  );
+  const healthScore = Math.round(healthParts.reduce((a, p) => a + p.score * p.weight, 0));
 
   // Auto-insights: the patterns a person cannot see in a flat list.
   const insights: Insights["insights"] = [];

@@ -1,5 +1,5 @@
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 
 export interface UnsubscribeResult {
   ok: boolean;

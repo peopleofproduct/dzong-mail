@@ -1,8 +1,8 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
-import { semanticSearchMessages } from "@unwalled/sync-engine";
+import { semanticSearchMessages } from "@dzong/sync-engine";
 import { serializeMessage } from "@/components/mail/types";
-import type { Message, Prisma } from "@unwalled/database";
+import type { Message, Prisma } from "@dzong/database";
 
 export type MailView =
   | "inbox"
@@ -445,9 +445,7 @@ export function splitInboxGroups(
       return { title: `#${label}`, ids };
     });
     const rest = items.filter((m) => !used.has(m.id)).map((m) => m.id);
-    return [...sections, { title: "Everything else", ids: rest }].filter(
-      (s) => s.ids.length > 0,
-    );
+    return [...sections, { title: "Everything else", ids: rest }].filter((s) => s.ids.length > 0);
   }
 
   const priority: string[] = [];

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { getThread } from "@/lib/queries";
 import { prisma } from "@/lib/db";
-import { cleanEmailHtml } from "@/lib/email-html";
+import { bodyHtmlSource, cleanEmailHtml } from "@/lib/email-html";
+import { getLoadRemoteContent, getTrustedRemoteSenders } from "@/lib/settings";
 import { markMessagesRead, sendDraftNow, summarizeThreadNow } from "@/lib/actions";
 import { AiDecisionCard } from "./ai-decision-card";
 import { AiDraftButton } from "./ai-draft-button";
@@ -20,7 +21,9 @@ interface ThreadPanelProps {
 
 /** Map inline-attachment Content-IDs to attachment ids so cid: images in
  *  the body resolve to the locally stored file. */
-function cidMapFor(attachments: { id: string; contentId: string | null; storagePath: string | null }[]) {
+function cidMapFor(
+  attachments: { id: string; contentId: string | null; storagePath: string | null }[],
+) {
   const map = new Map<string, string>();
   for (const a of attachments) {
     if (a.contentId && a.storagePath) map.set(a.contentId.replace(/[<>]/g, "").trim(), a.id);
@@ -52,7 +55,9 @@ function transportDetails(headers: Record<string, string> | null) {
   return { mailedBy, signedBy, security };
 }
 
-/** Build compose params to reopen a draft for editing and sending. */
+/** Build compose params to reopen a draft for editing and sending. The body
+ *  is deliberately not in the URL — ComposerSection loads it server-side by
+ *  draftId, keeping long/rich bodies out of query strings. */
 function draftParams(
   m: {
     id: string;
@@ -74,12 +79,16 @@ function draftParams(
   if (m.ccAddresses.length) p.set("cc", m.ccAddresses.join(", "));
   if (m.bccAddresses.length) p.set("bcc", m.bccAddresses.join(", "));
   p.set("subject", m.subject ?? "");
-  if (m.bodyText) p.set("body", m.bodyText);
   if (m.threadId) p.set("threadId", m.threadId);
   return p.toString();
 }
 
 export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
+  const [loadRemote, trustedRemoteSenders] = await Promise.all([
+    getLoadRemoteContent(),
+    getTrustedRemoteSenders(),
+  ]);
+  const trustedSenders = new Set(trustedRemoteSenders.map((s) => s.toLowerCase()));
   const messages = threadId.startsWith("single-")
     ? await prisma.message.findMany({
         where: { id: threadId.slice(7) },
@@ -103,25 +112,28 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
   const first = messages[0];
   const last = messages[messages.length - 1];
 
+  // Reply targets the last message that ISN'T ours — otherwise replying to
+  // a thread we last spoke on would address the reply to ourselves.
+  const selfAddress = last.emailAccount.emailAddress.toLowerCase();
+  const replyTarget =
+    [...messages].reverse().find((m) => m.fromAddress.toLowerCase() !== selfAddress) ?? last;
+
   const replyParams = new URLSearchParams(baseParams);
   replyParams.set("compose", "reply");
   replyParams.set("accountId", last.emailAccountId);
-  replyParams.set("to", last.fromAddress);
-  replyParams.set("subject", `Re: ${(last.subject ?? "").replace(/^Re:\s*/i, "")}`);
-  if (last.threadId) replyParams.set("threadId", last.threadId);
-  const inReplyTo = (last.headers as Record<string, string> | null)?.["Message-ID"];
+  replyParams.set("to", replyTarget.fromAddress);
+  replyParams.set("subject", `Re: ${(replyTarget.subject ?? "").replace(/^Re:\s*/i, "")}`);
+  if (replyTarget.threadId) replyParams.set("threadId", replyTarget.threadId);
+  const inReplyTo = (replyTarget.headers as Record<string, string> | null)?.["Message-ID"];
   if (inReplyTo) replyParams.set("inReplyTo", inReplyTo);
 
+  // The forward body is built server-side from the original message —
+  // structured HTML when the source had it, never a raw text dump in a URL.
   const fwdParams = new URLSearchParams(baseParams);
   fwdParams.set("compose", "new");
   fwdParams.set("accountId", last.emailAccountId);
   fwdParams.set("subject", `Fwd: ${(last.subject ?? "").replace(/^Fwd?:\s*/i, "")}`);
-  fwdParams.set(
-    "body",
-    `\n\n---------- Forwarded message ---------\nFrom: ${last.fromName ?? ""} <${last.fromAddress}>\n` +
-      `Date: ${last.receivedAt.toLocaleString()}\nSubject: ${last.subject ?? ""}\n\n` +
-      (last.bodyText ?? last.snippet ?? ""),
-  );
+  fwdParams.set("fwd", last.id);
 
   // Calendar-aware planning: upcoming events involving any sender on this
   // thread - "you meet them Tuesday" context while replying.
@@ -141,8 +153,7 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
   const nextEventFor = (addr: string) =>
     upcoming.find(
       (e) =>
-        e.organizer?.toLowerCase() === addr ||
-        e.attendees.some((a) => a.toLowerCase() === addr),
+        e.organizer?.toLowerCase() === addr || e.attendees.some((a) => a.toLowerCase() === addr),
     );
 
   // Attachment dedupe: how many times each file's bytes appear anywhere
@@ -277,9 +288,7 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
               <div className="px-5 pb-4">
                 {(() => {
                   const me = m.emailAccount.emailAddress.toLowerCase();
-                  const recipients = m.toAddresses.map((a) =>
-                    a.toLowerCase() === me ? "me" : a,
-                  );
+                  const recipients = m.toAddresses.map((a) => (a.toLowerCase() === me ? "me" : a));
                   const t = transportDetails(m.headers as Record<string, string> | null);
                   return (
                     <MessageDetails
@@ -299,10 +308,23 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
                 {m.aiDecisions.map((d) => (
                   <AiDecisionCard key={d.id} decision={d} />
                 ))}
+                {/* key per message — without it React reuses the instance
+                    across threads and a clicked "Load images" would leak
+                    into the next message's privacy state. */}
                 <MessageBody
-                  html={m.bodyHtml ? cleanEmailHtml(m.bodyHtml, cidMapFor(m.attachments)) : null}
+                  key={m.id}
+                  html={(() => {
+                    // Structured source for every folder — real HTML,
+                    // markup rescued from bodyText, or generated draft HTML.
+                    const src = bodyHtmlSource(m);
+                    return src ? cleanEmailHtml(src, cidMapFor(m.attachments)) : null;
+                  })()}
                   text={m.bodyText}
                   fallback={m.snippet ?? "No content synced."}
+                  senderAddress={m.fromAddress}
+                  remoteAllowed={
+                    loadRemote || trustedSenders.has((m.fromAddress ?? "").toLowerCase())
+                  }
                 />
                 {m.attachments.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">

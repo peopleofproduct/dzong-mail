@@ -7,10 +7,10 @@ import { useSearchParams } from "next/navigation";
 import { CalendarDays, History, Inbox, PanelLeft, Settings, Sparkles } from "lucide-react";
 import { ResizeHandle, usePaneWidth } from "./resize";
 
-const EVENT = "unwalled-sidebar-change";
+const EVENT = "dzong-sidebar-change";
 
 function isCollapsed(): boolean {
-  return localStorage.getItem("unwalled-sidebar") === "collapsed";
+  return localStorage.getItem("dzong-sidebar") === "collapsed";
 }
 
 function subscribe(cb: () => void) {
@@ -40,7 +40,12 @@ const btnActive =
  */
 export function IconRail({ pending, children }: { pending: number; children: ReactNode }) {
   const collapsed = useSyncExternalStore(subscribe, isCollapsed, () => false);
-  const { width, setWidth, startDrag } = usePaneWidth("unwalled-sidebar-width", DEFAULT_WIDTH, 160, 400);
+  const { width, setWidth, startDrag } = usePaneWidth(
+    "dzong-sidebar-width",
+    DEFAULT_WIDTH,
+    160,
+    400,
+  );
   const searchParams = useSearchParams();
   const view = searchParams.get("view") ?? "inbox";
 
@@ -51,7 +56,7 @@ export function IconRail({ pending, children }: { pending: number; children: Rea
   }, [collapsed]);
 
   const toggle = () => {
-    localStorage.setItem("unwalled-sidebar", collapsed ? "" : "collapsed");
+    localStorage.setItem("dzong-sidebar", collapsed ? "" : "collapsed");
     window.dispatchEvent(new Event(EVENT));
   };
 

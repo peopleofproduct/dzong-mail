@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.6"],
   // Keep the dev-tools "N" bubble off the icon rail's settings button.
   devIndicators: { position: "bottom-right" },
-  transpilePackages: ["@unwalled/database", "@unwalled/ai-engine", "@unwalled/sync-engine"],
+  transpilePackages: ["@dzong/database", "@dzong/ai-engine", "@dzong/sync-engine"],
   experimental: {
     // Composer attachments upload through a server action (default cap is 1 MB).
     serverActions: { bodySizeLimit: "25mb" },

@@ -65,7 +65,7 @@ body {
   max-width: 100%;
 }
 
-/* Compact density - applied via the unwalled-density cookie and the
+/* Compact density - applied via the dzong-density cookie and the
    density-compact class on <html>. Tighter rows and a half-step smaller
    type scale while keeping unread/read contrast intact. */
 .density-compact .mail-row {
@@ -152,6 +152,15 @@ body {
    so it applies uniformly across list variants). */
 .mail-row {
   transition: background-color 0.12s ease-out;
+}
+
+/* Touch/coarse pointers have no hover — without this the row actions
+   (archive, snooze, read-toggle, unsubscribe) would be unreachable.
+   Unlayered rules outrank Tailwind's layered `hidden` utility. */
+@media (hover: none) {
+  .mail-row .row-actions {
+    display: flex;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

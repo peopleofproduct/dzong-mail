@@ -1,10 +1,11 @@
 import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
-import { prisma } from "@unwalled/database";
-import type { EmailAccount, PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { EmailAccount, PrismaClient } from "@dzong/database";
 import { decryptIfPresent, decryptSecret } from "./crypto";
 import { refreshGoogleAccessToken } from "./oauth/google";
 import { refreshMicrosoftAccessToken } from "./oauth/microsoft";
+import { imapClientOptions } from "./providers/imap";
 
 /**
  * Live provider verification — exercises each account's real connectivity
@@ -31,9 +32,7 @@ async function accessTokenFor(account: EmailAccount): Promise<string | null> {
       return token ?? null;
     }
     const refresh =
-      account.provider === "GOOGLE"
-        ? refreshGoogleAccessToken
-        : refreshMicrosoftAccessToken;
+      account.provider === "GOOGLE" ? refreshGoogleAccessToken : refreshMicrosoftAccessToken;
     const tokens = await refresh(
       {
         clientId: account.oauthClientId,
@@ -52,13 +51,7 @@ async function verifyImap(account: EmailAccount): Promise<string> {
   }
   const password = decryptIfPresent(account.passwordEncrypted);
   if (!password) return "missing password";
-  const client = new ImapFlow({
-    host: account.imapHost,
-    port: account.imapPort ?? 993,
-    secure: account.imapSecurity !== "STARTTLS" && account.imapSecurity !== "NONE",
-    auth: { user: account.username, pass: password },
-    logger: false,
-  });
+  const client = new ImapFlow(imapClientOptions(account, password));
   client.on("error", () => {});
   try {
     await client.connect();
@@ -73,10 +66,14 @@ async function verifyImap(account: EmailAccount): Promise<string> {
 async function verifySmtp(account: EmailAccount): Promise<string> {
   if (!account.smtpHost || !account.username) return "no SMTP configured";
   const password = decryptIfPresent(account.passwordEncrypted);
+  const security = account.smtpSecurity ?? "SSL_TLS";
   const transporter = nodemailer.createTransport({
     host: account.smtpHost,
-    port: account.smtpPort ?? 465,
-    secure: account.smtpSecurity !== "STARTTLS" && account.smtpSecurity !== "NONE",
+    port: account.smtpPort ?? (security === "SSL_TLS" ? 465 : 587),
+    secure: security === "SSL_TLS",
+    requireTLS: security === "STARTTLS",
+    ignoreTLS: security === "NONE",
+    tls: { rejectUnauthorized: !account.allowSelfSignedCerts },
     auth: { user: account.username, pass: password ?? "" },
     connectionTimeout: 10_000,
   });
@@ -104,10 +101,10 @@ export async function verifyAccount(
       case "GOOGLE": {
         const token = await accessTokenFor(account);
         if (!token) return { ...base, ok: false, detail: "no usable OAuth token" };
-        const res = await fetch(
-          "https://gmail.googleapis.com/gmail/v1/users/me/profile",
-          { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
-        );
+        const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(10_000),
+        });
         if (!res.ok) return { ...base, ok: false, detail: `Gmail profile ${res.status}` };
         const profile = (await res.json()) as { emailAddress?: string; messagesTotal?: number };
         return {
@@ -125,7 +122,11 @@ export async function verifyAccount(
         });
         if (!res.ok) return { ...base, ok: false, detail: `Graph /me ${res.status}` };
         const me = (await res.json()) as { mail?: string; userPrincipalName?: string };
-        return { ...base, ok: true, detail: `Graph ok - ${me.mail ?? me.userPrincipalName ?? "?"}` };
+        return {
+          ...base,
+          ok: true,
+          detail: `Graph ok - ${me.mail ?? me.userPrincipalName ?? "?"}`,
+        };
       }
       case "MOCK":
         return { ...base, ok: true, detail: "demo provider - always available" };

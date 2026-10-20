@@ -32,10 +32,7 @@ export function usePaneWidth(storageKey: string, defaultWidth: number, min: numb
   const width = useSyncExternalStore(store.subscribe, store.snapshot, () => defaultWidth);
 
   const setWidth = (w: number) => {
-    localStorage.setItem(
-      storageKey,
-      String(Math.min(max, Math.max(min, Math.round(w)))),
-    );
+    localStorage.setItem(storageKey, String(Math.min(max, Math.max(min, Math.round(w)))));
     window.dispatchEvent(new Event(store.event));
   };
 
@@ -68,7 +65,11 @@ interface ResizeHandleProps {
 
 /** Thin edge handle with an always-visible grip pill; drag resizes,
  *  double-click resets to the pane's default width. */
-export function ResizeHandle({ onPointerDown, onDoubleClick, visible = "md:flex" }: ResizeHandleProps) {
+export function ResizeHandle({
+  onPointerDown,
+  onDoubleClick,
+  visible = "md:flex",
+}: ResizeHandleProps) {
   return (
     <div
       role="separator"

@@ -21,7 +21,7 @@ export function ResizableListPane({
   children: ReactNode;
 }) {
   const { width, setWidth, startDrag } = usePaneWidth(
-    "unwalled-list-width",
+    "dzong-list-width",
     DEFAULT_WIDTH,
     MIN_WIDTH,
     MAX_WIDTH,

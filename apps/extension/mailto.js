@@ -1,4 +1,4 @@
-/* mailto: interception - reroute mailto: link clicks into Unwalled's
+/* mailto: interception - reroute mailto: link clicks into Dzong's
  * composer instead of whatever the OS/browser would open. Runs at
  * document_start in the capture phase so single-page apps can't swallow
  * the event first. */

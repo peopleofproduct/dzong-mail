@@ -1,8 +1,9 @@
 import { ImapFlow } from "imapflow";
-import { prisma } from "@unwalled/database";
-import type { EmailAccount } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { EmailAccount } from "@dzong/database";
 import { decryptIfPresent } from "./crypto";
 import { syncAccount } from "./engine";
+import { imapClientOptions } from "./providers/imap";
 import { runPostSync } from "./post-sync";
 
 const RECONNECT_MS = 30_000; // backoff after a dropped connection
@@ -30,13 +31,7 @@ async function idleLoop(accountId: string): Promise<void> {
       const password = decryptIfPresent(account.passwordEncrypted);
       if (!password) return;
 
-      client = new ImapFlow({
-        host: account.imapHost,
-        port: account.imapPort ?? 993,
-        secure: account.imapSecurity !== "STARTTLS" && account.imapSecurity !== "NONE",
-        auth: { user: account.username, pass: password },
-        logger: false,
-      });
+      client = new ImapFlow(imapClientOptions(account, password));
       client.on("error", () => {
         /* handled by the idle await rejecting / close below */
       });

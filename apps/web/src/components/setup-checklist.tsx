@@ -4,7 +4,7 @@ import { CheckCircle2, Circle, Download } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getAccounts, getLocalUser } from "@/lib/queries";
 import { startOllamaPull } from "@/lib/actions";
-import { OLLAMA_DEFAULT_BASE_URL } from "@unwalled/ai-engine";
+import { OLLAMA_DEFAULT_BASE_URL } from "@dzong/ai-engine";
 
 interface Check {
   label: string;
@@ -64,9 +64,7 @@ export async function SetupChecklist() {
       label: provider === "OLLAMA" ? `Chat model (${ai?.model ?? "llama3.1"})` : "AI provider key",
       done: chatReady,
       hint:
-        tags === null && ollamaUp
-          ? "Ollama isn't running - start it, then recheck."
-          : undefined,
+        tags === null && ollamaUp ? "Ollama isn't running - start it, then recheck." : undefined,
       action:
         provider === "OLLAMA" && tags !== null
           ? { model: ai?.model ?? "llama3.1" }
@@ -78,9 +76,7 @@ export async function SetupChecklist() {
       label: `Search index model (${embedModel})`,
       done: embedReady,
       hint:
-        tags === null && ollamaUp
-          ? "Ollama isn't running - start it, then recheck."
-          : undefined,
+        tags === null && ollamaUp ? "Ollama isn't running - start it, then recheck." : undefined,
       action: ollamaUp && tags !== null && !embedReady ? { model: embedModel } : undefined,
     },
     {
@@ -109,9 +105,7 @@ export async function SetupChecklist() {
               <Circle size={15} className="shrink-0 text-zinc-300 dark:text-zinc-600" />
             )}
             <span
-              className={
-                c.done ? "text-zinc-400 line-through" : "text-zinc-700 dark:text-zinc-200"
-              }
+              className={c.done ? "text-zinc-400 line-through" : "text-zinc-700 dark:text-zinc-200"}
             >
               {c.label}
             </span>

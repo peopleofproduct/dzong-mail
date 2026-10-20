@@ -1,5 +1,5 @@
-import { prisma } from "@unwalled/database";
-import type { Message, PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { Message, PrismaClient } from "@dzong/database";
 
 /**
  * Per-recipient voice/tone intelligence.
@@ -51,7 +51,12 @@ function greetingOf(text: string): string | null {
   const m = GREETING_RE.exec(line);
   if (!m) return null;
   // "hey sam, sounds good" -> "hey sam"; "hey" alone stays "hey".
-  return m[0].replace(/[\s,]+$/, "").replace(/\s*,\s*/, " ").trim() || null;
+  return (
+    m[0]
+      .replace(/[\s,]+$/, "")
+      .replace(/\s*,\s*/, " ")
+      .trim() || null
+  );
 }
 
 function signoffOf(text: string): string | null {
@@ -59,7 +64,12 @@ function signoffOf(text: string): string | null {
   const m = SIGNOFF_RE.exec(tail);
   if (!m) return null;
   const line = m[0].split("\n").find((l) => l.trim().length > 0);
-  return line?.trim().replace(/[,.!]+$/, "").slice(0, 30) || null;
+  return (
+    line
+      ?.trim()
+      .replace(/[,.!]+$/, "")
+      .slice(0, 30) || null
+  );
 }
 
 function wordCount(text: string): number {
@@ -74,11 +84,11 @@ function formalityOf(texts: string[]): "formal" | "neutral" | "casual" | null {
   if (texts.length === 0) return null;
   const joined = texts.join("\n").toLowerCase();
   let score = 0;
-  const casualMarks =
-    (joined.match(/n't|'re|'ll|'ve|'d\b|!|😀|😊|👍|🙏|lol|haha|\bhey\b/g) ?? []).length;
-  const formalMarks =
-    (joined.match(/\b(regards|sincerely|furthermore|regarding|pursuant|kindly)\b/g) ?? [])
-      .length;
+  const casualMarks = (joined.match(/n't|'re|'ll|'ve|'d\b|!|😀|😊|👍|🙏|lol|haha|\bhey\b/g) ?? [])
+    .length;
+  const formalMarks = (
+    joined.match(/\b(regards|sincerely|furthermore|regarding|pursuant|kindly)\b/g) ?? []
+  ).length;
   score += casualMarks - formalMarks * 2;
   if (score >= 3) return "casual";
   if (score <= -2) return "formal";
@@ -168,9 +178,7 @@ export async function getRecipientStyle(
   const oneWay = theirs.length >= 3 && mine.length <= Math.max(1, theirs.length * 0.1);
   const broadcastish =
     oneWay &&
-    theirs.some((m) =>
-      [...m.aiLabels, ...m.providerLabels].some((l) => BROADCAST_LABELS.has(l)),
-    );
+    theirs.some((m) => [...m.aiLabels, ...m.providerLabels].some((l) => BROADCAST_LABELS.has(l)));
   const transactional =
     oneWay &&
     theirs.some((m) =>

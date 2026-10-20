@@ -1,4 +1,4 @@
-import type { EmailAccount } from "@unwalled/database";
+import type { EmailAccount } from "@dzong/database";
 
 /** Provider-agnostic attachment: metadata plus content when the provider
  * returned it inline. Persisted to local disk by the engine. */
@@ -32,6 +32,9 @@ export interface RawMessage {
   isRead: boolean;
   isStarred: boolean;
   isDraft: boolean;
+  /** Archived state when the provider models it explicitly (Gmail INBOX
+   *  label removal, etc.). Undefined = leave the local flag untouched. */
+  isArchived?: boolean;
   providerLabels: string[];
 }
 
@@ -49,6 +52,9 @@ export interface SyncContext {
 
 export interface ProviderSyncResult {
   messages: RawMessage[];
+  /** Provider message ids deleted server-side since the last sync —
+   *  the engine removes the corresponding local rows. */
+  deletedProviderIds?: string[];
   /** Provider-specific cursor to persist on the account for the next run. */
   nextSyncToken?: string;
 }
@@ -63,5 +69,7 @@ export interface SyncOutcome {
   fetched: number;
   inserted: number;
   updated: number;
+  /** Messages deleted locally because the provider reported them removed. */
+  deleted?: number;
   nextSyncToken?: string;
 }

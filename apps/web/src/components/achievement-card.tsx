@@ -8,11 +8,7 @@ const CARD_W = 1200;
 const CARD_H = 630;
 
 /** Paint the share asset on canvas - same layout as the DOM card. */
-function paintCard(
-  ctx: CanvasRenderingContext2D,
-  stats: AchievementStats,
-  name: string,
-) {
+function paintCard(ctx: CanvasRenderingContext2D, stats: AchievementStats, name: string) {
   // Backdrop: deep zinc-to-indigo gradient with a soft radial glow.
   const bg = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
   bg.addColorStop(0, "#09090b");
@@ -44,7 +40,7 @@ function paintCard(
   // Header.
   ctx.fillStyle = "#a5b4fc";
   ctx.font = "600 26px Arial, sans-serif";
-  ctx.fillText("UNWALLED MAIL", 80, 110);
+  ctx.fillText("DZONG MAIL", 80, 110);
   ctx.fillStyle = "#fafafa";
   ctx.font = "700 56px Arial, sans-serif";
   ctx.fillText("Inbox Zero, kept.", 80, 185);
@@ -78,19 +74,13 @@ function paintCard(
   ctx.fillText("Local-first mail - my data never left my machine.", 80, 575);
   ctx.fillStyle = "#a5b4fc";
   ctx.font = "700 22px Arial, sans-serif";
-  ctx.fillText("unwalled-mail", 1000, 575);
+  ctx.fillText("dzong-mail", 1000, 575);
 }
 
 /** The visible card plus a Share button that renders the same design to a
  *  PNG - Web Share API where the platform supports files, download
  *  otherwise. */
-export function AchievementCard({
-  stats,
-  name,
-}: {
-  stats: AchievementStats;
-  name: string;
-}) {
+export function AchievementCard({ stats, name }: { stats: AchievementStats; name: string }) {
   const [sharing, setSharing] = useState(false);
 
   const renderPng = async (): Promise<Blob | null> => {
@@ -108,15 +98,15 @@ export function AchievementCard({
     try {
       const blob = await renderPng();
       if (!blob) return;
-      const file = new File([blob], "unwalled-achievements.png", { type: "image/png" });
-      const text = `Inbox zero streak: ${stats.currentDays} days running, best ${stats.longestWeeks} weeks, ${stats.totalDone} conversations done - on Unwalled Mail`;
+      const file = new File([blob], "dzong-achievements.png", { type: "image/png" });
+      const text = `Inbox zero streak: ${stats.currentDays} days running, best ${stats.longestWeeks} weeks, ${stats.totalDone} conversations done - on Dzong Mail`;
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: "My inbox achievements", text });
       } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "unwalled-achievements.png";
+        a.download = "dzong-achievements.png";
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -157,9 +147,7 @@ export function AchievementCard({
           className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-indigo-500/25 blur-3xl"
         />
         <div className="relative">
-          <p className="text-xs font-semibold tracking-widest text-indigo-300">
-            UNWALLED MAIL
-          </p>
+          <p className="text-xs font-semibold tracking-widest text-indigo-300">DZONG MAIL</p>
           <p className="mt-2 flex items-center gap-2 text-3xl font-bold tracking-tight">
             <Trophy size={26} className="text-indigo-300" />
             Inbox Zero, kept.
@@ -184,9 +172,8 @@ export function AchievementCard({
             Local-first mail - data never leaves the machine.
           </p>
           <p className="mt-1 text-[10px] text-zinc-600">
-            Streaks count forward from when you started using Unwalled - there is no
-            historical record of past clear-inbox days to backfill, so early numbers are
-            honest ones.
+            Streaks count forward from when you started using Dzong - there is no historical
+            record of past clear-inbox days to backfill, so early numbers are honest ones.
           </p>
         </div>
       </div>

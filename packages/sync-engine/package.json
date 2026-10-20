@@ -1,5 +1,5 @@
 {
-  "name": "@unwalled/sync-engine",
+  "name": "@dzong/sync-engine",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@unwalled/ai-engine": "*",
-    "@unwalled/database": "*",
+    "@dzong/ai-engine": "*",
+    "@dzong/database": "*",
     "imapflow": "^1.0.180",
     "mailparser": "^3.7.2",
     "nodemailer": "^6.9.16"

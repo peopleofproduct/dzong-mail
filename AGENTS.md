@@ -1,4 +1,4 @@
-# Unwalled Mail
+# Dzong Mail
 
 Open-source, local-first AI email platform. All data lives on the user's own
 machine — PostgreSQL for metadata, local disk for message bodies, Ollama or
@@ -9,13 +9,13 @@ BYOK cloud keys for inference.
 npm workspaces orchestrated by Turborepo:
 
 - `apps/web` — Next.js 16 dashboard (App Router, TypeScript, Tailwind CSS 4,
-  Turbopack). Imports workspace packages via `@unwalled/*`.
-- `packages/database` — `@unwalled/database`. Prisma schema, generated client,
-  and shared `prisma` singleton (import `{ prisma }` from `@unwalled/database`).
-- `packages/ai-engine` — `@unwalled/ai-engine`. Provider abstraction
+  Turbopack). Imports workspace packages via `@dzong/*`.
+- `packages/database` — `@dzong/database`. Prisma schema, generated client,
+  and shared `prisma` singleton (import `{ prisma }` from `@dzong/database`).
+- `packages/ai-engine` — `@dzong/ai-engine`. Provider abstraction
   (`AIProvider` interface) routing completions/embeddings/classification to
   Ollama (local, default `http://localhost:11434`) or OpenAI/Anthropic stubs.
-- `packages/sync-engine` — `@unwalled/sync-engine`. `MailSyncProvider`
+- `packages/sync-engine` — `@dzong/sync-engine`. `MailSyncProvider`
   strategies (IMAP via imapflow/mailparser, Gmail history API, Graph delta,
   deterministic Mock), OAuth helpers for Google/Microsoft BYOK flows,
   AES-256-GCM secret encryption, `syncAccount`/`syncAllAccounts` orchestrator
@@ -61,7 +61,7 @@ provider: Ollama (`ollama serve`) with a pulled model (e.g.
 degrades gracefully when AI is off.
 
 Secrets at rest are AES-256-GCM encrypted with a key derived from
-`UNWALLED_SECRET_KEY`; a built-in dev key is used when unset (a warning is
+`DZONG_SECRET_KEY`; a built-in dev key is used when unset (a warning is
 logged). Set it before storing real credentials.
 
 OAuth flows: connect forms store BYOK client credentials, then server actions

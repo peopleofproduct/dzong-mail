@@ -1,15 +1,9 @@
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 import { draftAiReply } from "./drafts";
 
-async function readSetting<T>(
-  db: PrismaClient,
-  key: string,
-  fallback: T,
-): Promise<T> {
-  const row = await db.appSetting
-    .findUnique({ where: { key } })
-    .catch(() => null);
+async function readSetting<T>(db: PrismaClient, key: string, fallback: T): Promise<T> {
+  const row = await db.appSetting.findUnique({ where: { key } }).catch(() => null);
   return row !== null && row.value !== null ? (row.value as T) : fallback;
 }
 
@@ -57,11 +51,14 @@ export async function notifyNewMail(
     where: { id: accountId },
     select: { displayName: true, emailAddress: true },
   });
-  await emit({
-    kind: "new-mail",
-    title: `${inserted} new message${inserted === 1 ? "" : "s"}`,
-    body: account?.displayName ?? account?.emailAddress ?? "inbox",
-  }, db);
+  await emit(
+    {
+      kind: "new-mail",
+      title: `${inserted} new message${inserted === 1 ? "" : "s"}`,
+      body: account?.displayName ?? account?.emailAddress ?? "inbox",
+    },
+    db,
+  );
 }
 
 const dayKey = (d: Date) => d.toLocaleDateString("sv-SE");
@@ -170,14 +167,17 @@ export async function checkFollowUpReminders(
     if (!own.has(m.fromAddress.toLowerCase())) continue; // they replied since
     if (m.receivedAt >= cutoff) continue;
     const ageDays = Math.floor((Date.now() - m.receivedAt.getTime()) / 86400000);
-    await emit({
-      kind: "follow-up",
-      title: `No reply in ${ageDays} days`,
-      body: m.subject ?? "(no subject)",
-      messageId: m.id,
-      threadId: m.threadId,
-      dedupeKey: `followup:${m.threadId}:${dayKey(new Date())}`,
-    }, db);
+    await emit(
+      {
+        kind: "follow-up",
+        title: `No reply in ${ageDays} days`,
+        body: m.subject ?? "(no subject)",
+        messageId: m.id,
+        threadId: m.threadId,
+        dedupeKey: `followup:${m.threadId}:${dayKey(new Date())}`,
+      },
+      db,
+    );
     nudged++;
 
     // Auto follow-up: draft (or queue) exactly one nudge per thread, ever.

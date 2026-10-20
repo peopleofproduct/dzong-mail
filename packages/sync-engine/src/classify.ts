@@ -1,5 +1,5 @@
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 import { DEFAULT_AI_LABELS, resolveAIForAccount } from "./ai";
 
 export { DEFAULT_AI_LABELS };
@@ -40,8 +40,7 @@ export async function classifyAccountMessages(
   const thresholdRow = await db.appSetting.findUnique({
     where: { key: "aiConfidenceThreshold" },
   });
-  const threshold =
-    typeof thresholdRow?.value === "number" ? thresholdRow.value : 0.65;
+  const threshold = typeof thresholdRow?.value === "number" ? thresholdRow.value : 0.65;
 
   const pending = await db.message.findMany({
     where: { emailAccountId: accountId, aiLabels: { isEmpty: true }, isDraft: false },

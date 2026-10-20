@@ -1,6 +1,6 @@
 import { basename } from "node:path";
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 import { syncAllAccounts } from "./engine";
 import { startIdleWatchers } from "./idle";
 import { runPostSync } from "./post-sync";
@@ -98,7 +98,7 @@ export async function runSyncCycle(db: PrismaClient = prisma): Promise<void> {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main(): Promise<void> {
-  // The web app gets UNWALLED_SECRET_KEY from Next's .env.local loader; the
+  // The web app gets DZONG_SECRET_KEY from Next's .env.local loader; the
   // worker must load the same file or it can't decrypt stored credentials.
   for (const p of ["apps/web/.env.local", "../../apps/web/.env.local"]) {
     try {

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Unwalled Mail Companion",
+  "name": "Dzong Mail Companion",
   "version": "0.1.0",
-  "description": "Unread badge, new-mail notifications, mailto handling, and one-click 'email this page' for your local Unwalled Mail instance.",
+  "description": "Unread badge, new-mail notifications, mailto handling, and one-click 'email this page' for your local Dzong Mail instance.",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -15,7 +15,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Unwalled Mail",
+    "default_title": "Dzong Mail",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",

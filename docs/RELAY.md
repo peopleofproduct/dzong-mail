@@ -1,7 +1,7 @@
 # The Relay — design for the optional sync/push service
 
 _Status: design only. Nothing in this document is built or required to run
-Unwalled Mail. The local product is complete without it._
+Dzong Mail. The local product is complete without it._
 
 This document describes the one thing local-first email genuinely cannot do
 alone — be reachable when your laptop is asleep — and how we intend to do it
@@ -19,7 +19,7 @@ consider basic:
    when it wakes.
 
 Every competitor solves this by hosting your mail. That is precisely what
-Unwalled exists to avoid. So the relay is designed around a single constraint:
+Dzong exists to avoid. So the relay is designed around a single constraint:
 
 > **The relay moves ciphertext, never plaintext. We can operate it and still
 > be unable to read what passes through it.**

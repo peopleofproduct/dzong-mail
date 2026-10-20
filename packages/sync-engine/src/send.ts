@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
-import { prisma } from "@unwalled/database";
-import type { EmailAccount, PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { EmailAccount, PrismaClient } from "@dzong/database";
 import nodemailer from "nodemailer";
 import MailComposer from "nodemailer/lib/mail-composer";
 import { decryptIfPresent } from "./crypto";
 import { attachmentFilePath, storeAttachmentContent } from "./attachments";
+import { textToHtml } from "./text-html";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GRAPH_API = "https://graph.microsoft.com/v1.0";
@@ -31,6 +32,9 @@ export interface SendInput {
   scheduledAt?: Date;
   /** Ask the recipient's client for an MDN read receipt (honored at their discretion). */
   requestReceipt?: boolean;
+  /** RFC 5322 Message-ID to stamp on the outgoing message. Generated in
+   *  sendEmail when absent so every send has a stable, real identifier. */
+  internetMessageId?: string;
 }
 
 export interface SendResult {
@@ -53,6 +57,12 @@ function formattedFrom(account: EmailAccount): string {
   return name ? `"${name}" <${account.emailAddress}>` : account.emailAddress;
 }
 
+/** RFC 5322 Message-ID minted under the sender's own domain. */
+function generateMessageId(fromAddress: string): string {
+  const domain = fromAddress.split("@")[1]?.trim() || "dzong.local";
+  return `<${crypto.randomUUID()}@${domain}>`;
+}
+
 /** Raw RFC 822 source for the Gmail API. MailComposer handles attachment
  *  parts and header encoding correctly; the hand-rolled builder did neither. */
 function buildMime(from: string, input: SendInput): Promise<Buffer> {
@@ -64,6 +74,7 @@ function buildMime(from: string, input: SendInput): Promise<Buffer> {
     subject: input.subject,
     text: input.bodyText,
     html: input.bodyHtml,
+    messageId: input.internetMessageId,
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
     headers: input.requestReceipt
@@ -103,6 +114,9 @@ async function recordSent(
       bccAddresses: input.bcc ?? [],
       bodyText: input.bodyText,
       bodyHtml: input.bodyHtml,
+      // Every recorded send carries a real RFC Message-ID so exports and
+      // reply threading have a stable identifier.
+      headers: input.internetMessageId ? { "Message-ID": input.internetMessageId } : undefined,
       receivedAt: new Date(),
       isRead: true,
       isDraft: Boolean(input.scheduledAt),
@@ -150,10 +164,22 @@ async function deliverViaSmtp(
   if (!account.smtpHost || !account.username || !password) {
     throw new Error(`SMTP account ${account.id} is missing host, username, or password`);
   }
+  const security = account.smtpSecurity ?? "SSL_TLS";
+  if (security === "NONE") {
+    console.warn(
+      `[send] ${account.emailAddress}: SMTP security is NONE — credentials ` +
+        "travel unencrypted. Only use this for localhost bridges.",
+    );
+  }
   const transporter = nodemailer.createTransport({
     host: account.smtpHost,
-    port: account.smtpPort ?? 465,
-    secure: account.smtpSecurity !== "STARTTLS" && account.smtpSecurity !== "NONE",
+    port: account.smtpPort ?? (security === "SSL_TLS" ? 465 : 587),
+    secure: security === "SSL_TLS",
+    // requireTLS fails the send when the server won't upgrade — no silent
+    // plaintext credential downgrade. ignoreTLS makes NONE explicit.
+    requireTLS: security === "STARTTLS",
+    ignoreTLS: security === "NONE",
+    tls: { rejectUnauthorized: !account.allowSelfSignedCerts },
     auth: { user: account.username, pass: password },
   });
   const info = await transporter.sendMail({
@@ -164,6 +190,7 @@ async function deliverViaSmtp(
     subject: input.subject,
     text: input.bodyText,
     html: input.bodyHtml,
+    messageId: input.internetMessageId,
     inReplyTo: input.inReplyToHeader,
     references: input.inReplyToHeader,
     headers: input.requestReceipt
@@ -226,47 +253,89 @@ async function sendViaGmail(
   return { providerMessageId: data.id, messageRowId, scheduled: false };
 }
 
+/**
+ * Graph send: create a draft then send it. sendMail returns 202 with no body,
+ * which used to leave us recording a local `graph-sent-<uuid>` placeholder —
+ * the next delta sync then delivered the real sent copy and Sent showed every
+ * message twice. The created draft's id is stable across the Drafts → Sent
+ * move, so recording it makes the sync-side dedupe work.
+ */
 async function deliverViaGraph(
   account: EmailAccount,
   input: SendInput,
   accessToken: string,
-): Promise<string> {
+): Promise<{ id: string; conversationId?: string; internetMessageId?: string }> {
+  const auth = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
   const toRecipient = (address: string) => ({ emailAddress: { address } });
-  const res = await fetch(`${GRAPH_API}/me/sendMail`, {
+
+  const internetMessageHeaders = [
+    // In-Reply-To/References keep replies inside the original conversation
+    // for recipients on Outlook and elsewhere.
+    ...(input.inReplyToHeader
+      ? [
+          { name: "In-Reply-To", value: input.inReplyToHeader },
+          { name: "References", value: input.inReplyToHeader },
+        ]
+      : []),
+    ...(input.requestReceipt
+      ? [
+          { name: "Disposition-Notification-To", value: formattedFrom(account) },
+          { name: "Return-Receipt-To", value: formattedFrom(account) },
+        ]
+      : []),
+  ];
+
+  const createRes = await fetch(`${GRAPH_API}/me/messages`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: auth,
     body: JSON.stringify({
-      message: {
-        subject: input.subject,
-        body: {
-          contentType: input.bodyHtml ? "HTML" : "Text",
-          content: input.bodyHtml ?? input.bodyText,
-        },
-        toRecipients: input.to.map(toRecipient),
-        ccRecipients: (input.cc ?? []).map(toRecipient),
-        bccRecipients: (input.bcc ?? []).map(toRecipient),
-        internetMessageHeaders: input.requestReceipt
-          ? [
-              { name: "Disposition-Notification-To", value: formattedFrom(account) },
-              { name: "Return-Receipt-To", value: formattedFrom(account) },
-            ]
-          : undefined,
-        attachments: (input.attachments ?? []).map((a) => ({
-          "@odata.type": "#microsoft.graph.fileAttachment",
-          name: a.filename,
-          contentType: a.contentType,
-          contentBytes: a.content.toString("base64"),
-        })),
+      subject: input.subject,
+      body: {
+        contentType: input.bodyHtml ? "HTML" : "Text",
+        content: input.bodyHtml ?? input.bodyText,
       },
-      saveToSentItems: true,
+      toRecipients: input.to.map(toRecipient),
+      ccRecipients: (input.cc ?? []).map(toRecipient),
+      bccRecipients: (input.bcc ?? []).map(toRecipient),
+      internetMessageHeaders: internetMessageHeaders.length ? internetMessageHeaders : undefined,
+      attachments: (input.attachments ?? []).map((a) => ({
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        name: a.filename,
+        contentType: a.contentType,
+        contentBytes: a.content.toString("base64"),
+      })),
     }),
   });
-  if (!res.ok) throw new Error(`Graph sendMail failed: ${res.status} ${await res.text()}`);
-  // sendMail returns 202 with no body; the sent copy arrives via next delta sync.
-  return `graph-sent-${crypto.randomUUID()}`;
+  if (!createRes.ok) {
+    throw new Error(`Graph draft create failed: ${createRes.status} ${await createRes.text()}`);
+  }
+  const draft = (await createRes.json()) as { id: string };
+
+  const sendRes = await fetch(`${GRAPH_API}/me/messages/${encodeURIComponent(draft.id)}/send`, {
+    method: "POST",
+    headers: { Authorization: auth.Authorization },
+  });
+  if (!sendRes.ok) {
+    // Clean up the orphaned draft so a failed send doesn't linger in Drafts.
+    await fetch(`${GRAPH_API}/me/messages/${encodeURIComponent(draft.id)}`, {
+      method: "DELETE",
+      headers: { Authorization: auth.Authorization },
+    }).catch(() => {});
+    throw new Error(`Graph send failed: ${sendRes.status} ${await sendRes.text()}`);
+  }
+
+  // Grab the real RFC Message-ID + conversationId for export fidelity and
+  // thread grouping; best-effort — the send already succeeded.
+  let meta: { internetMessageId?: string; conversationId?: string } = {};
+  const metaRes = await fetch(
+    `${GRAPH_API}/me/messages/${encodeURIComponent(draft.id)}?$select=internetMessageId,conversationId`,
+    { headers: { Authorization: auth.Authorization } },
+  );
+  if (metaRes.ok) meta = (await metaRes.json()) as typeof meta;
+  return { id: draft.id, ...meta };
 }
 
 async function sendViaGraph(
@@ -275,9 +344,18 @@ async function sendViaGraph(
   input: SendInput,
   accessToken: string,
 ): Promise<SendResult> {
-  const providerMessageId = await deliverViaGraph(account, input, accessToken);
-  const messageRowId = await recordSent(db, account, input, providerMessageId);
-  return { providerMessageId, messageRowId, scheduled: false };
+  const sent = await deliverViaGraph(account, input, accessToken);
+  const messageRowId = await recordSent(
+    db,
+    account,
+    {
+      ...input,
+      threadId: input.threadId ?? sent.conversationId,
+      internetMessageId: sent.internetMessageId ?? input.internetMessageId,
+    },
+    sent.id,
+  );
+  return { providerMessageId: sent.id, messageRowId, scheduled: false };
 }
 
 /** Deliver a SendInput through the account's provider; returns the provider message id. */
@@ -305,7 +383,8 @@ async function deliver(
     case "MICROSOFT": {
       const token = decryptIfPresent(account.oauthAccessToken);
       if (!token) throw new Error(`Account ${account.id} has no access token — reconnect`);
-      return { providerMessageId: await deliverViaGraph(account, input, token) };
+      const sent = await deliverViaGraph(account, input, token);
+      return { providerMessageId: sent.id, threadId: sent.conversationId };
     }
     case "IMPORTED":
       throw new Error("Imported accounts cannot send mail");
@@ -352,10 +431,14 @@ export async function dispatchScheduledDraft(
     bcc: message.bccAddresses,
     subject: message.subject ?? "",
     bodyText: message.bodyText ?? message.snippet ?? "",
-    bodyHtml: message.bodyHtml ?? undefined,
+    bodyHtml: message.bodyHtml ?? (message.bodyText ? textToHtml(message.bodyText) : undefined),
     attachments: attachments.length ? attachments : undefined,
     threadId: message.threadId ?? undefined,
     requestReceipt: message.receiptRequested,
+    // The draft row stored the Message-ID minted at save time — reuse it so
+    // the delivered message keeps the identifier it was scheduled with.
+    internetMessageId:
+      (message.headers as Record<string, string> | null)?.["Message-ID"] ?? undefined,
   };
 
   const { providerMessageId, threadId } = await deliver(message.emailAccount, input);
@@ -384,6 +467,12 @@ export async function sendEmail(
   db: PrismaClient = prisma,
 ): Promise<SendResult> {
   const account = await db.emailAccount.findUniqueOrThrow({ where: { id: accountId } });
+
+  // Every send gets a stable RFC Message-ID and a rich body before it leaves —
+  // text-only callers get a structured HTML alternative so recipients and the
+  // Sent preview both see formatted mail.
+  input.internetMessageId ??= generateMessageId(account.emailAddress);
+  input.bodyHtml ??= input.bodyText ? textToHtml(input.bodyText) : undefined;
 
   if (input.scheduledAt || account.provider === "MOCK") {
     return sendViaMock(db, account, input);

@@ -24,7 +24,7 @@ export function PwaRegistrar() {
     () =>
       /iPhone|iPad|iPod/.test(navigator.userAgent) &&
       !window.matchMedia("(display-mode: standalone)").matches &&
-      localStorage.getItem("unwalled-install-dismissed") !== "1",
+      localStorage.getItem("dzong-install-dismissed") !== "1",
     () => false,
   );
   const iosHint = iosEligible && !dismissed;
@@ -35,7 +35,7 @@ export function PwaRegistrar() {
     }
     const onPrompt = (e: Event) => {
       e.preventDefault();
-      if (localStorage.getItem("unwalled-install-dismissed") !== "1") {
+      if (localStorage.getItem("dzong-install-dismissed") !== "1") {
         setInstallEvt(e as BeforeInstallPromptEvent);
       }
     };
@@ -44,7 +44,7 @@ export function PwaRegistrar() {
   }, []);
 
   const dismiss = () => {
-    localStorage.setItem("unwalled-install-dismissed", "1");
+    localStorage.setItem("dzong-install-dismissed", "1");
     setDismissed(true);
   };
 
@@ -73,7 +73,7 @@ export function PwaRegistrar() {
     <div className="anim-rise fixed bottom-4 left-4 z-40 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-3.5 py-2.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
       <Download size={15} className="text-indigo-500" />
       <span className="text-xs text-zinc-600 dark:text-zinc-300">
-        Install Unwalled Mail as an app
+        Install Dzong Mail as an app
       </span>
       <button
         type="button"

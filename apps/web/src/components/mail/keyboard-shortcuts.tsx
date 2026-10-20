@@ -41,7 +41,13 @@ const HELP: Array<{ keys: string; action: string }> = [
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
-  return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+  return (
+    !!el &&
+    (el.tagName === "INPUT" ||
+      el.tagName === "TEXTAREA" ||
+      el.tagName === "SELECT" ||
+      el.isContentEditable)
+  );
 }
 
 export function KeyboardShortcuts() {
@@ -52,6 +58,11 @@ export function KeyboardShortcuts() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // The help dialog swallows keys while open; Escape dismisses it.
+      if (helpOpen) {
+        if (e.key === "Escape" || e.key === "?") setHelpOpen(false);
+        return;
+      }
       if (e.key === "?" && !isTyping(e.target)) {
         e.preventDefault();
         setHelpOpen((o) => !o);
@@ -93,12 +104,15 @@ export function KeyboardShortcuts() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [router, searchParams]);
+  }, [router, searchParams, helpOpen]);
 
   if (!helpOpen) return null;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
       onClick={() => setHelpOpen(false)}
     >
       <div

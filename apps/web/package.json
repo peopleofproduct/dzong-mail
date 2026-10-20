@@ -1,5 +1,5 @@
 {
-  "name": "@unwalled/web",
+  "name": "@dzong/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@unwalled/ai-engine": "*",
-    "@unwalled/database": "*",
-    "@unwalled/sync-engine": "*",
+    "@dzong/ai-engine": "*",
+    "@dzong/database": "*",
+    "@dzong/sync-engine": "*",
     "cmdk": "^1.1.1",
     "lucide-react": "^1.59.0",
     "next": "16.4.2",

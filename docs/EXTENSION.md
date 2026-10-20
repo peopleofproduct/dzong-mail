@@ -1,4 +1,4 @@
-# Browser extension - Unwalled Mail Companion
+# Browser extension - Dzong Mail Companion
 
 A Manifest V3 extension that makes the local app feel always-on. It talks
 only to your own machine - every call goes to `localhost`, nothing is
@@ -10,7 +10,7 @@ proxied or relayed.
   worker polls `/api/v1/notifications` (default: every minute) so you
   see new mail even when the app tab is closed - the one thing a PWA
   service worker can't do.
-- **mailto: interception.** Email links on any page open the Unwalled
+- **mailto: interception.** Email links on any page open the Dzong
   composer with `to`/`cc`/`bcc`/`subject`/`body` prefilled, instead of
   launching the OS default. Toggleable.
 - **Email this page / this link.** Right-click or the toolbar popup
@@ -49,7 +49,7 @@ code, documented localhost-only host access).
 - The app's `src/proxy.ts` answers CORS only for `*-extension://`
   origins - a scheme websites cannot forge, so no web page can read
   your local API through the browser.
-- If you set `UNWALLED_API_TOKEN` in `apps/web/.env.local`, paste the
+- If you set `DZONG_API_TOKEN` in `apps/web/.env.local`, paste the
   same token in the extension's options; it is sent as a Bearer token.
 - The extension stores no mail content - only your settings and the
   ID of the newest notification it has already toasted.

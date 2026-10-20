@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { listRoutines } from "@unwalled/sync-engine";
+import { listRoutines } from "@dzong/sync-engine";
 import { deleteRoutineNow } from "@/lib/actions";
 
 function cadenceLabel(everyHours: number, hour?: number): string {
@@ -18,9 +18,8 @@ export async function RoutinesSection() {
         Routines
       </h2>
       <p className="text-xs text-zinc-400">
-        Recurring assistant jobs created from chat - &quot;every morning, summarize
-        overnight mail&quot;. Each run lands as a notification. Managed entirely on
-        this machine.
+        Recurring assistant jobs created from chat - &quot;every morning, summarize overnight
+        mail&quot;. Each run lands as a notification. Managed entirely on this machine.
       </p>
 
       {routines.length === 0 ? (

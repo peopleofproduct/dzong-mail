@@ -1,6 +1,6 @@
 import { simpleParser } from "mailparser";
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 import type { RawMessage } from "./types";
 
 /**
@@ -9,7 +9,7 @@ import type { RawMessage } from "./types";
  * bulk-removed by deleting one account row.
  */
 
-const IMPORT_ADDRESS = "imported@unwalled.local";
+const IMPORT_ADDRESS = "imported@dzong.local";
 
 export async function getOrCreateImportAccount(db: PrismaClient = prisma) {
   const user = await db.user.findFirstOrThrow();
@@ -119,29 +119,31 @@ export async function importMailFiles(
         skipped++;
         continue;
       }
-      const created = await db.message.create({
-        data: {
-          emailAccountId: account.id,
-          providerMessageId: msg.providerMessageId,
-          threadId: msg.threadId,
-          folder: msg.folder,
-          subject: msg.subject,
-          snippet: msg.snippet,
-          fromAddress: msg.fromAddress,
-          fromName: msg.fromName,
-          toAddresses: msg.toAddresses,
-          ccAddresses: msg.ccAddresses,
-          bccAddresses: msg.bccAddresses,
-          headers: msg.headers,
-          bodyText: msg.bodyText,
-          bodyHtml: msg.bodyHtml,
-          sizeBytes: msg.sizeBytes,
-          receivedAt: msg.receivedAt,
-          isRead: msg.isRead,
-          isDraft: msg.isDraft,
-          providerLabels: msg.providerLabels,
-        },
-      }).catch(() => null); // unique(providerMessageId) — re-imports skip
+      const created = await db.message
+        .create({
+          data: {
+            emailAccountId: account.id,
+            providerMessageId: msg.providerMessageId,
+            threadId: msg.threadId,
+            folder: msg.folder,
+            subject: msg.subject,
+            snippet: msg.snippet,
+            fromAddress: msg.fromAddress,
+            fromName: msg.fromName,
+            toAddresses: msg.toAddresses,
+            ccAddresses: msg.ccAddresses,
+            bccAddresses: msg.bccAddresses,
+            headers: msg.headers,
+            bodyText: msg.bodyText,
+            bodyHtml: msg.bodyHtml,
+            sizeBytes: msg.sizeBytes,
+            receivedAt: msg.receivedAt,
+            isRead: msg.isRead,
+            isDraft: msg.isDraft,
+            providerLabels: msg.providerLabels,
+          },
+        })
+        .catch(() => null); // unique(providerMessageId) — re-imports skip
       if (!created) {
         skipped++;
         continue;

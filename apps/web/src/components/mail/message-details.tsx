@@ -67,11 +67,14 @@ export function MessageDetails({ to, details }: { to: string; details: MessageDe
         className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
       >
         to {to}
-        <ChevronDown size={12} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+        <ChevronDown
+          size={12}
+          className={open ? "rotate-180 transition-transform" : "transition-transform"}
+        />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-[26rem] max-w-[85vw] rounded-lg border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="absolute top-full left-0 z-30 mt-1 w-[26rem] max-w-[85vw] rounded-lg border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
           <dl className="space-y-1.5">
             {rows.map(([label, value]) =>
               value ? (

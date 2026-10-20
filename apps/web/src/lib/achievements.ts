@@ -1,4 +1,4 @@
-import type { Prisma } from "@unwalled/database";
+import type { Prisma } from "@dzong/database";
 import { prisma } from "@/lib/db";
 
 export interface AchievementStats {
@@ -81,8 +81,7 @@ export async function getAchievementStats(): Promise<AchievementStats> {
     dayKey(new Date()),
   );
   const threads = new Set(done.map((m) => m.threadId ?? m.id));
-  const inboxClear =
-    (await prisma.message.count({ where: inboxWhere() })) === 0;
+  const inboxClear = (await prisma.message.count({ where: inboxWhere() })) === 0;
   return {
     currentDays: current,
     longestDays: longest,

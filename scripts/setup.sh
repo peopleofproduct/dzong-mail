@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unwalled Mail — one-command local setup.
+# Dzong Mail — one-command local setup.
 # Checks prerequisites (installing what's missing on macOS/Debian),
 # creates the database, applies migrations, seeds a demo inbox,
 # and pulls the local AI models.
@@ -41,7 +41,7 @@ if ! have psql && ! have pg_isready; then
     sudo systemctl enable --now postgresql
   else
     die "PostgreSQL not found. Install it (https://postgresql.org/download) or use Docker:
-       docker run -d --name unwalled-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=unwalled_mail -p 5432:5432 postgres:17"
+       docker run -d --name dzong-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=dzong_mail -p 5432:5432 postgres:17"
   fi
 fi
 
@@ -56,11 +56,11 @@ for i in $(seq 1 15); do
 done
 
 # Create the database + a postgres superuser for the default URL if missing.
-psql -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='unwalled_mail'" \
-  | grep -q 1 || psql -d postgres -c "CREATE DATABASE unwalled_mail" >/dev/null
+psql -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='dzong_mail'" \
+  | grep -q 1 || psql -d postgres -c "CREATE DATABASE dzong_mail" >/dev/null
 psql -d postgres -tc "SELECT 1 FROM pg_roles WHERE rolname='postgres'" \
   | grep -q 1 || psql -d postgres -c "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD 'postgres'" >/dev/null
-echo "   postgres + unwalled_mail ✓"
+echo "   postgres + dzong_mail ✓"
 
 # Optional: pgvector accelerates semantic search at large mailbox sizes.
 # Everything works without it (in-process cosine fallback); failures here
@@ -73,7 +73,7 @@ elif have apt-get && ! dpkg -l | grep -q postgresql-.*-pgvector; then
   sudo apt-get install -y "$(apt-cache search '^postgresql-[0-9]+-pgvector$' | head -1 | cut -d' ' -f1)" >/dev/null 2>&1 \
     || true
 fi
-psql -d unwalled_mail -c "CREATE EXTENSION IF NOT EXISTS vector" >/dev/null 2>&1 \
+psql -d dzong_mail -c "CREATE EXTENSION IF NOT EXISTS vector" >/dev/null 2>&1 \
   && echo "   pgvector extension enabled (fast semantic index)" \
   || true
 
@@ -84,8 +84,8 @@ if [ ! -f packages/database/.env ]; then
   echo "   wrote packages/database/.env"
 fi
 if [ ! -f apps/web/.env.local ]; then
-  echo "UNWALLED_SECRET_KEY=$(openssl rand -hex 32)" > apps/web/.env.local
-  echo "   generated UNWALLED_SECRET_KEY in apps/web/.env.local"
+  echo "DZONG_SECRET_KEY=$(openssl rand -hex 32)" > apps/web/.env.local
+  echo "   generated DZONG_SECRET_KEY in apps/web/.env.local"
 fi
 
 # ─── 4. Dependencies, migrate, seed ──────────────────────────────────────────
@@ -128,7 +128,7 @@ fi
 
 cat <<'DONE'
 
-  ✅  Unwalled Mail is set up.
+  ✅  Dzong Mail is set up.
 
     npm run dev       → open http://localhost:3000
     npm run worker    → (second terminal) scheduled sends + auto-sync

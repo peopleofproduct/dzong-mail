@@ -1,5 +1,5 @@
 {
-  "name": "@unwalled/mcp-server",
+  "name": "@dzong/mcp-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     }
   },
   "bin": {
-    "unwalled-mcp": "./src/index.ts"
+    "dzong-mcp": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

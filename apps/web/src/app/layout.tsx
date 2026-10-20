@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Unwalled Mail",
+  title: "Dzong Mail",
   description: "Open-source, local-first AI email client. Your data stays on your machine.",
 };
 
@@ -25,11 +25,11 @@ export const viewport: Viewport = {
 const themeInit = `
 (function () {
   try {
-    var pref = localStorage.getItem("unwalled-theme") || "system";
+    var pref = localStorage.getItem("dzong-theme") || "system";
     var dark = pref === "dark" || (pref === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
-    var density = (document.cookie.match(/(?:^|;\s*)unwalled-density=(\w+)/) || [])[1];
+    var density = (document.cookie.match(/(?:^|;\s*)dzong-density=(\w+)/) || [])[1];
     document.documentElement.classList.toggle("density-compact", density === "compact");
   } catch (e) {}
 })();

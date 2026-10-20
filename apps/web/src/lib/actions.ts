@@ -22,19 +22,32 @@ import {
   sendEmail,
   createDraftRow,
   summarizeThread,
+  textToHtml,
   syncAccount,
+  runPostSync,
   unsubscribeMessage,
   unsubscribeSender,
   importMailFiles,
   verifyAccount,
-} from "@unwalled/sync-engine";
-import type { GeneratedRule, RuleAction, RuleCondition, SendAttachment } from "@unwalled/sync-engine";
-import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@unwalled/sync-engine";
+} from "@dzong/sync-engine";
+import type {
+  GeneratedRule,
+  RuleAction,
+  RuleCondition,
+  SendAttachment,
+} from "@dzong/sync-engine";
+import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@dzong/sync-engine";
+import { cleanEmailHtml } from "@/lib/email-html";
 import { snapshotInboxZero } from "@/lib/achievements";
-import { getRequestReadReceipts, getUndoSendSeconds, setSetting } from "@/lib/settings";
-import type { Prisma } from "@unwalled/database";
+import {
+  getRequestReadReceipts,
+  getTrustedRemoteSenders,
+  getUndoSendSeconds,
+  setSetting,
+} from "@/lib/settings";
+import type { Prisma } from "@dzong/database";
 
-const DEMO_USER_EMAIL = "me@unwalled.local";
+const DEMO_USER_EMAIL = "me@dzong.local";
 
 async function getOrCreateLocalUser() {
   return prisma.user.upsert({
@@ -62,18 +75,22 @@ export async function connectMockAccount() {
   const user = await getOrCreateLocalUser();
   const account = await prisma.emailAccount.upsert({
     where: {
-      userId_emailAddress: { userId: user.id, emailAddress: "demo@unwalled.local" },
+      userId_emailAddress: { userId: user.id, emailAddress: "demo@dzong.local" },
     },
     update: {},
     create: {
       userId: user.id,
       provider: "MOCK",
-      emailAddress: "demo@unwalled.local",
+      emailAddress: "demo@dzong.local",
       displayName: "Demo Inbox",
     },
   });
   try {
-    await syncAccount(account.id);
+    const outcome = await syncAccount(account.id);
+    // Same post-sync treatment as the worker: classify + embed + rules.
+    if (outcome.inserted > 0) {
+      await runPostSync(account.id, outcome.inserted).catch(() => null);
+    }
   } catch (err) {
     safeRedirect("/", { error: String(err) });
   }
@@ -98,6 +115,9 @@ export async function connectImapAccount(formData: FormData) {
     smtpPort: Number.isFinite(smtpPort) ? smtpPort : null,
     smtpSecurity: (get("smtpSecurity") || null) as "SSL_TLS" | "STARTTLS" | "NONE" | null,
     username: get("username") || emailAddress,
+    // Self-hosted servers (Proton Bridge etc.) sometimes present self-signed
+    // certs — explicit opt-in only, strict verification stays the default.
+    allowSelfSignedCerts: get("allowSelfSigned") === "on",
   };
 
   // Re-connecting an address the user already added updates its credentials
@@ -144,20 +164,34 @@ export async function connectOAuthAccount(formData: FormData) {
     },
   });
 
+  // Bind the OAuth handshake to this flow with a server-side nonce — the
+  // callback rejects states that don't match a pending initiation, so a
+  // forged callback can't swap in someone else's account.
+  const nonce = crypto.randomUUID();
+  await prisma.appSetting.upsert({
+    where: { key: `oauth-state:${account.id}` },
+    update: { value: nonce as unknown as Prisma.InputJsonValue },
+    create: { key: `oauth-state:${account.id}`, value: nonce as unknown as Prisma.InputJsonValue },
+  });
+
   const config = {
     clientId,
     redirectUri: await redirectUriFor(provider.toLowerCase() as "google" | "microsoft"),
   };
+  const state = `${account.id}:${nonce}`;
   const url =
     provider === "GOOGLE"
-      ? buildGoogleAuthorizationUrl(config, account.id)
-      : buildMicrosoftAuthorizationUrl(config, account.id);
+      ? buildGoogleAuthorizationUrl(config, state)
+      : buildMicrosoftAuthorizationUrl(config, state);
   redirect(url);
 }
 
 export async function syncAccountNow(accountId: string) {
   try {
-    await syncAccount(accountId);
+    const outcome = await syncAccount(accountId);
+    if (outcome.inserted > 0) {
+      await runPostSync(accountId, outcome.inserted).catch(() => null);
+    }
   } catch (err) {
     safeRedirect("/settings", { error: String(err) });
   }
@@ -171,7 +205,10 @@ export async function syncAllNow() {
   });
   for (const { id } of accounts) {
     try {
-      await syncAccount(id);
+      const outcome = await syncAccount(id);
+      if (outcome.inserted > 0) {
+        await runPostSync(id, outcome.inserted).catch(() => null);
+      }
     } catch {
       // Keep going — other accounts may still succeed.
     }
@@ -200,7 +237,7 @@ export async function removeAccount(accountId: string) {
   await prisma.emailAccount.delete({ where: { id: accountId } });
 
   const { rm } = await import("node:fs/promises");
-  const { attachmentsDir } = await import("@unwalled/sync-engine");
+  const { attachmentsDir } = await import("@dzong/sync-engine");
   await Promise.allSettled(
     attachmentDirs.map((id) => rm(join(attachmentsDir(), id), { recursive: true, force: true })),
   );
@@ -237,9 +274,7 @@ export async function toggleMessageFlag(messageId: string, flag: "isRead" | "isS
     data: {
       [flag]: !message[flag],
       // Stamp the first-open time for the local read receipt.
-      ...(flag === "isRead" && !message.isRead && !message.readAt
-        ? { readAt: new Date() }
-        : {}),
+      ...(flag === "isRead" && !message.isRead && !message.readAt ? { readAt: new Date() } : {}),
     },
   });
   await audit(flag === "isStarred" ? "star" : "read", messageId, {
@@ -444,8 +479,8 @@ export async function sendEmailAction(formData: FormData) {
   // Undo-send: every send queues through a short window first. Setting the
   // window to 0 restores instant sends.
   const undoSeconds = await getUndoSendSeconds();
-  const scheduledAt = explicitLater ??
-    (undoSeconds > 0 ? new Date(Date.now() + undoSeconds * 1000) : undefined);
+  const scheduledAt =
+    explicitLater ?? (undoSeconds > 0 ? new Date(Date.now() + undoSeconds * 1000) : undefined);
 
   const draftId = get("draftId");
   let rowId: string | undefined;
@@ -491,7 +526,9 @@ export async function cancelScheduledSend(messageId: string): Promise<{ ok: bool
 }
 
 /** Skip the wait — dispatch a queued send right now. */
-export async function dispatchQueuedSend(messageId: string): Promise<{ ok: boolean; reason?: string }> {
+export async function dispatchQueuedSend(
+  messageId: string,
+): Promise<{ ok: boolean; reason?: string }> {
   try {
     await dispatchScheduledDraft(messageId);
     revalidatePath("/");
@@ -539,7 +576,13 @@ export async function saveComposerDraft(formData: FormData): Promise<{
           bccAddresses: bcc,
           subject: subject || null,
           bodyText: body,
-          bodyHtml: get("bodyHtml") || null,
+          // Sanitize editor output server-side too — remote refs stay intact
+          // (the viewer blocks them at render time) but scripts/event
+          // handlers never reach storage. Text-only edits keep a structured
+          // HTML copy so previews never fall back to raw text.
+          bodyHtml: get("bodyHtml")
+            ? cleanEmailHtml(get("bodyHtml")).htmlWithRemote
+            : textToHtml(body) || null,
           snippet: body.slice(0, 200),
           hasAttachment: uploads.length > 0,
         },
@@ -554,7 +597,7 @@ export async function saveComposerDraft(formData: FormData): Promise<{
         ccAddresses: cc,
         bccAddresses: bcc,
         bodyText: body,
-        bodyHtml: get("bodyHtml") || undefined,
+        bodyHtml: get("bodyHtml") ? cleanEmailHtml(get("bodyHtml")).htmlWithRemote : undefined,
       });
     }
 
@@ -622,7 +665,7 @@ export async function startOllamaPull(model: string) {
 
 /** Remove a scheduled assistant routine (Settings → Routines). */
 export async function deleteRoutineNow(id: string) {
-  const { deleteRoutine } = await import("@unwalled/sync-engine");
+  const { deleteRoutine } = await import("@dzong/sync-engine");
   await deleteRoutine(id);
   revalidatePath("/settings");
 }
@@ -871,17 +914,20 @@ export async function savePrefs(formData: FormData) {
     autoFollowUp === "draft" || autoFollowUp === "send" ? autoFollowUp : "off",
   );
   await setSetting("requestReadReceipts", get("requestReadReceipts") === "on");
+  // Avatar lookups phone home to Gravatar and sender domains — opt-in only,
+  // off by default.
+  await setSetting("avatarsEnabled", get("avatarsEnabled") === "on");
+  // Remote images in mail bodies let senders track opens — stays opt-in so
+  // the default keeps blocking tracking pixels.
+  await setSetting("loadRemoteContent", get("loadRemoteContent") === "on");
   // 0-100 in the UI, stored as the 0-1 fraction the classifier compares.
   const thresholdPct = Number(get("aiConfidenceThreshold")) || 65;
-  await setSetting(
-    "aiConfidenceThreshold",
-    Math.min(100, Math.max(0, thresholdPct)) / 100,
-  );
+  await setSetting("aiConfidenceThreshold", Math.min(100, Math.max(0, thresholdPct)) / 100);
   // Density rides in a cookie (not AppSetting) so the layout-init script can
   // apply it before first paint without making the root layout dynamic.
   const cookieStore = await cookies();
   const density = get("density") === "compact" ? "compact" : "comfortable";
-  cookieStore.set("unwalled-density", density, {
+  cookieStore.set("dzong-density", density, {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",
@@ -890,13 +936,41 @@ export async function savePrefs(formData: FormData) {
   safeRedirect("/settings", { notice: "Preferences saved" });
 }
 
+/** Persist a sender as trusted for remote images — called from the
+ *  per-message "Always trust sender" button in the mail body banner. */
+export async function trustRemoteSender(address: string) {
+  const email = address.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+  const current = await getTrustedRemoteSenders();
+  if (current.includes(email)) return;
+  await setSetting("remoteContentSenders", [...current, email]);
+  revalidatePath("/");
+}
+
+/** Remove a sender from the remote-content allowlist (Settings row). */
+export async function untrustRemoteSender(formData: FormData) {
+  const email = String(formData.get("sender") ?? "")
+    .trim()
+    .toLowerCase();
+  const current = await getTrustedRemoteSenders();
+  await setSetting(
+    "remoteContentSenders",
+    current.filter((s) => s !== email),
+  );
+  revalidatePath("/settings");
+  revalidatePath("/");
+  safeRedirect("/settings", { notice: `Remote content blocked again for ${email}` });
+}
+
 /** Pin/unpin labels as custom inbox sections. */
 export async function saveSplitLabels(formData: FormData) {
   const labels = formData.getAll("splitLabel").map(String).filter(Boolean);
   await setSetting("inboxSplitLabels", labels);
   revalidatePath("/settings");
   revalidatePath("/");
-  safeRedirect("/settings", { notice: labels.length ? "Inbox sections saved" : "Back to default sections" });
+  safeRedirect("/settings", {
+    notice: labels.length ? "Inbox sections saved" : "Back to default sections",
+  });
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -1077,7 +1151,7 @@ export async function undoAuditEntry(entryId: string): Promise<{ ok: boolean }> 
       await prisma.message.deleteMany({ where: { id: { in: ids }, isDraft: true } });
       break;
     case "unschedule": {
-      const { deleteRoutine } = await import("@unwalled/sync-engine");
+      const { deleteRoutine } = await import("@dzong/sync-engine");
       for (const id of ids) await deleteRoutine(id);
       break;
     }

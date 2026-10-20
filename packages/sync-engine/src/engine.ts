@@ -1,5 +1,5 @@
-import { prisma } from "@unwalled/database";
-import type { EmailAccount, PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { EmailAccount, PrismaClient } from "@dzong/database";
 import { persistAttachments } from "./attachments";
 import { flagReadReceipts, ingestCalendarEvents } from "./ingest-extras";
 import { decryptIfPresent, decryptSecret, encryptSecret } from "./crypto";
@@ -111,9 +111,14 @@ function toCreateInput(accountId: string, msg: RawMessage) {
     isRead: msg.isRead,
     isStarred: msg.isStarred,
     isDraft: msg.isDraft,
+    isArchived: msg.isArchived ?? false,
     providerLabels: msg.providerLabels,
   };
 }
+
+// One sync per account at a time — a UI-triggered sync overlapping a
+// worker/IDLE sync would double-process new mail and race the syncToken.
+const inFlight = new Map<string, Promise<SyncOutcome>>();
 
 /**
  * Sync a single account: fetch raw messages via the provider strategy,
@@ -123,6 +128,16 @@ export async function syncAccount(
   accountId: string,
   db: PrismaClient = prisma,
 ): Promise<SyncOutcome> {
+  const running = inFlight.get(accountId);
+  if (running) return running;
+  const task = syncAccountInner(accountId, db).finally(() => {
+    inFlight.delete(accountId);
+  });
+  inFlight.set(accountId, task);
+  return task;
+}
+
+async function syncAccountInner(accountId: string, db: PrismaClient): Promise<SyncOutcome> {
   const account = await db.emailAccount.findUniqueOrThrow({ where: { id: accountId } });
   const provider = providerFor(account);
   const result = await provider.sync({ account, secrets: await secretsFor(account, db) });
@@ -197,10 +212,29 @@ export async function syncAccount(
             isStarred: m.isStarred,
             folder: m.folder,
             providerLabels: m.providerLabels,
+            // Undefined = the provider doesn't model archive state; leave the
+            // local flag untouched.
+            ...(m.isArchived !== undefined ? { isArchived: m.isArchived } : {}),
           },
         }),
       ),
     );
+  }
+
+  // Mirror provider-side deletions (Gmail history messageDeleted, Graph
+  // @removed) so remote trash/permanent deletes stop reappearing locally.
+  let deleted = 0;
+  if (result.deletedProviderIds && result.deletedProviderIds.length > 0) {
+    const removed = await db.message.deleteMany({
+      where: {
+        emailAccountId: account.id,
+        providerMessageId: { in: result.deletedProviderIds },
+      },
+    });
+    deleted = removed.count;
+    if (deleted > 0) {
+      console.log(`[sync] removed ${deleted} message(s) deleted server-side`);
+    }
   }
 
   await db.emailAccount.update({
@@ -216,6 +250,7 @@ export async function syncAccount(
     fetched: incoming.length,
     inserted: fresh.length,
     updated: stale.length,
+    deleted,
     nextSyncToken: result.nextSyncToken,
   };
 }

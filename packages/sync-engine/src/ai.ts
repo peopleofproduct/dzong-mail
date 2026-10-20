@@ -1,7 +1,7 @@
-import { prisma } from "@unwalled/database";
-import type { AISettings, PrismaClient } from "@unwalled/database";
-import { resolveProvider } from "@unwalled/ai-engine";
-import type { AIProvider, AIProviderConfig } from "@unwalled/ai-engine";
+import { prisma } from "@dzong/database";
+import type { AISettings, PrismaClient } from "@dzong/database";
+import { resolveProvider } from "@dzong/ai-engine";
+import type { AIProvider, AIProviderConfig } from "@dzong/ai-engine";
 import { decryptIfPresent } from "./crypto";
 
 export const DEFAULT_AI_LABELS = [

@@ -174,9 +174,7 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
   );
   const dayInvites = invites.filter(
     (e) =>
-      e.status !== "CANCELLED" &&
-      e.startsAt.getDate() === selectedDay &&
-      e.attendees.length > 0,
+      e.status !== "CANCELLED" && e.startsAt.getDate() === selectedDay && e.attendees.length > 0,
   );
   const attendeeAddrs = [
     ...new Set(dayInvites.flatMap((e) => e.attendees.map((a) => a.toLowerCase()))),
@@ -247,11 +245,17 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-6 px-6 py-6 lg:grid-cols-[1fr_300px]">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
           <div className="mb-3 flex items-center justify-between">
-            <Link href={mk(prev)} className="rounded-md p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <Link
+              href={mk(prev)}
+              className="rounded-md p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
               <ChevronLeft size={16} />
             </Link>
             <h2 className="text-sm font-semibold text-black dark:text-zinc-100">{monthName}</h2>
-            <Link href={mk(next)} className="rounded-md p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <Link
+              href={mk(next)}
+              className="rounded-md p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
               <ChevronRight size={16} />
             </Link>
           </div>
@@ -270,7 +274,9 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
               return (
                 <Link
                   key={i}
-                  href={day ? `?m=${year}-${pad(month + 1)}&d=${key(new Date(year, month, day))}` : "#"}
+                  href={
+                    day ? `?m=${year}-${pad(month + 1)}&d=${key(new Date(year, month, day))}` : "#"
+                  }
                   aria-disabled={!day}
                   className={`flex min-h-20 flex-col gap-0.5 bg-white p-1.5 text-left align-top dark:bg-zinc-950 ${
                     day ? "" : "pointer-events-none opacity-40"
@@ -280,9 +286,7 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
                     <>
                       <span
                         className={`w-fit rounded-full px-1.5 text-[11px] font-medium ${
-                          isToday
-                            ? "bg-indigo-600 text-white"
-                            : "text-zinc-500 dark:text-zinc-400"
+                          isToday ? "bg-indigo-600 text-white" : "text-zinc-500 dark:text-zinc-400"
                         }`}
                       >
                         {day}
@@ -343,7 +347,10 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
                   return (
                     <li key={e.id} className="flex flex-col">
                       {e.threadId ? (
-                        <Link href={`/?thread=${encodeURIComponent(e.threadId)}`} className="w-fit hover:opacity-80">
+                        <Link
+                          href={`/?thread=${encodeURIComponent(e.threadId)}`}
+                          className="w-fit hover:opacity-80"
+                        >
                           {label}
                         </Link>
                       ) : (
@@ -426,7 +433,9 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
                                   className="mt-0.5"
                                 >
                                   <button className="text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                                    Draft {b.replyDebt === 1 ? "the reply" : `all ${b.replyDebt} replies`} before this meeting →
+                                    Draft{" "}
+                                    {b.replyDebt === 1 ? "the reply" : `all ${b.replyDebt} replies`}{" "}
+                                    before this meeting →
                                   </button>
                                 </form>
                               )}

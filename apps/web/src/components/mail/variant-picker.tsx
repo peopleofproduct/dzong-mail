@@ -32,6 +32,15 @@ export function VariantPicker({
     // (which closes on backdrop click) a stray click must not close both.
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pick a draft"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onClose();
+        }
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -42,10 +51,12 @@ export function VariantPicker({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Pick a draft
-          </h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600" aria-label="Close">
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Pick a draft</h3>
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-zinc-600"
+            aria-label="Close"
+          >
             <X size={16} />
           </button>
         </div>

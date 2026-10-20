@@ -1,9 +1,10 @@
-import { prisma } from "@unwalled/database";
-import type { EmailAccount, Message, PrismaClient } from "@unwalled/database";
-import type { AIProvider } from "@unwalled/ai-engine";
+import { prisma } from "@dzong/database";
+import type { EmailAccount, Message, PrismaClient } from "@dzong/database";
+import type { AIProvider } from "@dzong/ai-engine";
 import { resolveAIForAccount, resolveAIForUser } from "./ai";
 import type { RuleAction, RuleCondition } from "./rules";
 import { getRecipientStyle, stylePromptFragment } from "./style";
+import { textToHtml } from "./text-html";
 
 function threadContext(messages: Message[], maxMessages = 8, maxChars = 4000): string {
   const recent = messages.slice(-maxMessages);
@@ -83,7 +84,10 @@ export async function createDraftRow(
       ccAddresses: input.ccAddresses ?? [],
       bccAddresses: input.bccAddresses ?? [],
       bodyText: input.bodyText,
-      bodyHtml: input.bodyHtml,
+      // Text-only drafts (AI replies, templates) get a structured HTML copy so
+      // the preview shows them formatted like received mail — never raw text
+      // with bare URLs.
+      bodyHtml: input.bodyHtml ?? textToHtml(input.bodyText),
       receivedAt: new Date(),
       isRead: true,
       isDraft: true,
@@ -118,18 +122,18 @@ export async function draftAiReply(
     temperature: 0.4,
   });
 
-  return saveReplyDraft(
-    messageId,
-    fixSignoffPlaceholders(response.text.trim(), ctx.name),
-    db,
-  );
+  return saveReplyDraft(messageId, fixSignoffPlaceholders(response.text.trim(), ctx.name), db);
 }
 
 /** Style nudge + sampling temperature per generated variant. */
 const VARIANT_STYLES = [
   { key: "Concise", hint: "Keep it very short — two to four sentences.", temperature: 0.3 },
   { key: "Warm", hint: "Warm, friendly and personable in tone.", temperature: 0.6 },
-  { key: "Detailed", hint: "Thorough — cover everything relevant to the exchange.", temperature: 0.45 },
+  {
+    key: "Detailed",
+    hint: "Thorough — cover everything relevant to the exchange.",
+    temperature: 0.45,
+  },
 ] as const;
 
 export interface ReplyVariant {
@@ -360,8 +364,7 @@ export async function composeWithAI(
       ? await db.emailAccount.findUnique({ where: { id: input.accountId } })
       : null) ?? (await db.emailAccount.findFirst({ where: { userId } }));
   const name = account ? await senderName(account, db) : null;
-  const style =
-    account && input.to ? await getRecipientStyle(input.to, account.id, db) : null;
+  const style = account && input.to ? await getRecipientStyle(input.to, account.id, db) : null;
 
   const response = await ai.provider.complete({
     messages: [
@@ -404,10 +407,7 @@ export async function composeVariantsWithAI(
       ? await db.emailAccount.findUnique({ where: { id: input.accountId } })
       : null) ?? (await db.emailAccount.findFirst({ where: { userId } }));
   const name = account ? await senderName(account, db) : null;
-  const style =
-    account && input.to
-      ? await getRecipientStyle(input.to, account.id, db)
-      : null;
+  const style = account && input.to ? await getRecipientStyle(input.to, account.id, db) : null;
 
   const systemBase =
     "You are an email writing assistant. Output only the email body — " +

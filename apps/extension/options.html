@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Unwalled Mail - Extension settings</title>
+    <title>Dzong Mail - Extension settings</title>
     <style>
       :root {
         --ink: #0f172a;
@@ -46,9 +46,9 @@
     </style>
   </head>
   <body>
-    <h1><img src="icons/icon-48.png" alt="" /> Unwalled Mail Companion</h1>
+    <h1><img src="icons/icon-48.png" alt="" /> Dzong Mail Companion</h1>
     <p class="help">
-      The extension talks to the Unwalled Mail app running on this machine.
+      The extension talks to the Dzong Mail app running on this machine.
       Everything stays local - nothing leaves <code>localhost</code>.
     </p>
 
@@ -57,9 +57,9 @@
     <p class="help">Where the app runs. Change the port if you run it elsewhere on localhost.</p>
 
     <label for="apiToken">API token (optional)</label>
-    <input id="apiToken" type="password" placeholder="only if you set UNWALLED_API_TOKEN" />
+    <input id="apiToken" type="password" placeholder="only if you set DZONG_API_TOKEN" />
     <p class="help">
-      Paste the same value you set as <code>UNWALLED_API_TOKEN</code> in
+      Paste the same value you set as <code>DZONG_API_TOKEN</code> in
       <code>apps/web/.env.local</code>. Leave blank if you didn't set one.
     </p>
 
@@ -72,7 +72,7 @@
     </div>
     <div class="row">
       <input id="interceptMailto" type="checkbox" checked />
-      <label for="interceptMailto" style="margin:0;font-weight:400">Open mailto: links in Unwalled</label>
+      <label for="interceptMailto" style="margin:0;font-weight:400">Open mailto: links in Dzong</label>
     </div>
 
     <div class="row">

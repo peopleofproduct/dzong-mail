@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Unwalled Mail",
-    short_name: "Unwalled",
+    name: "Dzong Mail",
+    short_name: "Dzong",
     description:
       "Open-source, local-first AI email client. Your messages, your models, your machine.",
     start_url: "/",

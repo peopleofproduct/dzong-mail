@@ -48,8 +48,7 @@ export function AskConversation({ initial }: { initial?: string }) {
               <li>&quot;summarize the thread with the landlord&quot;</li>
             </ul>
             <p className="pt-2 text-[11px]">
-              Follow-ups remember the conversation - try &quot;and the unread
-              ones?&quot;
+              Follow-ups remember the conversation - try &quot;and the unread ones?&quot;
             </p>
           </div>
         ) : (
@@ -57,9 +56,9 @@ export function AskConversation({ initial }: { initial?: string }) {
             <AssistantStream
               key={`${i}-${turn.question}`}
               question={turn.question}
-              history={turns.slice(0, i).flatMap((t) =>
-                t.answer ? [{ question: t.question, answer: t.answer }] : [],
-              )}
+              history={turns
+                .slice(0, i)
+                .flatMap((t) => (t.answer ? [{ question: t.question, answer: t.answer }] : []))}
               onComplete={(answer) => recordAnswer(i, answer)}
             />
           ))

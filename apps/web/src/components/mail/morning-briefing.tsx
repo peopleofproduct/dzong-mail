@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { ArrowRight, Coffee, X } from "lucide-react";
 
-const DISMISS_KEY = "unwalled-briefing-dismissed";
+const DISMISS_KEY = "dzong-briefing-dismissed";
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("storage", cb);
@@ -38,10 +38,12 @@ export function MorningBriefingCard({ stats, dateKey }: { stats: BriefingStats; 
   const parts = [
     stats.inserted > 0 && `${stats.inserted} new message${stats.inserted === 1 ? "" : "s"}`,
     stats.classified > 0 && `${stats.classified} auto-labeled`,
-    stats.rulesApplied > 0 && `${stats.rulesApplied} rule action${stats.rulesApplied === 1 ? "" : "s"}`,
+    stats.rulesApplied > 0 &&
+      `${stats.rulesApplied} rule action${stats.rulesApplied === 1 ? "" : "s"}`,
     stats.sent > 0 && `${stats.sent} scheduled send${stats.sent === 1 ? "" : "s"} dispatched`,
     stats.unsnoozed > 0 && `${stats.unsnoozed} snoozed returned`,
-    stats.followUpReminders > 0 && `${stats.followUpReminders} follow-up reminder${stats.followUpReminders === 1 ? "" : "s"}`,
+    stats.followUpReminders > 0 &&
+      `${stats.followUpReminders} follow-up reminder${stats.followUpReminders === 1 ? "" : "s"}`,
   ].filter(Boolean) as string[];
 
   const pending = [

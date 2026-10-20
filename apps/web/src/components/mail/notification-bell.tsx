@@ -16,8 +16,8 @@ interface Item {
 }
 
 const POLL_MS = 30_000;
-const DESKTOP_KEY = "unwalled-desktop-notify";
-const PREF_EVENT = "unwalled-notify-pref";
+const DESKTOP_KEY = "dzong-desktop-notify";
+const PREF_EVENT = "dzong-notify-pref";
 
 const subscribePref = (cb: () => void) => {
   window.addEventListener(PREF_EVENT, cb);
@@ -60,7 +60,11 @@ export function NotificationBell() {
           baseline.current = data.items[0]?.createdAt ?? new Date().toISOString();
           return;
         }
-        if (desktop && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        if (
+          desktop &&
+          typeof Notification !== "undefined" &&
+          Notification.permission === "granted"
+        ) {
           for (const item of data.items) {
             if (item.createdAt > baseline.current) {
               new Notification(item.title, { body: item.body ?? undefined, tag: item.id });

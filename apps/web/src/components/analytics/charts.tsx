@@ -54,7 +54,14 @@ export function HealthRing({ score }: { score: number }) {
   return (
     <div className="relative mx-auto h-48 w-48">
       <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
-        <circle cx="100" cy="100" r={r} fill="none" strokeWidth="16" className="stroke-zinc-100 dark:stroke-zinc-800" />
+        <circle
+          cx="100"
+          cy="100"
+          r={r}
+          fill="none"
+          strokeWidth="16"
+          className="stroke-zinc-100 dark:stroke-zinc-800"
+        />
         <circle
           cx="100"
           cy="100"
@@ -75,11 +82,14 @@ export function HealthRing({ score }: { score: number }) {
         <span className="mt-1 text-xs font-medium tracking-wide text-zinc-400 uppercase">
           inbox health
         </span>
-        <span
-          className="mt-1 text-[10px] font-semibold uppercase tracking-wider"
-          style={{ color }}
-        >
-          {score >= 75 ? "excellent" : score >= 45 ? "fair" : score >= 20 ? "needs work" : "critical"}
+        <span className="mt-1 text-[10px] font-semibold tracking-wider uppercase" style={{ color }}>
+          {score >= 75
+            ? "excellent"
+            : score >= 45
+              ? "fair"
+              : score >= 20
+                ? "needs work"
+                : "critical"}
         </span>
       </div>
     </div>
@@ -107,9 +117,7 @@ export function WeeklyBars({ weekly }: { weekly: { label: string; count: number 
               style={{ height: `${Math.max(3, (w.count / max) * 100)}%` }}
               title={`Week of ${w.label}: ${w.count} messages`}
             />
-            <span className="w-full truncate text-center text-[9px] text-zinc-400">
-              {w.label}
-            </span>
+            <span className="w-full truncate text-center text-[9px] text-zinc-400">{w.label}</span>
           </div>
         ))}
       </div>
@@ -156,7 +164,11 @@ export function ArrivalHeatmap({ heatmap }: { heatmap: number[][] }) {
       <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-zinc-400">
         less
         {[0.15, 0.4, 0.65, 1].map((o) => (
-          <span key={o} className="h-2.5 w-2.5 rounded-[3px]" style={{ backgroundColor: `rgba(99,102,241,${o})` }} />
+          <span
+            key={o}
+            className="h-2.5 w-2.5 rounded-[3px]"
+            style={{ backgroundColor: `rgba(99,102,241,${o})` }}
+          />
         ))}
         more
       </div>
@@ -172,15 +184,14 @@ export function CategoryDonut({
 }) {
   const r = 70;
   const circ = 2 * Math.PI * r;
-  const segments = categories.reduce<{ len: number; offset: number; label: string; tone: string }[]>(
-    (segs, c) => {
-      const len = (c.pct / 100) * circ;
-      const offset = segs.length ? segs[segs.length - 1].offset + segs[segs.length - 1].len : 0;
-      segs.push({ len, offset, label: c.label, tone: c.tone });
-      return segs;
-    },
-    [],
-  );
+  const segments = categories.reduce<
+    { len: number; offset: number; label: string; tone: string }[]
+  >((segs, c) => {
+    const len = (c.pct / 100) * circ;
+    const offset = segs.length ? segs[segs.length - 1].offset + segs[segs.length - 1].len : 0;
+    segs.push({ len, offset, label: c.label, tone: c.tone });
+    return segs;
+  }, []);
   return (
     <div className="flex items-center gap-6">
       <div className="relative h-40 w-40 shrink-0">
@@ -286,7 +297,10 @@ export function FlowBalance({
 
 /** Reply-debt aging buckets. */
 export function DebtAging({ buckets }: { buckets: { bucket: string; count: number }[] }) {
-  const total = Math.max(1, buckets.reduce((a, b) => a + b.count, 0));
+  const total = Math.max(
+    1,
+    buckets.reduce((a, b) => a + b.count, 0),
+  );
   const colors = ["bg-emerald-400", "bg-amber-400", "bg-orange-500", "bg-rose-500"];
   return (
     <div>
@@ -303,7 +317,9 @@ export function DebtAging({ buckets }: { buckets: { bucket: string; count: numbe
       <div className="mt-3 grid grid-cols-4 gap-2">
         {buckets.map((b, i) => (
           <div key={b.bucket} className="text-center">
-            <p className={`text-lg font-bold ${i >= 2 ? "text-rose-500" : "text-zinc-900 dark:text-zinc-100"}`}>
+            <p
+              className={`text-lg font-bold ${i >= 2 ? "text-rose-500" : "text-zinc-900 dark:text-zinc-100"}`}
+            >
               {b.count}
             </p>
             <p className="text-[10px] text-zinc-400">{b.bucket}</p>

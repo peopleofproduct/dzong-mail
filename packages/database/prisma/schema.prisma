@@ -1,4 +1,4 @@
-// Unwalled Mail — local-first data model
+// Dzong Mail — local-first data model
 // All data lives on the user's own PostgreSQL instance.
 
 generator client {
@@ -46,6 +46,10 @@ model EmailAccount {
   smtpSecurity      EncryptionType?
   username          String?
   passwordEncrypted String?
+
+  // Accept self-signed/expired certs for IMAP+SMTP (self-hosted servers
+  // like Proton Bridge). Default off - strict verification stays the norm.
+  allowSelfSignedCerts Boolean @default(false)
 
   // OAuth — user-supplied client credentials (BYOK)
   oauthClientId       String?
@@ -141,7 +145,7 @@ model Attachment {
   sizeBytes Int?
   contentId String? // cid: for inline references
 
-  // Path relative to the attachments dir (UNWALLED_DATA_DIR/attachments).
+  // Path relative to the attachments dir (DZONG_DATA_DIR/attachments).
   // Null when only metadata was synced and the content was not downloaded.
   storagePath String?
 

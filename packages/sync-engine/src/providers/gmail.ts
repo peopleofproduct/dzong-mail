@@ -73,6 +73,34 @@ function b64urlToBuffer(data: string): Buffer {
 
 interface GmailHistoryEntry {
   messagesAdded?: Array<{ message: { id: string } }>;
+  messagesDeleted?: Array<{ message: { id: string } }>;
+  labelsAdded?: Array<{ message: { id: string } }>;
+  labelsRemoved?: Array<{ message: { id: string } }>;
+}
+
+// Beyond messageAdded: label changes surface remote reads/archives/label
+// moves, and deletions let us mirror server-side removal locally.
+const HISTORY_TYPES = ["messageAdded", "labelsAdded", "labelsRemoved", "messagesDeleted"];
+
+/** Map Gmail's label model to a display folder. */
+function gmailFolder(labels: string[]): string {
+  if (labels.includes("INBOX")) return "INBOX";
+  if (labels.includes("SENT")) return "Sent";
+  if (labels.includes("DRAFT")) return "Drafts";
+  if (labels.includes("TRASH")) return "Trash";
+  if (labels.includes("SPAM")) return "Spam";
+  return labels[0] ?? "All Mail";
+}
+
+/** Gmail archives by removing INBOX — mirror that onto the local flag so
+ *  mail the user archived in Gmail doesn't pop back into the local inbox. */
+function gmailIsArchived(labels: string[]): boolean {
+  return (
+    !labels.includes("INBOX") &&
+    !labels.includes("SENT") &&
+    !labels.includes("DRAFT") &&
+    !labels.includes("TRASH")
+  );
 }
 
 function headerValue(headers: GmailHeader[] | undefined, name: string): string | undefined {
@@ -112,17 +140,19 @@ export class GmailSyncProvider implements MailSyncProvider {
     const historyId = ((await profileRes.json()) as { historyId?: string }).historyId;
 
     const ids = new Set<string>();
+    const deletedIds: string[] = [];
 
     if (account.syncToken) {
-      // Incremental: walk history.list for messageAdded events.
+      // Incremental: walk history.list for every mutation type — new mail,
+      // label moves (read/archive/custom), and deletions.
       let pageToken: string | undefined;
       let historyExpired = false;
       do {
         const params = new URLSearchParams({
           startHistoryId: account.syncToken,
-          historyTypes: "messageAdded",
           maxResults: "500",
         });
+        for (const type of HISTORY_TYPES) params.append("historyTypes", type);
         if (pageToken) params.set("pageToken", pageToken);
         const res = await get(`/history?${params}`);
         if (res.status === 404) {
@@ -136,43 +166,51 @@ export class GmailSyncProvider implements MailSyncProvider {
         };
         for (const entry of data.history ?? []) {
           for (const added of entry.messagesAdded ?? []) ids.add(added.message.id);
+          for (const added of entry.labelsAdded ?? []) ids.add(added.message.id);
+          for (const removed of entry.labelsRemoved ?? []) ids.add(removed.message.id);
+          for (const removed of entry.messagesDeleted ?? []) deletedIds.push(removed.message.id);
         }
         pageToken = data.nextPageToken;
       } while (pageToken);
 
       if (!historyExpired) {
-        return this.fetchMessages(get, [...ids], historyId);
+        return this.fetchMessages(get, [...ids], historyId, deletedIds);
       }
       // History too old — fall through to a bounded full listing.
     }
 
-    let pageToken: string | undefined;
-    do {
-      const params = new URLSearchParams({
-        maxResults: String(MAX_MESSAGES),
-        labelIds: "INBOX",
-      });
-      if (pageToken) params.set("pageToken", pageToken);
-      const res = await get(`/messages?${params}`);
-      if (!res.ok) throw new Error(`Gmail messages.list failed: ${res.status}`);
-      const data = (await res.json()) as {
-        messages?: Array<{ id: string }>;
-        nextPageToken?: string;
-      };
-      for (const m of data.messages ?? []) ids.add(m.id);
-      pageToken = data.nextPageToken;
-    } while (pageToken && ids.size < MAX_MESSAGES);
+    // Bounded listing across INBOX and SENT so a fresh connect captures the
+    // outbound side too (a history-expired resync hits this path as well).
+    for (const label of ["INBOX", "SENT"] as const) {
+      let pageToken: string | undefined;
+      do {
+        const params = new URLSearchParams({
+          maxResults: String(MAX_MESSAGES),
+          labelIds: label,
+        });
+        if (pageToken) params.set("pageToken", pageToken);
+        const res = await get(`/messages?${params}`);
+        if (!res.ok) throw new Error(`Gmail messages.list failed: ${res.status}`);
+        const data = (await res.json()) as {
+          messages?: Array<{ id: string }>;
+          nextPageToken?: string;
+        };
+        for (const m of data.messages ?? []) ids.add(m.id);
+        pageToken = data.nextPageToken;
+      } while (pageToken && ids.size < MAX_MESSAGES * 2);
+    }
 
-    return this.fetchMessages(get, [...ids], historyId);
+    return this.fetchMessages(get, [...ids], historyId, deletedIds);
   }
 
   private async fetchMessages(
     get: (path: string) => Promise<Response>,
     ids: string[],
     historyId: string | undefined,
+    deletedIds: string[] = [],
   ): Promise<ProviderSyncResult> {
     const messages: RawMessage[] = [];
-    for (const id of ids.slice(0, MAX_MESSAGES)) {
+    for (const id of ids.slice(0, MAX_MESSAGES * 2)) {
       const params = new URLSearchParams({ format: "full" });
       const res = await get(`/messages/${id}?${params}`);
       if (!res.ok) continue;
@@ -214,7 +252,7 @@ export class GmailSyncProvider implements MailSyncProvider {
       messages.push({
         providerMessageId: msg.id,
         threadId: msg.threadId,
-        folder: labels.includes("INBOX") ? "INBOX" : (labels[0] ?? "All Mail"),
+        folder: gmailFolder(labels),
         subject: headerValue(headers, "Subject"),
         snippet: msg.snippet,
         fromAddress: from.address,
@@ -231,9 +269,10 @@ export class GmailSyncProvider implements MailSyncProvider {
         isRead: !labels.includes("UNREAD"),
         isStarred: labels.includes("STARRED"),
         isDraft: labels.includes("DRAFT"),
+        isArchived: gmailIsArchived(labels),
         providerLabels: labels,
       });
     }
-    return { messages, nextSyncToken: historyId };
+    return { messages, nextSyncToken: historyId, deletedProviderIds: deletedIds };
   }
 }

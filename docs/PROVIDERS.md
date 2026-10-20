@@ -1,6 +1,6 @@
 # Provider compatibility
 
-Unwalled Mail speaks three protocols: Gmail API (OAuth), Microsoft Graph
+Dzong Mail speaks three protocols: Gmail API (OAuth), Microsoft Graph
 (OAuth) and plain IMAP/SMTP. Anything that exposes one of those works - the
 list below is what we preset and test, not a hard boundary.
 
@@ -42,5 +42,5 @@ gate on it.
 - **Provider-specific labels**: Gmail categories and Exchange folders map to
   provider labels on ingest; custom IMAP flags are preserved but not synced
   back (we write via appends/flag ops where the server allows).
-- **App passwords are stored encrypted** (`UNWALLED_SECRET_KEY`) and never
+- **App passwords are stored encrypted** (`DZONG_SECRET_KEY`) and never
   leave the machine.

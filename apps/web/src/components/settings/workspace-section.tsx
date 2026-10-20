@@ -3,10 +3,13 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import {
   getAutoFollowUp,
+  getAvatarsEnabled,
   getFollowUpDays,
+  getLoadRemoteContent,
   getRequestReadReceipts,
   getSetting,
   getSplitLabels,
+  getTrustedRemoteSenders,
   getUndoSendSeconds,
 } from "@/lib/settings";
 import {
@@ -15,6 +18,7 @@ import {
   savePrefs,
   saveSnippet,
   saveSplitLabels,
+  untrustRemoteSender,
 } from "@/lib/actions";
 
 const inputClass =
@@ -35,6 +39,9 @@ export async function WorkspaceSection() {
     followUpDays,
     autoFollowUp,
     requestReceipts,
+    avatarsEnabled,
+    loadRemoteContent,
+    trustedRemoteSenders,
     confidenceThreshold,
     activeSplits,
     snippets,
@@ -44,6 +51,9 @@ export async function WorkspaceSection() {
     getFollowUpDays(),
     getAutoFollowUp(),
     getRequestReadReceipts(),
+    getAvatarsEnabled(),
+    getLoadRemoteContent(),
+    getTrustedRemoteSenders(),
     getSetting<number>("aiConfidenceThreshold", 0.65),
     getSplitLabels(),
     prisma.snippet.findMany({ orderBy: { name: "asc" } }),
@@ -56,9 +66,7 @@ export async function WorkspaceSection() {
   ]);
   const knownLabels = [...new Set(labelRows.flatMap((r) => r.labels))].sort();
   const density =
-    (await cookies()).get("unwalled-density")?.value === "compact"
-      ? "compact"
-      : "comfortable";
+    (await cookies()).get("dzong-density")?.value === "compact" ? "compact" : "comfortable";
 
   return (
     <section className="flex flex-col gap-6">
@@ -128,15 +136,66 @@ export async function WorkspaceSection() {
             />
             Request read receipts on outgoing mail
           </label>
+          <label
+            className="flex items-end gap-2 pb-2 text-xs text-zinc-600 dark:text-zinc-300"
+            title="Each lookup queries Gravatar and the sender's domain — turn off if you don't want sender addresses leaving this machine."
+          >
+            <input
+              type="checkbox"
+              name="avatarsEnabled"
+              defaultChecked={avatarsEnabled}
+              className="accent-indigo-600"
+            />
+            Look up sender avatars online
+          </label>
+          <label
+            className="flex items-end gap-2 pb-2 text-xs text-zinc-600 dark:text-zinc-300"
+            title="Load images and remote CSS in every message without the per-message click - senders can then see when you open their mail."
+          >
+            <input
+              type="checkbox"
+              name="loadRemoteContent"
+              defaultChecked={loadRemoteContent}
+              className="accent-indigo-600"
+            />
+            Always load remote images in emails
+          </label>
           <div className="flex items-end">
             <button className={btnClass}>Save preferences</button>
           </div>
         </form>
         <p className="mt-2 text-[11px] text-zinc-400">
           Undo-send holds every outgoing message for the configured delay - recall it from the toast
-          before it leaves the machine. Follow-up reminders land in the notification bell.
+          before it leaves the machine. Follow-up reminders land in the notification bell. Avatar
+          lookups ask Gravatar and the sender&apos;s domain once per sender - uncheck the box to
+          keep those lookups fully off this machine.
         </p>
       </div>
+
+      {/* Per-sender remote-content allowlist */}
+      {trustedRemoteSenders.length > 0 && (
+        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <h3 className={h3}>Trusted senders - remote content</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Images and remote content load automatically in mail from these senders, even with the
+            global toggle off. Added from the &quot;Always trust sender&quot; button in a message.
+          </p>
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {trustedRemoteSenders.map((sender) => (
+              <li
+                key={sender}
+                className="flex items-center justify-between gap-3 rounded-md border border-zinc-100 px-3 py-1.5 dark:border-zinc-800"
+              >
+                <span className="truncate text-xs text-zinc-700 dark:text-zinc-300">{sender}</span>
+                <form action={untrustRemoteSender}>
+                  <input type="hidden" name="sender" value={sender} />
+                  <button className="text-xs text-red-500 hover:text-red-400">Remove</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Custom inbox splits */}
       <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -193,7 +252,12 @@ export async function WorkspaceSection() {
           </ul>
         )}
         <form action={saveSnippet} className="mt-3 grid gap-2">
-          <input name="name" placeholder="Name (e.g. Intro, Pricing reply)" required className={inputClass} />
+          <input
+            name="name"
+            placeholder="Name (e.g. Intro, Pricing reply)"
+            required
+            className={inputClass}
+          />
           <textarea
             name="body"
             placeholder="Snippet text - inserted at the cursor"

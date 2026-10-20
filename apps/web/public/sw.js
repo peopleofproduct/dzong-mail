@@ -1,8 +1,8 @@
-/* Unwalled Mail service worker - offline shell only.
+/* Dzong Mail service worker - offline shell only.
    Mail content is never cached here; the app already reads from a local
    store, so the SW only keeps the UI shell reachable when the dev server
    or machine network blips. */
-const VERSION = "unwalled-v1";
+const VERSION = "dzong-v1";
 const SHELL = ["/offline.html", "/icon-192.png", "/icon-512.png", "/favicon.ico"];
 
 self.addEventListener("install", (event) => {

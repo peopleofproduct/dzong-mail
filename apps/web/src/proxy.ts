@@ -6,7 +6,7 @@ import type { NextRequest } from "next/server";
  * companion browser extension is one of them, but its Origin header carries
  * a `*-extension://` scheme that regular web pages cannot forge — so echoing
  * that origin back is safe and keeps localhost APIs unreadable to websites.
- * Bearer-token auth (UNWALLED_API_TOKEN) still applies inside each route.
+ * Bearer-token auth (DZONG_API_TOKEN) still applies inside each route.
  */
 const EXTENSION_ORIGIN = /^[a-z]+-extension:\/\/[a-z0-9-]+$/i;
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { unsubscribeSender, draftAiReply, saveRoutine } from "@unwalled/sync-engine";
+import { unsubscribeSender, draftAiReply, saveRoutine } from "@dzong/sync-engine";
 import { apiGuard, badRequest } from "../_lib";
 
 /**
@@ -31,25 +31,20 @@ type ActionKind =
   | "draft_reply"
   | "schedule";
 
-const SIMPLE: Record<string, { apply: Record<string, unknown>; inverse: string; audit: string }> =
-  {
-    archive: { apply: { isArchived: true }, inverse: "unarchive", audit: "archive" },
-    unarchive: { apply: { isArchived: false }, inverse: "archive", audit: "unarchive" },
-    mark_unread: { apply: { isRead: false }, inverse: "mark-read", audit: "unread" },
-    trash: {
-      apply: { isArchived: true, folder: "Trash" },
-      inverse: "restore",
-      audit: "move-trash",
-    },
-    star: { apply: { isStarred: true }, inverse: "toggle-flag", audit: "star" },
-    unstar: { apply: { isStarred: false }, inverse: "toggle-flag", audit: "unstar" },
-  };
+const SIMPLE: Record<string, { apply: Record<string, unknown>; inverse: string; audit: string }> = {
+  archive: { apply: { isArchived: true }, inverse: "unarchive", audit: "archive" },
+  unarchive: { apply: { isArchived: false }, inverse: "archive", audit: "unarchive" },
+  mark_unread: { apply: { isRead: false }, inverse: "mark-read", audit: "unread" },
+  trash: {
+    apply: { isArchived: true, folder: "Trash" },
+    inverse: "restore",
+    audit: "move-trash",
+  },
+  star: { apply: { isStarred: true }, inverse: "toggle-flag", audit: "star" },
+  unstar: { apply: { isStarred: false }, inverse: "toggle-flag", audit: "unstar" },
+};
 
-async function writeAudit(
-  action: string,
-  ids: string[],
-  detail: Record<string, unknown>,
-) {
+async function writeAudit(action: string, ids: string[], detail: Record<string, unknown>) {
   return prisma.auditEntry.create({
     data: {
       action,
@@ -125,7 +120,12 @@ export async function POST(request: NextRequest) {
       inverse: "unarchive",
       senders,
     });
-    return NextResponse.json({ ok: true, results, archived: archivedIds.length, auditId: entry.id });
+    return NextResponse.json({
+      ok: true,
+      results,
+      archived: archivedIds.length,
+      auditId: entry.id,
+    });
   }
 
   // ── draft_reply: AI-draft for each cited thread (small cap, it costs model time) ──
@@ -140,7 +140,10 @@ export async function POST(request: NextRequest) {
       else failed += 1;
     }
     if (draftIds.length === 0) {
-      return NextResponse.json({ ok: false, error: "No drafts could be generated" }, { status: 502 });
+      return NextResponse.json(
+        { ok: false, error: "No drafts could be generated" },
+        { status: 502 },
+      );
     }
     const entry = await prisma.auditEntry.create({
       data: {

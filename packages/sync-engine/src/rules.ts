@@ -1,5 +1,5 @@
-import { prisma } from "@unwalled/database";
-import type { AutomationRule, Message, PrismaClient, RuleTrigger } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { AutomationRule, Message, PrismaClient, RuleTrigger } from "@dzong/database";
 import { createDraftRow, draftAiReply } from "./drafts";
 
 export interface RuleCondition {
@@ -9,7 +9,14 @@ export interface RuleCondition {
 }
 
 export type RuleActionType =
-  "ARCHIVE" | "ADD_LABEL" | "MARK_READ" | "STAR" | "MOVE_FOLDER" | "DRAFT_REPLY" | "DELETE" | "WEBHOOK";
+  | "ARCHIVE"
+  | "ADD_LABEL"
+  | "MARK_READ"
+  | "STAR"
+  | "MOVE_FOLDER"
+  | "DRAFT_REPLY"
+  | "DELETE"
+  | "WEBHOOK";
 
 export interface RuleAction {
   type: RuleActionType;

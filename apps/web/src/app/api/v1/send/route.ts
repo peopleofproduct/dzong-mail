@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { sendEmail } from "@unwalled/sync-engine";
+import { sendEmail } from "@dzong/sync-engine";
 import { prisma } from "@/lib/db";
 import { apiGuard, badRequest } from "../_lib";
 

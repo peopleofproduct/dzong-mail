@@ -1,4 +1,4 @@
-/* Unwalled Mail Companion - background service worker (MV3).
+/* Dzong Mail Companion - background service worker (MV3).
  * Polls the local API for the unread count and new notifications,
  * wires context menus, handles mailto redirects, and opens deep links
  * into the app. All state lives in chrome.storage so the worker can be
@@ -12,7 +12,7 @@ const DEFAULTS = {
   interceptMailto: true,
 };
 
-const ALARM_NAME = "unwalled-poll";
+const ALARM_NAME = "dzong-poll";
 const MAX_TOASTS_PER_POLL = 3;
 
 async function settings() {
@@ -60,12 +60,12 @@ async function poll() {
       toastThreads: {},
     });
     for (const n of fresh.slice(-MAX_TOASTS_PER_POLL)) {
-      await chrome.notifications.create(`unwalled-${n.id}`, {
+      await chrome.notifications.create(`dzong-${n.id}`, {
         type: "basic",
         iconUrl: "icons/icon-128.png",
         title: n.title,
         message: n.body ?? "",
-        contextMessage: "Unwalled Mail",
+        contextMessage: "Dzong Mail",
       });
       if (n.threadId) toastThreads[n.id] = n.threadId;
     }
@@ -138,7 +138,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.notifications.onClicked.addListener(async (notificationId) => {
   const s = await settings();
-  const notifId = notificationId.replace(/^unwalled-/, "");
+  const notifId = notificationId.replace(/^dzong-/, "");
   const { toastThreads = {} } = await chrome.storage.local.get({
     toastThreads: {},
   });

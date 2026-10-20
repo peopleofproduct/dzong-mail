@@ -75,7 +75,11 @@ function labelName(question: string): string | null {
     question.match(/(?:as|with|to)\s+([a-zA-Z][\w -]{0,28}?)(?:\s*$|[.,!?]|\s+please)/i)?.[1] ??
     question.match(/(?:label|tag)\s+(?:the\s+)?"?([\w -]{1,30}?)"?(?:\s+label|\s*$)/i)?.[1];
   if (!bare) return null;
-  const name = bare.trim().toUpperCase().replace(/\s+/g, "_").replace(/[^\w-]/g, "");
+  const name = bare
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^\w-]/g, "");
   return name || null;
 }
 
@@ -87,7 +91,12 @@ function unlabelName(question: string): string | null {
     question.match(/unlabel\s+(?:as\s+|with\s+)?"?([\w -]{1,30}?)"?(?:\s*$|[.,!?])/i);
   const raw = m?.[1]?.trim();
   if (!raw || /^(these|them|it|all|this|those)$/i.test(raw)) return labelName(question);
-  return raw.toUpperCase().replace(/\s+/g, "_").replace(/[^\w-]/g, "") || null;
+  return (
+    raw
+      .toUpperCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^\w-]/g, "") || null
+  );
 }
 
 // Word-boundary regexes - \bread\b does not match inside "unread".
@@ -196,7 +205,8 @@ function cadenceOf(question: string): RoutineSpec | null {
   if (/\bevery week|weekly\b/i.test(question)) {
     return { prompt: question, everyHours: 168 };
   }
-  const morning = /\b(every|each)\s+morning\b|\bevery\s+(week)?day\b|\bdaily\b|\bevery\s+(night|evening)\b/i;
+  const morning =
+    /\b(every|each)\s+morning\b|\bevery\s+(week)?day\b|\bdaily\b|\bevery\s+(night|evening)\b/i;
   if (morning.test(question)) {
     const hour = /\b(night|evening)\b/i.test(question) ? 20 : 8;
     return { prompt: question, everyHours: 24, hour };
@@ -215,9 +225,10 @@ function stepFor(
 ): ProposedAction | null {
   switch (kind) {
     case "unsubscribe": {
-      const senders = [
-        ...new Set(targets.map((h) => h.message.fromAddress)),
-      ].slice(0, UNSUB_SENDER_CAP);
+      const senders = [...new Set(targets.map((h) => h.message.fromAddress))].slice(
+        0,
+        UNSUB_SENDER_CAP,
+      );
       if (senders.length === 0) return null;
       const ids = targets.filter((h) => senders.includes(h.message.fromAddress));
       return base("unsubscribe", `Unsubscribe from ${N(senders.length, "sender")}`, ids, {
@@ -248,10 +259,15 @@ function stepFor(
       const tagged = targets.filter((h) => h.message.labels.includes(name));
       if (tagged.length === 0) return null;
       const capped = tagged.slice(0, ACTION_CAP);
-      return base("unlabel", `Remove the ${name} label from ${N(capped.length, "message")}`, capped, {
-        params: { label: name },
-        truncated: tagged.length > ACTION_CAP,
-      });
+      return base(
+        "unlabel",
+        `Remove the ${name} label from ${N(capped.length, "message")}`,
+        capped,
+        {
+          params: { label: name },
+          truncated: tagged.length > ACTION_CAP,
+        },
+      );
     }
     case "snooze": {
       const hours = snoozeHours(question);
@@ -299,10 +315,7 @@ function stepFor(
  * from these and archive the rest" proposes an ordered plan. Read-only
  * questions produce nothing; every step names its exact message set.
  */
-export function proposeActions(
-  question: string,
-  hits: SemanticHit[],
-): ProposedAction[] {
+export function proposeActions(question: string, hits: SemanticHit[]): ProposedAction[] {
   const steps: ProposedAction[] = [];
 
   // A routine request ("every morning, summarize overnight mail") needs

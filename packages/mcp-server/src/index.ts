@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * Unwalled Mail MCP server — exposes the local mailbox to MCP-compatible
+ * Dzong Mail MCP server — exposes the local mailbox to MCP-compatible
  * agents (Claude Desktop, Cursor, etc.) over stdio. Every tool is a thin,
  * read-authenticated wrapper over the web app's /api/v1 endpoints, so the
  * agent only ever talks to the user's own machine.
  *
  * Env:
- *   UNWALLED_BASE_URL   default http://localhost:3000
- *   UNWALLED_API_TOKEN  Bearer token if the API is locked down (docs/API.md)
+ *   DZONG_BASE_URL   default http://localhost:3000
+ *   DZONG_API_TOKEN  Bearer token if the API is locked down (docs/API.md)
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const BASE_URL = (process.env.UNWALLED_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-const TOKEN = process.env.UNWALLED_API_TOKEN;
+const BASE_URL = (process.env.DZONG_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const TOKEN = process.env.DZONG_API_TOKEN;
 
 async function api<T = unknown>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}/api/v1${path}`, {
@@ -41,16 +41,16 @@ function fail(err: unknown) {
   };
 }
 
-const server = new McpServer({ name: "unwalled-mail", version: "0.1.0" });
+const server = new McpServer({ name: "dzong-mail", version: "0.1.0" });
 
 server.registerTool(
-  "unwalled_list_accounts",
+  "dzong_list_accounts",
   { description: "List connected mail accounts (provider, address, sync status, message count)." },
   async () => ok(await api("GET", "/accounts")),
 );
 
 server.registerTool(
-  "unwalled_list_messages",
+  "dzong_list_messages",
   {
     description:
       "List messages. Filter by view (inbox/starred/snoozed/drafts/sent/archive/newsletters/digest), " +
@@ -83,7 +83,7 @@ server.registerTool(
 );
 
 server.registerTool(
-  "unwalled_get_message",
+  "dzong_get_message",
   {
     description: "Fetch a full message: body text plus attachment metadata and download URLs.",
     inputSchema: { id: z.string().describe("Message id") },
@@ -98,7 +98,7 @@ server.registerTool(
 );
 
 server.registerTool(
-  "unwalled_message_action",
+  "dzong_message_action",
   {
     description: "Archive, unarchive, mark read/unread, or star/unstar a message.",
     inputSchema: {
@@ -116,7 +116,7 @@ server.registerTool(
 );
 
 server.registerTool(
-  "unwalled_ask",
+  "dzong_ask",
   {
     description:
       "Ask a natural-language question about the user's mail. Returns a grounded answer " +
@@ -133,7 +133,7 @@ server.registerTool(
 );
 
 server.registerTool(
-  "unwalled_send",
+  "dzong_send",
   {
     description:
       "Send an email through a connected account, or schedule it with an ISO scheduledAt. " +
@@ -160,7 +160,7 @@ server.registerTool(
 );
 
 server.registerTool(
-  "unwalled_sync",
+  "dzong_sync",
   {
     description: "Trigger a mail sync — all sync-enabled accounts, or one by accountId.",
     inputSchema: { accountId: z.string().optional() },

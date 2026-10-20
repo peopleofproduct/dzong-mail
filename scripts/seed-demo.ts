@@ -1,24 +1,24 @@
 // Seeds a local demo user + MOCK account and runs one sync pass.
 // Usage: npm run db:seed
-import { prisma } from "@unwalled/database";
-import { syncAccount } from "@unwalled/sync-engine";
+import { prisma } from "@dzong/database";
+import { syncAccount } from "@dzong/sync-engine";
 
 async function main() {
   const user = await prisma.user.upsert({
-    where: { email: "me@unwalled.local" },
+    where: { email: "me@dzong.local" },
     update: {},
-    create: { email: "me@unwalled.local", name: "Local User" },
+    create: { email: "me@dzong.local", name: "Local User" },
   });
 
   const account = await prisma.emailAccount.upsert({
     where: {
-      userId_emailAddress: { userId: user.id, emailAddress: "demo@unwalled.local" },
+      userId_emailAddress: { userId: user.id, emailAddress: "demo@dzong.local" },
     },
     update: {},
     create: {
       userId: user.id,
       provider: "MOCK",
-      emailAddress: "demo@unwalled.local",
+      emailAddress: "demo@dzong.local",
       displayName: "Demo Inbox",
     },
   });

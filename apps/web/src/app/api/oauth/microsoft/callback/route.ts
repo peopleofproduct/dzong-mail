@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { decryptSecret, encryptSecret, exchangeMicrosoftCode } from "@unwalled/sync-engine";
+import { decryptSecret, encryptSecret, exchangeMicrosoftCode } from "@dzong/sync-engine";
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const accountId = url.searchParams.get("state");
+  const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
-  if (error || !code || !accountId) {
+  // state = "<accountId>:<nonce>" — validated against the nonce stored at
+  // initiation so forged/replayed callbacks can't bind another account.
+  const [accountId, nonce] = (state ?? "").split(":");
+  if (error || !code || !accountId || !nonce) {
     return NextResponse.redirect(
       new URL(
         `/?error=${encodeURIComponent(error ?? "OAuth callback missing parameters")}`,
@@ -17,6 +20,16 @@ export async function GET(request: NextRequest) {
       ),
     );
   }
+
+  const stored = await prisma.appSetting.findUnique({
+    where: { key: `oauth-state:${accountId}` },
+  });
+  if (!stored || stored.value !== nonce) {
+    return NextResponse.redirect(
+      new URL("/?error=Invalid%20OAuth%20state%20—%20restart%20the%20connection", url.origin),
+    );
+  }
+  await prisma.appSetting.delete({ where: { key: `oauth-state:${accountId}` } });
 
   const account = await prisma.emailAccount.findUniqueOrThrow({ where: { id: accountId } });
   if (!account.oauthClientId || !account.oauthClientSecret) {

@@ -1,5 +1,5 @@
-import { prisma } from "@unwalled/database";
-import type { PrismaClient } from "@unwalled/database";
+import { prisma } from "@dzong/database";
+import type { PrismaClient } from "@dzong/database";
 import type { RawMessage } from "./types";
 import { emit } from "./notify";
 
@@ -20,9 +20,7 @@ export interface ParsedEvent {
 
 /** iCal dates: 20261020T090000Z, 20261020T090000, or all-day 20261020. */
 function parseIcsDate(value: string): Date | null {
-  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(
-    value.trim(),
-  );
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(value.trim());
   if (!m) return null;
   const [, y, mo, d, h, mi, s, z] = m;
   if (h === undefined) return new Date(Date.UTC(+y, +mo - 1, +d));
@@ -90,7 +88,10 @@ export function parseIcs(content: string): ParsedEvent[] {
         cur.attendees = [
           ...(cur.attendees ?? []),
           // Lowercased so case-sensitive hasSome lookups match reliably.
-          p.value.replace(/^mailto:/i, "").trim().toLowerCase(),
+          p.value
+            .replace(/^mailto:/i, "")
+            .trim()
+            .toLowerCase(),
         ];
         break;
       case "RRULE":
@@ -216,7 +217,8 @@ export async function flagReadReceipts(
     if (!isReadReceipt(msg)) continue;
     msg.isRead = true;
     const original =
-      headerVal(msg, "original-subject") ?? msg.subject?.replace(/^(read|return receipt|not read)[: ]/i, "").trim();
+      headerVal(msg, "original-subject") ??
+      msg.subject?.replace(/^(read|return receipt|not read)[: ]/i, "").trim();
 
     // A receipt's arrival IS the "opened" signal - stamp readAt on the
     // sent message it answers (readAt on sent mail means recipient-read).

@@ -28,6 +28,8 @@ import { CommandPalette } from "@/components/mail/command-palette";
 import { UndoSendToast } from "@/components/mail/undo-send-toast";
 import { MorningBriefingCard } from "@/components/mail/morning-briefing";
 import { getSplitLabels } from "@/lib/settings";
+import { cleanEmailHtml, htmlToText, looksLikeHtml } from "@/lib/email-html";
+import { textToHtml } from "@dzong/sync-engine";
 import { Composer } from "@/components/mail/composer";
 import { KeyboardShortcuts } from "@/components/mail/keyboard-shortcuts";
 import { MessageList } from "@/components/mail/message-list";
@@ -107,7 +109,8 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     items = accountEmail ? result.hits.filter((h) => h.accountEmail === accountEmail) : result.hits;
     if (!result.ok) semanticNote = result.reason ?? "AI search isn't available right now";
     else if (result.hits.length === 0)
-      semanticNote = "No AI matches yet - your inbox is still being indexed (it happens during sync)";
+      semanticNote =
+        "No AI matches yet - your inbox is still being indexed (it happens during sync)";
   } else {
     items = (await getMessagesForView(view, q, 100, accountId)).map(serializeMessage);
   }
@@ -239,7 +242,8 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
   // Reopening a saved draft restores its stored attachment chips and, when
   // the draft was written with the rich editor, its formatted body.
   const draftId = str(params, "draftId");
-  const [draftAttachments, snippets, draftBody] = await Promise.all([
+  const fwdId = str(params, "fwd");
+  const [draftAttachments, snippets, draftBody, fwdSource] = await Promise.all([
     draftId
       ? prisma.attachment.findMany({
           where: { messageId: draftId },
@@ -250,10 +254,41 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
     draftId
       ? prisma.message.findUnique({
           where: { id: draftId },
-          select: { bodyHtml: true },
+          select: { bodyHtml: true, bodyText: true },
         })
       : Promise.resolve(null),
+    fwdId ? prisma.message.findUnique({ where: { id: fwdId } }) : Promise.resolve(null),
   ]);
+
+  // Forward fidelity: the draft body is built from the original's structured
+  // HTML, so forwarded newsletters keep their formatting instead of arriving
+  // as a raw text dump.
+  let initialBodyText = draftBody?.bodyText ?? undefined;
+  let initialBodyHtml = draftBody?.bodyHtml
+    ? cleanEmailHtml(draftBody.bodyHtml).html
+    : undefined;
+  if (fwdSource) {
+    const headerText =
+      `\n\n---------- Forwarded message ---------\n` +
+      `From: ${fwdSource.fromName ?? ""} <${fwdSource.fromAddress}>\n` +
+      `Date: ${fwdSource.receivedAt.toLocaleString()}\n` +
+      `Subject: ${fwdSource.subject ?? ""}\n\n`;
+    const sourceText = fwdSource.bodyText ?? fwdSource.snippet ?? "";
+    const sourceTextIsMarkup = looksLikeHtml(sourceText);
+    initialBodyText =
+      headerText + (sourceTextIsMarkup ? htmlToText(sourceText) : sourceText);
+    const sourceHtml =
+      fwdSource.bodyHtml ?? (sourceTextIsMarkup ? sourceText : textToHtml(sourceText));
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const headerHtml =
+      "<p>---------- Forwarded message ---------<br>" +
+      `From: ${esc(fwdSource.fromName ?? "")} &lt;${esc(fwdSource.fromAddress)}&gt;<br>` +
+      `Date: ${esc(fwdSource.receivedAt.toLocaleString())}<br>` +
+      `Subject: ${esc(fwdSource.subject ?? "")}</p>`;
+    initialBodyHtml = cleanEmailHtml(headerHtml + sourceHtml).html;
+  }
+
   return (
     <Composer
       accounts={accounts.map((a) => ({
@@ -262,7 +297,10 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
         provider: a.provider,
       }))}
       draftAttachments={draftAttachments.map((a) => ({ ...a, sizeBytes: a.sizeBytes ?? null }))}
-      draftBodyHtml={draftBody?.bodyHtml ?? undefined}
+      // Re-sanitize stored rich text through the display pipeline — the
+      // editor restores it verbatim into a contenteditable.
+      initialBodyHtml={initialBodyHtml}
+      initialBodyText={initialBodyText}
       snippets={snippets}
     />
   );
@@ -297,8 +335,14 @@ async function BriefingSection() {
     prisma.notification.count({ where: { kind: "follow-up", readAt: null } }),
   ]);
   const stats = {
-    inserted: 0, classified: 0, rulesApplied: 0, sent: 0, unsnoozed: 0,
-    followUpReminders: 0, draftsWaiting, followUpsWaiting,
+    inserted: 0,
+    classified: 0,
+    rulesApplied: 0,
+    sent: 0,
+    unsnoozed: 0,
+    followUpReminders: 0,
+    draftsWaiting,
+    followUpsWaiting,
   };
   for (const r of runs) {
     const s = r.summary as Record<string, number>;
@@ -311,9 +355,7 @@ async function BriefingSection() {
   }
   const total = stats.inserted + stats.sent + stats.unsnoozed + stats.followUpReminders;
   if (total === 0 && draftsWaiting === 0 && followUpsWaiting === 0) return null;
-  return (
-    <MorningBriefingCard stats={stats} dateKey={new Date().toLocaleDateString("sv-SE")} />
-  );
+  return <MorningBriefingCard stats={stats} dateKey={new Date().toLocaleDateString("sv-SE")} />;
 }
 
 /**
@@ -344,10 +386,13 @@ async function EnergySection() {
     <div className="border-b border-zinc-200 bg-white px-4 py-1.5 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
       <span>
         Inbox work today:{" "}
-        <span className="font-medium text-zinc-700 dark:text-zinc-300">~{total} min</span>
-        {" "}({unread} unread, {needsReply} waiting replies).
+        <span className="font-medium text-zinc-700 dark:text-zinc-300">~{total} min</span> ({unread}{" "}
+        unread, {needsReply} waiting replies).
       </span>{" "}
-      <Link href="/?view=needs-reply" className="text-indigo-600 hover:underline dark:text-indigo-400">
+      <Link
+        href="/?view=needs-reply"
+        className="text-indigo-600 hover:underline dark:text-indigo-400"
+      >
         Do the ~{subset}-min subset that matters →
       </Link>
     </div>

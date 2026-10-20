@@ -1,6 +1,6 @@
 # Local HTTP API
 
-Unwalled Mail exposes a small REST API at `/api/v1/*` while the web app is
+Dzong Mail exposes a small REST API at `/api/v1/*` while the web app is
 running (`npm run dev` → `http://localhost:3000`). It exists so scripts, agents,
 and other local tools can read and act on your mailbox without touching the UI.
 
@@ -12,13 +12,13 @@ local files the UI does, and it only listens on your dev server.
 Open by default (loopback only). To lock it down, set a token:
 
 ```bash
-UNWALLED_API_TOKEN="some-long-random-string" npm run dev
+DZONG_API_TOKEN="some-long-random-string" npm run dev
 ```
 
 Then send it as a Bearer token:
 
 ```bash
-curl -H "Authorization: Bearer $UNWALLED_API_TOKEN" http://localhost:3000/api/v1/accounts
+curl -H "Authorization: Bearer $DZONG_API_TOKEN" http://localhost:3000/api/v1/accounts
 ```
 
 ## Endpoints

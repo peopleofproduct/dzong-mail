@@ -27,6 +27,9 @@ export function SyncStatus() {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [lastOk, setLastOk] = useState(0);
+  // Why post-sync produced nothing — distinguishes "AI offline" from
+  // "nothing to index" so users aren't guessing why search feels dumb.
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const inFlight = useRef(false);
   const lastTry = useRef(0);
   const [, relabel] = useReducer((x: number) => x + 1, 0);
@@ -45,6 +48,10 @@ export function SyncStatus() {
           body: "{}",
         });
         if (res.ok) {
+          const data = (await res.json().catch(() => null)) as {
+            postSync?: { reason?: string }[];
+          } | null;
+          setAiNote(data?.postSync?.find((p) => p.reason)?.reason ?? null);
           setLastOk(Date.now());
           router.refresh();
         }
@@ -73,12 +80,20 @@ export function SyncStatus() {
         lastTry.current = 0;
         window.dispatchEvent(new Event("focus"));
       }}
-      title="Auto-syncs every minute — click to sync now"
+      title={
+        aiNote
+          ? `Auto-sync on — but AI post-processing reports: ${aiNote}`
+          : "Auto-syncs every minute — click to sync now"
+      }
       className="flex items-center gap-1.5 rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 sm:px-2 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
     >
       <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
-      <span className="hidden text-[11px] whitespace-nowrap text-zinc-400 lg:inline dark:text-zinc-500">
-        {syncing ? "Syncing…" : ago(lastOk)}
+      <span
+        className={`hidden text-[11px] whitespace-nowrap lg:inline ${
+          aiNote ? "text-amber-500 dark:text-amber-400" : "text-zinc-400 dark:text-zinc-500"
+        }`}
+      >
+        {syncing ? "Syncing…" : aiNote ? "synced · AI offline" : ago(lastOk)}
       </span>
     </button>
   );
