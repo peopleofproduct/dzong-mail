@@ -61,6 +61,111 @@ export async function notifyNewMail(
   );
 }
 
+/** Labels that mark a message as bulk/noise — never worth an OS toast. */
+const NOISE_LABELS = new Set([
+  "NEWSLETTER",
+  "MARKETING",
+  "COLD_PITCH",
+  "SOCIAL",
+  "NOTIFICATION",
+]);
+
+/** Fallback for unclassified mail (AI off): obvious bulk senders by
+ *  address convention. */
+const BULK_SENDER =
+  /^(?:no-?reply|newsletter|marketing|promo|promotions|notifications?|alerts?|digest|updates?|news|bounce|mailer-daemon|postmaster)@/i;
+
+/** Max individual toasts per sync batch — beyond this, one summary row. */
+const MAX_MAIL_TOASTS = 5;
+
+/**
+ * Smart new-mail notifications: emit only for messages worth interrupting
+ * for. Called AFTER post-sync classification so aiLabels are settled.
+ *
+ * A message notifies when:
+ *  - the sender is on the VIP list (vipSenders setting), or
+ *  - it carries ACTION_REQUIRED, or
+ *  - it has no noise label — and when AI produced no labels at all, it
+ *    must also pass bulk-mail heuristics (List-Unsubscribe/List-Id,
+ *    Precedence: bulk|list|junk, noreply-style senders).
+ * Non-inbox folders (your own Sent copies syncing down) and
+ * rule-archived mail never notify.
+ *
+ * `notifyAllMail` setting restores the old one-batch-toast behaviour.
+ */
+export async function notifyImportantMail(
+  accountId: string,
+  insertedIds: string[],
+  db: PrismaClient = prisma,
+): Promise<void> {
+  if (insertedIds.length === 0) return;
+  if (await readSetting<boolean>(db, "notifyAllMail", false)) {
+    return notifyNewMail(accountId, insertedIds.length, db);
+  }
+  const vip = new Set(
+    (await readSetting<string[]>(db, "vipSenders", [])).map((s) => s.toLowerCase()),
+  );
+  const rows = await db.message.findMany({
+    where: { id: { in: insertedIds }, isDraft: false },
+    select: {
+      id: true,
+      subject: true,
+      fromName: true,
+      fromAddress: true,
+      threadId: true,
+      labels: true,
+      aiLabels: true,
+      headers: true,
+      isArchived: true,
+      folder: true,
+    },
+  });
+  const important = rows.filter((m) => {
+    const from = (m.fromAddress ?? "").toLowerCase();
+    if (vip.has(from)) return true;
+    // Only inbox arrivals are "new mail" — synced Sent/other folders aren't.
+    if (m.folder && !/inbox/i.test(m.folder)) return false;
+    if (m.isArchived) return false; // a rule already triaged it
+    const tags = new Set([...m.labels, ...m.aiLabels]);
+    if (tags.has("ACTION_REQUIRED")) return true;
+    for (const t of tags) if (NOISE_LABELS.has(t)) return false;
+    if (tags.size === 0) {
+      // AI off or couldn't classify — apply bulk-mail heuristics.
+      const h = (m.headers ?? {}) as Record<string, string>;
+      if (h["List-Unsubscribe"] || h["List-Id"]) return false;
+      const precedence = (h["Precedence"] ?? "").toLowerCase();
+      if (["bulk", "list", "junk"].includes(precedence)) return false;
+      if (BULK_SENDER.test(from)) return false;
+    }
+    return true;
+  });
+
+  for (const m of important.slice(0, MAX_MAIL_TOASTS)) {
+    await emit(
+      {
+        kind: "new-mail",
+        title: `New from ${m.fromName ?? m.fromAddress}`,
+        body: m.subject ?? "(no subject)",
+        messageId: m.id,
+        threadId: m.threadId ?? undefined,
+        dedupeKey: `newmail:${m.id}`,
+      },
+      db,
+    );
+  }
+  if (important.length > MAX_MAIL_TOASTS) {
+    const extra = important.length - MAX_MAIL_TOASTS;
+    await emit(
+      {
+        kind: "new-mail",
+        title: `+${extra} more important message${extra === 1 ? "" : "s"}`,
+        dedupeKey: `newmail-extra:${accountId}:${dayKey(new Date())}`,
+      },
+      db,
+    );
+  }
+}
+
 const dayKey = (d: Date) => d.toLocaleDateString("sv-SE");
 
 /**

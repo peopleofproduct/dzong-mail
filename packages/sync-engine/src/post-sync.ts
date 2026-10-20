@@ -3,7 +3,7 @@ import type { PrismaClient } from "@dzong/database";
 import { classifyAccountMessages } from "./classify";
 import { applyAutomationRules } from "./rules";
 import { embedAccountMessages } from "./semantic";
-import { notifyNewMail } from "./notify";
+import { notifyImportantMail } from "./notify";
 
 export interface PostSyncStats {
   classified: number;
@@ -23,12 +23,11 @@ export interface PostSyncStats {
  */
 export async function runPostSync(
   accountId: string,
-  inserted: number,
+  insertedIds: string[],
   db: PrismaClient = prisma,
 ): Promise<PostSyncStats> {
   const stats: PostSyncStats = { classified: 0, embedded: 0, rulesApplied: 0 };
-  if (inserted === 0) return stats;
-  await notifyNewMail(accountId, inserted, db);
+  if (insertedIds.length === 0) return stats;
 
   const classification = await classifyAccountMessages(accountId, db);
   stats.classified = classification.classified;
@@ -48,5 +47,8 @@ export async function runPostSync(
   } else if (embedding.reason) {
     console.log(`[post-sync] embedding skipped: ${embedding.reason}`);
   }
+  // Notify last — labels and rules have settled, so the importance
+  // filter sees the final state of each message.
+  await notifyImportantMail(accountId, insertedIds, db);
   return stats;
 }

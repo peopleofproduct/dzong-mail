@@ -68,6 +68,9 @@ export interface SyncOutcome {
   accountId: string;
   fetched: number;
   inserted: number;
+  /** Db ids of the newly inserted messages — post-sync (classification,
+   *  notifications) needs them to scope its work to this batch. */
+  insertedIds: string[];
   updated: number;
   /** Messages deleted locally because the provider reported them removed. */
   deleted?: number;

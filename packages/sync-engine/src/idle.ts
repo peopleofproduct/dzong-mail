@@ -53,7 +53,7 @@ async function idleLoop(accountId: string): Promise<void> {
             const outcome = await syncAccount(accountId);
             if (outcome.inserted > 0) {
               console.log(`[idle] ${account.emailAddress}: ${outcome.inserted} new message(s)`);
-              await runPostSync(accountId, outcome.inserted);
+              await runPostSync(accountId, outcome.insertedIds);
             }
           } catch (err) {
             console.error(`[idle] sync failed for ${account.emailAddress}:`, err);

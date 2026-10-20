@@ -46,3 +46,8 @@ export const getLoadRemoteContent = () => getSetting<boolean>("loadRemoteContent
  *  automatically even when the global toggle is off. */
 export const getTrustedRemoteSenders = () =>
   getSetting<string[]>("remoteContentSenders", []);
+
+/** Off (default) = only important mail raises a notification — AI labels
+ *  and bulk-mail heuristics filter newsletters/marketing out. On = every
+ *  sync batch toasts, like the old behaviour. */
+export const getNotifyAllMail = () => getSetting<boolean>("notifyAllMail", false);

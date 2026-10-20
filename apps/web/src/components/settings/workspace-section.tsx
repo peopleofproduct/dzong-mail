@@ -6,6 +6,7 @@ import {
   getAvatarsEnabled,
   getFollowUpDays,
   getLoadRemoteContent,
+  getNotifyAllMail,
   getRequestReadReceipts,
   getSetting,
   getSplitLabels,
@@ -42,6 +43,8 @@ export async function WorkspaceSection() {
     avatarsEnabled,
     loadRemoteContent,
     trustedRemoteSenders,
+    notifyAllMail,
+    vipSenders,
     confidenceThreshold,
     activeSplits,
     snippets,
@@ -54,6 +57,8 @@ export async function WorkspaceSection() {
     getAvatarsEnabled(),
     getLoadRemoteContent(),
     getTrustedRemoteSenders(),
+    getNotifyAllMail(),
+    getSetting<string[]>("vipSenders", []),
     getSetting<number>("aiConfidenceThreshold", 0.65),
     getSplitLabels(),
     prisma.snippet.findMany({ orderBy: { name: "asc" } }),
@@ -159,6 +164,28 @@ export async function WorkspaceSection() {
               className="accent-indigo-600"
             />
             Always load remote images in emails
+          </label>
+          <label
+            className="flex items-end gap-2 pb-2 text-xs text-zinc-600 dark:text-zinc-300"
+            title="Unchecked = only important mail toasts - AI labels and bulk-mail heuristics filter newsletters, marketing and other noise out. Checked = a notification for every sync batch."
+          >
+            <input
+              type="checkbox"
+              name="notifyAllMail"
+              defaultChecked={notifyAllMail}
+              className="accent-indigo-600"
+            />
+            Notify for every new message (not just important)
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+            VIP senders - always notify (comma-separated emails)
+            <input
+              name="vipSenders"
+              type="text"
+              defaultValue={vipSenders.join(", ")}
+              placeholder="boss@work.com, partner@home.com"
+              className={inputClass}
+            />
           </label>
           <div className="flex items-end">
             <button className={btnClass}>Save preferences</button>

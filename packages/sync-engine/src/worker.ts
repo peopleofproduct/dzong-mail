@@ -84,7 +84,7 @@ export async function runSyncCycle(db: PrismaClient = prisma): Promise<void> {
     console.log(
       `[worker] synced ${outcome.accountId}: ${outcome.inserted} new, ${outcome.updated} updated`,
     );
-    const stats = await runPostSync(outcome.accountId, outcome.inserted, db);
+    const stats = await runPostSync(outcome.accountId, outcome.insertedIds, db);
     summary.classified += stats.classified;
     summary.embedded += stats.embedded;
     summary.rulesApplied += stats.rulesApplied;

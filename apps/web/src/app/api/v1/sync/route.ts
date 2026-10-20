@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       if (outcome.inserted === 0) continue;
       try {
         postSync.push({
-          ...(await runPostSync(outcome.accountId, outcome.inserted)),
+          ...(await runPostSync(outcome.accountId, outcome.insertedIds)),
           accountId: outcome.accountId,
         });
       } catch (err) {

@@ -168,6 +168,7 @@ async function syncAccountInner(accountId: string, db: PrismaClient): Promise<Sy
   });
 
   // Apply automation rules to the newly inserted batch only.
+  let insertedIds: string[] = [];
   if (fresh.length > 0) {
     const inserted = await db.message.findMany({
       where: {
@@ -176,6 +177,7 @@ async function syncAccountInner(accountId: string, db: PrismaClient): Promise<Sy
       },
       select: { id: true, providerMessageId: true },
     });
+    insertedIds = inserted.map((m) => m.id);
     const idByProviderId = new Map(inserted.map((m) => [m.providerMessageId, m.id]));
     try {
       await persistAttachments(fresh, idByProviderId, db);
@@ -249,6 +251,7 @@ async function syncAccountInner(accountId: string, db: PrismaClient): Promise<Sy
     accountId: account.id,
     fetched: incoming.length,
     inserted: fresh.length,
+    insertedIds,
     updated: stale.length,
     deleted,
     nextSyncToken: result.nextSyncToken,

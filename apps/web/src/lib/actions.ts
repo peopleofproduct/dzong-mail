@@ -89,7 +89,7 @@ export async function connectMockAccount() {
     const outcome = await syncAccount(account.id);
     // Same post-sync treatment as the worker: classify + embed + rules.
     if (outcome.inserted > 0) {
-      await runPostSync(account.id, outcome.inserted).catch(() => null);
+      await runPostSync(account.id, outcome.insertedIds).catch(() => null);
     }
   } catch (err) {
     safeRedirect("/", { error: String(err) });
@@ -190,7 +190,7 @@ export async function syncAccountNow(accountId: string) {
   try {
     const outcome = await syncAccount(accountId);
     if (outcome.inserted > 0) {
-      await runPostSync(accountId, outcome.inserted).catch(() => null);
+      await runPostSync(accountId, outcome.insertedIds).catch(() => null);
     }
   } catch (err) {
     safeRedirect("/settings", { error: String(err) });
@@ -207,7 +207,7 @@ export async function syncAllNow() {
     try {
       const outcome = await syncAccount(id);
       if (outcome.inserted > 0) {
-        await runPostSync(id, outcome.inserted).catch(() => null);
+        await runPostSync(id, outcome.insertedIds).catch(() => null);
       }
     } catch {
       // Keep going — other accounts may still succeed.
@@ -920,6 +920,16 @@ export async function savePrefs(formData: FormData) {
   // Remote images in mail bodies let senders track opens — stays opt-in so
   // the default keeps blocking tracking pixels.
   await setSetting("loadRemoteContent", get("loadRemoteContent") === "on");
+  // Default off = smart notifications (important mail only); on = toast
+  // for every sync batch.
+  await setSetting("notifyAllMail", get("notifyAllMail") === "on");
+  // VIP senders always toast, whatever the classifier says — normalised
+  // to lowercase bare addresses.
+  const vips = get("vipSenders")
+    .split(/[,\s;]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s));
+  await setSetting("vipSenders", [...new Set(vips)]);
   // 0-100 in the UI, stored as the 0-1 fraction the classifier compares.
   const thresholdPct = Number(get("aiConfidenceThreshold")) || 65;
   await setSetting("aiConfidenceThreshold", Math.min(100, Math.max(0, thresholdPct)) / 100);
