@@ -42,9 +42,24 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     question?: string;
     stream?: boolean;
+    history?: unknown;
   };
   const question = body.question?.trim();
   if (!question) return badRequest('"question" is required');
+
+  // Prior turns for follow-up coherence - bounded, strings only.
+  const history = Array.isArray(body.history)
+    ? body.history
+        .filter(
+          (t): t is { question: string; answer: string } =>
+            typeof t?.question === "string" && typeof t?.answer === "string",
+        )
+        .slice(-6)
+        .map((t) => ({
+          question: t.question.slice(0, 500),
+          answer: t.answer.slice(0, 2000),
+        }))
+    : [];
 
   const user = await getLocalUser();
   if (!user) return NextResponse.json({ error: "No local user" }, { status: 503 });
@@ -58,6 +73,7 @@ export async function POST(request: NextRequest) {
         try {
           send({ type: "status", stage: "retrieving" });
           const result = await askInbox(user.id, question, undefined, {
+            history,
             onSources: (hits) => send({ type: "sources", sources: hits.map(serializeHit) }),
             onToken: (text) => send({ type: "token", text }),
           });
@@ -90,7 +106,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const result = await askInbox(user.id, question);
+  const result = await askInbox(user.id, question, undefined, { history });
   if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 503 });
   return NextResponse.json({
     answer: result.answer,

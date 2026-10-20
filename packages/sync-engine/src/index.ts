@@ -23,7 +23,9 @@ export {
 } from "./semantic";
 export type { EmbedOutcome, SemanticHit, AskResult } from "./semantic";
 export { proposeActions } from "./agent";
-export type { AgentActionKind, ProposedAction } from "./agent";
+export type { AgentActionKind, ProposedAction, ActionParams } from "./agent";
+export { listRoutines, saveRoutine, deleteRoutine, runDueRoutines } from "./routines";
+export type { Routine } from "./routines";
 export {
   applyAutomationRules,
   matchesCondition,

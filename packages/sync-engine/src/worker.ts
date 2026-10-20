@@ -6,6 +6,7 @@ import { startIdleWatchers } from "./idle";
 import { runPostSync } from "./post-sync";
 import { dispatchScheduledDraft } from "./send";
 import { checkFollowUpReminders, emit, recordAgentRun } from "./notify";
+import { runDueRoutines } from "./routines";
 
 const TICK_MS = Number(process.env.WORKER_TICK_MS ?? 30_000);
 const SYNC_INTERVAL_MS = Number(process.env.WORKER_SYNC_INTERVAL_MS ?? 5 * 60_000);
@@ -132,6 +133,10 @@ async function main(): Promise<void> {
       if (Date.now() - lastFollowUp >= FOLLOW_UP_INTERVAL_MS) {
         lastFollowUp = Date.now();
         const nudged = await checkFollowUpReminders(prisma, FOLLOW_UP_DAYS);
+        const routines = await runDueRoutines().catch(() => 0);
+        if (routines > 0) {
+          console.log(`[worker] ${routines} routine(s) ran`);
+        }
         if (nudged > 0) {
           console.log(`[worker] ${nudged} follow-up reminder(s) raised`);
           await recordAgentRun("maintenance", { followUpReminders: nudged });

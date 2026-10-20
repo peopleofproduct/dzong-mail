@@ -95,9 +95,18 @@ function recommendations(sources: Source[]) {
 /**
  * Streams the assistant's answer token-by-token from /api/v1/ask, then
  * renders the cited findings with bulk actions and computed next steps.
- * Remounts per question (key={question} from the server panel).
+ * `history` carries earlier turns so follow-ups stay coherent;
+ * `onComplete` hands the final answer back to the conversation.
  */
-export function AssistantStream({ question }: { question: string }) {
+export function AssistantStream({
+  question,
+  history = [],
+  onComplete,
+}: {
+  question: string;
+  history?: { question: string; answer: string }[];
+  onComplete?: (answer: string) => void;
+}) {
   const [phase, setPhase] = useState<Phase>("thinking");
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
@@ -110,6 +119,12 @@ export function AssistantStream({ question }: { question: string }) {
   const [auditIds, setAuditIds] = useState<Record<number, string>>({});
   const answerRef = useRef<HTMLParagraphElement>(null);
   const router = useRouter();
+  // Latest-prop refs: the fetch runs once per question, but history and the
+  // completion callback change identity every render without needing a restart.
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -119,7 +134,7 @@ export function AssistantStream({ question }: { question: string }) {
         const res = await fetch("/api/v1/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question, stream: true }),
+          body: JSON.stringify({ question, stream: true, history: historyRef.current }),
           signal: controller.signal,
         });
         if (!res.ok || !res.body) {
@@ -168,6 +183,7 @@ export function AssistantStream({ question }: { question: string }) {
                 setRetrievalReason(evt.retrievalReason);
                 setActions(evt.actions ?? []);
                 setPhase("done");
+                onCompleteRef.current?.(evt.answer);
               } else if (evt.type === "error") {
                 setError(evt.reason);
                 setPhase("error");

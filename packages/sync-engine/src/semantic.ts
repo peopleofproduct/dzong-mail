@@ -316,6 +316,8 @@ export async function askInbox(
     onToken?: (token: string) => void;
     /** Fired as soon as retrieval finishes, before the answer generates. */
     onSources?: (hits: SemanticHit[]) => void;
+    /** Prior turns so follow-ups ("and the unread ones?") stay coherent. */
+    history?: { question: string; answer: string }[];
   } = {},
 ): Promise<AskResult> {
   const ai = await resolveAIForUser(userId, db);
@@ -375,6 +377,12 @@ export async function askInbox(
           "\n\n" +
           context,
       },
+      ...(options.history ?? [])
+        .slice(-6)
+        .flatMap((turn) => [
+          { role: "user" as const, content: turn.question },
+          { role: "assistant" as const, content: turn.answer },
+        ]),
       { role: "user" as const, content: question },
     ],
     temperature: 0.2,

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { deleteTask, saveTask, toggleTask } from "@/lib/actions";
+import { deleteTask, draftOwedRepliesNow, saveTask, toggleTask } from "@/lib/actions";
 
 interface CalEvent {
   id: string;
@@ -419,6 +419,16 @@ async function CalendarBody(props: Pick<PageProps<"/calendar">, "searchParams">)
                                     day: "numeric",
                                   })}
                                 </Link>
+                              )}
+                              {b.replyDebt > 0 && (
+                                <form
+                                  action={draftOwedRepliesNow.bind(null, addr)}
+                                  className="mt-0.5"
+                                >
+                                  <button className="text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                                    Draft {b.replyDebt === 1 ? "the reply" : `all ${b.replyDebt} replies`} before this meeting →
+                                  </button>
+                                </form>
                               )}
                             </li>
                           );

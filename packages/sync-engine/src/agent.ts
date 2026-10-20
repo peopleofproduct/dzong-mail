@@ -12,7 +12,8 @@ export type AgentActionKind =
   | "star"
   | "unstar"
   | "unsubscribe"
-  | "draft_reply";
+  | "draft_reply"
+  | "schedule";
 
 /** Extra data an action kind carries into the confirm card + executor. */
 export interface ActionParams {
@@ -22,6 +23,10 @@ export interface ActionParams {
   hours?: number;
   /** Sender addresses for unsubscribe. */
   senders?: string[];
+  /** Routine prompt + cadence for schedule. */
+  prompt?: string;
+  everyHours?: number;
+  hour?: number;
 }
 
 /** A mutation the assistant offers to run - always gated by user confirm. */
@@ -175,111 +180,159 @@ function base(
   };
 }
 
-/**
- * Turn a command-style question plus its cited findings into a concrete,
- * confirmable mutation. Read-only questions produce nothing; the proposal
- * always names the exact message set so the user can verify before running.
- */
-export function proposeActions(
+/** A scheduled routine the user can create from chat ("every morning…"). */
+export interface RoutineSpec {
+  prompt: string;
+  everyHours: number;
+  /** Wall-clock hour for daily routines (local time), else run-on-interval. */
+  hour?: number;
+}
+
+/** Parse "every morning / daily / hourly / every week" cadence from a command. */
+function cadenceOf(question: string): RoutineSpec | null {
+  if (/\bevery hour|hourly\b/i.test(question)) {
+    return { prompt: question, everyHours: 1 };
+  }
+  if (/\bevery week|weekly\b/i.test(question)) {
+    return { prompt: question, everyHours: 168 };
+  }
+  const morning = /\b(every|each)\s+morning\b|\bevery\s+(week)?day\b|\bdaily\b|\bevery\s+(night|evening)\b/i;
+  if (morning.test(question)) {
+    const hour = /\b(night|evening)\b/i.test(question) ? 20 : 8;
+    return { prompt: question, everyHours: 24, hour };
+  }
+  if (/\bevery\s+(day|weekday)\b/i.test(question)) {
+    return { prompt: question, everyHours: 24, hour: 8 };
+  }
+  return null;
+}
+
+/** Build the proposal for one intent, or null when it can't act. */
+function stepFor(
+  kind: AgentActionKind,
   question: string,
-  hits: SemanticHit[],
-): ProposedAction[] {
-  const intent = INTENTS.find((i) => i.re.test(question));
-  if (!intent) return [];
-
-  const targets = hits.filter(intent.eligible);
-  if (targets.length === 0) return [];
-
-  switch (intent.kind) {
+  targets: SemanticHit[],
+): ProposedAction | null {
+  switch (kind) {
     case "unsubscribe": {
       const senders = [
         ...new Set(targets.map((h) => h.message.fromAddress)),
       ].slice(0, UNSUB_SENDER_CAP);
-      if (senders.length === 0) return [];
-      const ids = targets.filter((h) =>
-        senders.includes(h.message.fromAddress),
-      );
-      return [
-        base("unsubscribe", `Unsubscribe from ${N(senders.length, "sender")}`, ids, {
-          params: { senders },
-          caveat:
-            "The unsubscribe request itself can't be undone - undo restores the archived mail only.",
-          truncated: targets.length > ACTION_CAP,
-        }),
-      ];
+      if (senders.length === 0) return null;
+      const ids = targets.filter((h) => senders.includes(h.message.fromAddress));
+      return base("unsubscribe", `Unsubscribe from ${N(senders.length, "sender")}`, ids, {
+        params: { senders },
+        caveat:
+          "The unsubscribe request itself can't be undone - undo restores the archived mail only.",
+        truncated: targets.length > ACTION_CAP,
+      });
     }
     case "draft_reply": {
       const capped = targets.slice(0, DRAFT_CAP);
-      return [
-        base("draft_reply", `Draft replies to ${N(capped.length, "thread")}`, capped, {
-          truncated: targets.length > DRAFT_CAP,
-        }),
-      ];
+      return base("draft_reply", `Draft replies to ${N(capped.length, "thread")}`, capped, {
+        truncated: targets.length > DRAFT_CAP,
+      });
     }
     case "label": {
       const name = labelName(question);
-      if (!name) return [];
+      if (!name) return null;
       const capped = targets.slice(0, ACTION_CAP);
-      return [
-        base("label", `Label ${N(capped.length, "message")} as ${name}`, capped, {
-          params: { label: name },
-          truncated: targets.length > ACTION_CAP,
-        }),
-      ];
+      return base("label", `Label ${N(capped.length, "message")} as ${name}`, capped, {
+        params: { label: name },
+        truncated: targets.length > ACTION_CAP,
+      });
     }
     case "unlabel": {
       const name = unlabelName(question);
-      if (!name) return [];
+      if (!name) return null;
       const tagged = targets.filter((h) => h.message.labels.includes(name));
-      if (tagged.length === 0) return [];
+      if (tagged.length === 0) return null;
       const capped = tagged.slice(0, ACTION_CAP);
-      return [
-        base("unlabel", `Remove the ${name} label from ${N(capped.length, "message")}`, capped, {
-          params: { label: name },
-          truncated: tagged.length > ACTION_CAP,
-        }),
-      ];
+      return base("unlabel", `Remove the ${name} label from ${N(capped.length, "message")}`, capped, {
+        params: { label: name },
+        truncated: tagged.length > ACTION_CAP,
+      });
     }
     case "snooze": {
       const hours = snoozeHours(question);
       const capped = targets.slice(0, ACTION_CAP);
       const span =
-        hours >= 168 ? `${Math.round(hours / 168)} week${hours > 168 ? "s" : ""}`
-        : hours >= 24 ? `${Math.round(hours / 24)} day${hours > 24 ? "s" : ""}`
-        : `${hours} hour${hours > 1 ? "s" : ""}`;
-      return [
-        base("snooze", `Snooze ${N(capped.length, "message")} for ${span}`, capped, {
-          params: { hours },
-          truncated: targets.length > ACTION_CAP,
-        }),
-      ];
+        hours >= 168
+          ? `${Math.round(hours / 168)} week${hours > 168 ? "s" : ""}`
+          : hours >= 24
+            ? `${Math.round(hours / 24)} day${hours > 24 ? "s" : ""}`
+            : `${hours} hour${hours > 1 ? "s" : ""}`;
+      return base("snooze", `Snooze ${N(capped.length, "message")} for ${span}`, capped, {
+        params: { hours },
+        truncated: targets.length > ACTION_CAP,
+      });
     }
     case "star":
     case "unstar": {
       const capped = targets.slice(0, ACTION_CAP);
-      return [
-        base(
-          intent.kind,
-          `${intent.kind === "star" ? "Star" : "Unstar"} ${N(capped.length, "message")}`,
-          capped,
-          { truncated: targets.length > ACTION_CAP },
-        ),
-      ];
+      return base(
+        kind,
+        `${kind === "star" ? "Star" : "Unstar"} ${N(capped.length, "message")}`,
+        capped,
+        { truncated: targets.length > ACTION_CAP },
+      );
     }
     default: {
       const capped = targets.slice(0, ACTION_CAP);
-      const verbs: Record<string, string> = {
+      const verbs: Partial<Record<AgentActionKind, string>> = {
         archive: `Archive ${N(capped.length, "message")}`,
         unarchive: `Move ${N(capped.length, "message")} back to inbox`,
         mark_read: `Mark ${N(capped.length, "message")} as read`,
         mark_unread: `Mark ${N(capped.length, "message")} as unread`,
         trash: `Move ${N(capped.length, "message")} to trash`,
       };
-      return [
-        base(intent.kind, verbs[intent.kind] ?? "Apply", capped, {
-          truncated: targets.length > ACTION_CAP,
-        }),
-      ];
+      return base(kind, verbs[kind] ?? "Apply", capped, {
+        truncated: targets.length > ACTION_CAP,
+      });
     }
   }
+}
+
+/**
+ * Turn a command-style question plus its cited findings into concrete,
+ * confirmable mutations - one step per detected intent, so "unsubscribe
+ * from these and archive the rest" proposes an ordered plan. Read-only
+ * questions produce nothing; every step names its exact message set.
+ */
+export function proposeActions(
+  question: string,
+  hits: SemanticHit[],
+): ProposedAction[] {
+  const steps: ProposedAction[] = [];
+
+  // A routine request ("every morning, summarize overnight mail") needs
+  // no findings - it schedules future runs, not a one-off mutation.
+  const routine = cadenceOf(question);
+  if (routine) {
+    const span =
+      routine.everyHours >= 168
+        ? "every week"
+        : routine.everyHours >= 24
+          ? `every day at ${routine.hour}:00`
+          : "every hour";
+    steps.push(
+      base("schedule", `Run this ${span}`, [], {
+        params: {
+          prompt: routine.prompt,
+          everyHours: routine.everyHours,
+          hour: routine.hour,
+        },
+      }),
+    );
+  }
+
+  for (const intent of INTENTS) {
+    if (!intent.re.test(question)) continue;
+    const targets = hits.filter(intent.eligible);
+    if (targets.length === 0) continue;
+    const step = stepFor(intent.kind, question, targets);
+    if (step) steps.push(step);
+    if (steps.length >= 4) break;
+  }
+  return steps;
 }

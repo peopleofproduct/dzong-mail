@@ -21,7 +21,7 @@ async function readSetting<T>(
  */
 export async function emit(
   input: {
-    kind: "new-mail" | "follow-up" | "send" | "agent" | "system" | "read-receipt";
+    kind: "new-mail" | "follow-up" | "send" | "agent" | "system" | "read-receipt" | "routine";
     title: string;
     body?: string;
     messageId?: string;

@@ -4,6 +4,7 @@ import { Lock, Mail, Search, Sparkles, Workflow } from "lucide-react";
 import { connectMockAccount } from "@/lib/actions";
 import { getAccounts } from "@/lib/queries";
 import { ThemeToggle } from "@/components/mail/theme-toggle";
+import { SetupChecklist } from "@/components/setup-checklist";
 
 const features = [
   {
@@ -89,6 +90,10 @@ export default function WelcomePage() {
             <DemoCta />
           </Suspense>
         </div>
+
+        <Suspense fallback={null}>
+          <SetupChecklist />
+        </Suspense>
 
         <div className="mt-12 grid gap-6 sm:grid-cols-2">
           {features.map((f) => (

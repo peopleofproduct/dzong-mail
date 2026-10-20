@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { unsubscribeSender, draftAiReply } from "@unwalled/sync-engine";
+import { unsubscribeSender, draftAiReply, saveRoutine } from "@unwalled/sync-engine";
 import { apiGuard, badRequest } from "../_lib";
 
 /**
@@ -28,7 +28,8 @@ type ActionKind =
   | "star"
   | "unstar"
   | "unsubscribe"
-  | "draft_reply";
+  | "draft_reply"
+  | "schedule";
 
 const SIMPLE: Record<string, { apply: Record<string, unknown>; inverse: string; audit: string }> =
   {
@@ -66,9 +67,38 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     kind?: string;
     messageIds?: unknown;
-    params?: { label?: string; hours?: number; senders?: unknown };
+    params?: {
+      label?: string;
+      hours?: number;
+      senders?: unknown;
+      prompt?: string;
+      everyHours?: number;
+      hour?: number;
+    };
   };
   const kind = body.kind as ActionKind;
+
+  // ── schedule: a recurring assistant routine, reversible by removal ──
+  if (kind === "schedule") {
+    const p = body.params;
+    if (!p?.prompt || !p.everyHours) {
+      return badRequest("schedule needs params.prompt and params.everyHours");
+    }
+    const routine = await saveRoutine({
+      prompt: p.prompt,
+      everyHours: p.everyHours,
+      hour: p.hour,
+    });
+    const entry = await prisma.auditEntry.create({
+      data: {
+        action: "schedule",
+        targetType: "routine",
+        targetId: routine.id,
+        detail: { inverse: "unschedule", ids: [routine.id], via: "assistant" },
+      },
+    });
+    return NextResponse.json({ ok: true, routineId: routine.id, auditId: entry.id });
+  }
 
   const ids = Array.isArray(body.messageIds)
     ? body.messageIds.filter((x): x is string => typeof x === "string")

@@ -5,6 +5,7 @@ import { AccountsSection } from "@/components/accounts-section";
 import { AISettingsSection } from "@/components/settings/ai-settings-section";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RulesSection } from "@/components/settings/rules-section";
+import { RoutinesSection } from "@/components/settings/routines-section";
 import { SubscriptionsSection } from "@/components/settings/subscriptions-section";
 import { WorkspaceSection } from "@/components/settings/workspace-section";
 
@@ -44,6 +45,9 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
         </Suspense>
         <Suspense fallback={<SectionSkeleton />}>
           <RulesSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton />}>
+          <RoutinesSection />
         </Suspense>
         <Suspense fallback={<SectionSkeleton />}>
           <SubscriptionsSection />

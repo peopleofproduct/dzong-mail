@@ -6,6 +6,7 @@ import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getLocalUser } from "@/lib/queries";
 import {
   applyAutomationRules,
   buildGoogleAuthorizationUrl,
@@ -605,12 +606,60 @@ export async function removeDraftAttachment(attachmentId: string): Promise<{ ok:
   return { ok: true };
 }
 
+/** Welcome checklist: kick off an Ollama model pull in the background. */
+export async function startOllamaPull(model: string) {
+  const user = await getLocalUser();
+  const base = user?.aiSettings?.baseUrl ?? "http://localhost:11434";
+  // Fire and forget - Ollama streams progress; the checklist flips green
+  // on the next page load once the model lands.
+  void fetch(`${base}/api/pull`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: model, stream: false }),
+  }).catch(() => null);
+  revalidatePath("/welcome");
+}
+
+/** Remove a scheduled assistant routine (Settings → Routines). */
+export async function deleteRoutineNow(id: string) {
+  const { deleteRoutine } = await import("@unwalled/sync-engine");
+  await deleteRoutine(id);
+  revalidatePath("/settings");
+}
+
 // ─── AI features ────────────────────────────────────────────────────────────
 
 export async function draftAiReplyNow(messageId: string) {
   const result = await draftAiReply(messageId);
   revalidatePath("/");
   safeRedirect("/", result.ok ? { notice: "Draft ready in Drafts" } : { error: result.reason! });
+}
+
+/** Meeting-brief CTA: AI-draft replies to everything a sender is still owed. */
+export async function draftOwedRepliesNow(fromAddress: string) {
+  const owed = await prisma.message.findMany({
+    where: {
+      fromAddress: { equals: fromAddress, mode: "insensitive" },
+      isRead: false,
+      isDraft: false,
+      aiLabels: { has: "NEEDS_REPLY" },
+    },
+    orderBy: { receivedAt: "asc" },
+    take: 3,
+    select: { id: true },
+  });
+  let drafted = 0;
+  for (const m of owed) {
+    const res = await draftAiReply(m.id).catch(() => ({ ok: false as const }));
+    if (res.ok) drafted++;
+  }
+  revalidatePath("/");
+  safeRedirect(
+    "/?view=drafts",
+    drafted > 0
+      ? { notice: `${drafted} reply draft${drafted === 1 ? "" : "s"} ready` }
+      : { error: "No drafts could be generated" },
+  );
 }
 
 /** Generate reply variants for the picker — returns bodies, persists nothing. */
@@ -1027,6 +1076,11 @@ export async function undoAuditEntry(entryId: string): Promise<{ ok: boolean }> 
     case "delete-drafts":
       await prisma.message.deleteMany({ where: { id: { in: ids }, isDraft: true } });
       break;
+    case "unschedule": {
+      const { deleteRoutine } = await import("@unwalled/sync-engine");
+      for (const id of ids) await deleteRoutine(id);
+      break;
+    }
     case "toggle-flag": {
       const flag = detail.flag === "isStarred" ? "isStarred" : "isRead";
       const rows = await prisma.message.findMany({ where: { id: { in: ids } } });
