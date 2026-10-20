@@ -974,7 +974,12 @@ export async function reviewDecision(decisionId: string, approve: boolean) {
 export async function undoAuditEntry(entryId: string): Promise<{ ok: boolean }> {
   const entry = await prisma.auditEntry.findUnique({ where: { id: entryId } });
   if (!entry || entry.undoneAt) return { ok: false };
-  const detail = entry.detail as { inverse?: string; ids?: string[]; flag?: string } | null;
+  const detail = entry.detail as {
+    inverse?: string;
+    ids?: string[];
+    flag?: string;
+    label?: string;
+  } | null;
   const ids = detail?.ids ?? (entry.targetType === "message" ? [entry.targetId] : []);
   if (!detail?.inverse || detail.inverse === "noop" || ids.length === 0) return { ok: false };
 
@@ -999,6 +1004,28 @@ export async function undoAuditEntry(entryId: string): Promise<{ ok: boolean }> 
       break;
     case "unsnooze":
       await prisma.message.updateMany({ where: { id: { in: ids } }, data: { snoozedUntil: null } });
+      break;
+    case "label":
+    case "unlabel": {
+      const name = detail.label;
+      if (!name) return { ok: false };
+      const rows = await prisma.message.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, labels: true },
+      });
+      for (const row of rows) {
+        const next =
+          detail.inverse === "label"
+            ? row.labels.includes(name)
+              ? row.labels
+              : [...row.labels, name]
+            : row.labels.filter((l) => l !== name);
+        await prisma.message.update({ where: { id: row.id }, data: { labels: next } });
+      }
+      break;
+    }
+    case "delete-drafts":
+      await prisma.message.deleteMany({ where: { id: { in: ids }, isDraft: true } });
       break;
     case "toggle-flag": {
       const flag = detail.flag === "isStarred" ? "isStarred" : "isRead";

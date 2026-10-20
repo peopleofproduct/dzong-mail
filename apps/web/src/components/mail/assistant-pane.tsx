@@ -36,6 +36,8 @@ interface ProposedAction {
   messageIds: string[];
   preview: { messageId: string; subject: string | null; from: string }[];
   truncated: boolean;
+  params?: { label?: string; hours?: number; senders?: string[] };
+  caveat?: string;
 }
 
 type ActionState = "pending" | "running" | "done" | "dismissed" | "undone" | "failed";
@@ -207,7 +209,11 @@ export function AssistantStream({ question }: { question: string }) {
       const res = await fetch("/api/v1/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: action.kind, messageIds: action.messageIds }),
+        body: JSON.stringify({
+          kind: action.kind,
+          messageIds: action.messageIds,
+          params: action.params,
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
@@ -358,6 +364,11 @@ export function AssistantStream({ question }: { question: string }) {
                   </li>
                 )}
               </ul>
+              {action.caveat && state === "pending" && (
+                <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                  {action.caveat}
+                </p>
+              )}
               <div className="mt-2.5 flex items-center gap-2">
                 {state === "pending" && (
                   <>
