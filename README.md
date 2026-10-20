@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/web/src/app/icon.svg" width="88" alt="Dzong Mail — fortress-gateway mark" />
+</p>
+
 # Dzong Mail
 
 **Your messages, your models, your machine — no paywalls, ever.**

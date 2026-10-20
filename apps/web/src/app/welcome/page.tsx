@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { Lock, Mail, Search, Sparkles, Workflow } from "lucide-react";
+import { Lock, Search, Sparkles, Workflow } from "lucide-react";
 import { connectMockAccount } from "@/lib/actions";
+import { BrandMark } from "@/components/brand-mark";
 import { getAccounts } from "@/lib/queries";
 import { ThemeToggle } from "@/components/mail/theme-toggle";
 import { SetupChecklist } from "@/components/setup-checklist";
@@ -52,7 +53,7 @@ export default function WelcomePage() {
     <div className="flex flex-1 flex-col overflow-y-auto bg-white dark:bg-zinc-950">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 dark:border-zinc-800 dark:bg-zinc-950/95">
         <div className="flex items-center gap-2">
-          <Mail size={18} className="text-indigo-600 dark:text-indigo-400" />
+          <BrandMark size={20} />
           <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
             Dzong Mail
           </span>
@@ -61,7 +62,8 @@ export default function WelcomePage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-10 sm:px-6 sm:py-16">
-        <p className="text-xs font-semibold tracking-wide text-indigo-600 uppercase dark:text-indigo-400">
+        <BrandMark size={56} className="rounded-2xl shadow-lg shadow-zinc-950/10" />
+        <p className="mt-6 text-xs font-semibold tracking-wide text-indigo-600 uppercase dark:text-indigo-400">
           Open source · Local-first · MIT
         </p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">

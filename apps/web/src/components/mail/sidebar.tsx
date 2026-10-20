@@ -6,7 +6,6 @@ import {
   Folder,
   Inbox,
   LayoutList,
-  Mail,
   Newspaper,
   Pencil,
   ReplyAll,
@@ -17,6 +16,7 @@ import {
   Timer,
   FileEdit,
 } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import type { SidebarData } from "@/lib/queries";
 import { VIEW_LABELS } from "@/lib/queries";
 import type { MailView } from "@/lib/queries";
@@ -87,7 +87,7 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
         href="/"
         className="mb-2 flex items-center gap-2 px-2 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
       >
-        <Mail size={16} className="text-indigo-500" />
+        <BrandMark size={18} />
         Dzong Mail
       </Link>
 
