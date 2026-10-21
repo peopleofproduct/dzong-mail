@@ -182,10 +182,14 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
         : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
     }`;
 
-  return (
-    <>
-      {accounts.length > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+  // Sticky glass header inside the list scroller: account chips + filter
+  // rail stay pinned while rows glide underneath (MessageList also nests
+  // the selection toolbar in this same pinned block).
+  const listHeader =
+    accounts.length > 1 || (showChips && chipCounts) || semanticNote ? (
+      <>
+        {accounts.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200/60 bg-white/80 px-3 py-2 backdrop-blur-md dark:border-zinc-800/60 dark:bg-zinc-950/80">
           <NavLink
             href={accountHref()}
             className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -209,10 +213,10 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
               {a.displayName ?? a.emailAddress}
             </NavLink>
           ))}
-        </div>
-      )}
-      {showChips && chipCounts && (
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+          </div>
+        )}
+        {showChips && chipCounts && (
+          <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200/60 bg-white/80 px-3 py-2 backdrop-blur-md dark:border-zinc-800/60 dark:bg-zinc-950/80">
           <NavLink href={chipHref({})} className={chipCls(view === "inbox" && !filter)}>
             All
           </NavLink>
@@ -250,20 +254,24 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
               <span className="ml-1 text-[10px] opacity-70">{chipCounts.newsletters}</span>
             )}
           </NavLink>
-        </div>
-      )}
-      {semanticNote && (
-        <p className="border-b border-zinc-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-zinc-800 dark:bg-amber-950/40 dark:text-amber-300">
-          {semanticNote}
-        </p>
-      )}
-      <MessageList
-        messages={items}
-        selectedId={str(params, "selected")}
-        threadId={str(params, "thread")}
-        sections={sections}
-      />
-    </>
+          </div>
+        )}
+        {semanticNote && (
+          <p className="border-b border-zinc-200/60 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-700 backdrop-blur-md dark:border-zinc-800/60 dark:bg-amber-950/50 dark:text-amber-300">
+            {semanticNote}
+          </p>
+        )}
+      </>
+    ) : undefined;
+
+  return (
+    <MessageList
+      messages={items}
+      selectedId={str(params, "selected")}
+      threadId={str(params, "thread")}
+      sections={sections}
+      header={listHeader}
+    />
   );
 }
 

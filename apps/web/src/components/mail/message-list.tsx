@@ -49,9 +49,18 @@ interface MessageListProps {
   threadId?: string;
   /** Optional split-inbox groupings — renders collapsible headers between groups. */
   sections?: ListSection[];
+  /** Chips/filter rail pinned to the top of the scroller — glass, content
+   *  scrolls underneath. */
+  header?: React.ReactNode;
 }
 
-export function MessageList({ messages, selectedId, threadId, sections }: MessageListProps) {
+export function MessageList({
+  messages,
+  selectedId,
+  threadId,
+  sections,
+  header,
+}: MessageListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -61,6 +70,11 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
   const lastArchived = useRef<string[]>([]);
   const gPending = useRef(0);
   const vPending = useRef(0);
+  // Measured height of the pinned header block — section titles stick just
+  // beneath it (via the --listhead custom property) rather than sliding
+  // under the glass.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerH, setHeaderH] = useState(0);
 
   // Optimistic layer: flag patches paint instantly; `hidden` removes rows the
   // server will filter out on the next render (archive/snooze in the inbox).
@@ -163,6 +177,18 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     },
     [patch],
   );
+
+  // Track the pinned header's live height (it grows when the selection
+  // toolbar appears) so section titles know where to stick.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) =>
+      setHeaderH(entries[0]?.contentRect.height ?? 0),
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -540,9 +566,12 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
 
   if (displayed.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-sm text-zinc-400">
-        Nothing here. Hit <kbd className="mx-1 rounded bg-zinc-100 px-1 dark:bg-zinc-800">⌘K</kbd>
-        or sync an account.
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        {header && <div className="sticky top-0 z-20">{header}</div>}
+        <div className="flex flex-1 items-center justify-center p-8 text-sm text-zinc-400">
+          Nothing here. Hit <kbd className="mx-1 rounded bg-zinc-100 px-1 dark:bg-zinc-800">⌘K</kbd>
+          or sync an account.
+        </div>
       </div>
     );
   }
@@ -550,34 +579,42 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
   const byId = new Map(displayed.map((m) => [m.id, m]));
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
-      {checked.size > 0 && (
-        <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <span className="font-medium text-zinc-600 dark:text-zinc-300">
-            {checked.size} selected
-          </span>
-          <button
-            onClick={() => archive([...checked])}
-            className="rounded bg-zinc-900 px-2 py-1 text-white dark:bg-zinc-100 dark:text-black"
-          >
-            Archive
-          </button>
-          <button
-            onClick={() => {
-              const ids = [...checked];
-              patch(ids, { isRead: true });
-              void markMessagesRead(ids);
-            }}
-            className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Mark read
-          </button>
-          <button
-            onClick={() => setChecked(new Set())}
-            className="ml-auto text-zinc-400 hover:text-zinc-600"
-          >
-            <X size={14} />
-          </button>
+    <div
+      className="flex flex-1 flex-col overflow-y-auto"
+      style={{ "--listhead": `${headerH}px` } as React.CSSProperties}
+    >
+      {(header || checked.size > 0) && (
+        <div ref={headerRef} className="sticky top-0 z-20">
+          {header}
+          {checked.size > 0 && (
+            <div className="flex items-center gap-2 border-b border-zinc-200/60 bg-white/80 px-3 py-2 text-xs backdrop-blur-md dark:border-zinc-800/60 dark:bg-zinc-950/80">
+              <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                {checked.size} selected
+              </span>
+              <button
+                onClick={() => archive([...checked])}
+                className="rounded bg-zinc-900 px-2 py-1 text-white dark:bg-zinc-100 dark:text-black"
+              >
+                Archive
+              </button>
+              <button
+                onClick={() => {
+                  const ids = [...checked];
+                  patch(ids, { isRead: true });
+                  void markMessagesRead(ids);
+                }}
+                className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Mark read
+              </button>
+              <button
+                onClick={() => setChecked(new Set())}
+                className="ml-auto text-zinc-400 hover:text-zinc-600"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
         </div>
       )}
       {sections && sections.length > 0 ? (
@@ -590,7 +627,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             <div key={section.title} className="border-b border-zinc-200 dark:border-zinc-800">
               <button
                 onClick={() => toggleSection(section.title)}
-                className="sticky top-0 z-[5] flex w-full items-center gap-2 bg-zinc-50/95 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-400"
+                className="sticky top-[var(--listhead,0px)] z-[5] flex w-full items-center gap-2 bg-zinc-50/95 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-400"
               >
                 <span className={`transition-transform ${isCollapsed ? "-rotate-90" : ""}`}>▾</span>
                 {section.title}

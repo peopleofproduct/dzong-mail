@@ -178,7 +178,8 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
     <div className="flex flex-1 flex-col overflow-y-auto">
       {unread.length > 0 && <MarkReadOnMount ids={unread} action={markMessagesRead} />}
 
-      <div className="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+      {/* Pinned glass header — subject stays visible while the thread scrolls. */}
+      <div className="sticky top-0 z-10 border-b border-zinc-200/60 bg-white/80 px-5 py-4 backdrop-blur-md dark:border-zinc-800/60 dark:bg-zinc-950/80">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
@@ -384,7 +385,7 @@ export async function ThreadPanel({ threadId, baseParams }: ThreadPanelProps) {
         ))}
       </div>
 
-      <div className="sticky bottom-0 flex gap-2 border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="sticky bottom-0 flex gap-2 border-t border-zinc-200/60 bg-white/80 p-4 backdrop-blur-md dark:border-zinc-800/60 dark:bg-zinc-950/80">
         <Link
           id="thread-reply"
           href={`/?${replyParams.toString()}`}
