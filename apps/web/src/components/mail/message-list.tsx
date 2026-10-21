@@ -337,7 +337,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             });
           }}
           onClick={(e) => e.stopPropagation()}
-          className="mt-1.5 h-3.5 w-3.5 accent-indigo-600"
+          className="row-check mt-1.5 h-3.5 w-3.5 accent-indigo-600"
           aria-label="Select message"
         />
         <button
@@ -346,7 +346,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             toggleStar(m);
           }}
           aria-label="Star"
-          className={`mt-1 shrink-0 ${
+          className={`row-star mt-1 shrink-0 ${
             m.isStarred
               ? "text-amber-500"
               : "text-zinc-300 group-hover:text-zinc-400 dark:text-zinc-600"
@@ -354,7 +354,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
         >
           <Star size={14} fill={m.isStarred ? "currentColor" : "none"} />
         </button>
-        <span className="relative mt-0.5 hidden sm:block">
+        <span className="row-avatar relative mt-0.5 hidden sm:block">
           <SenderAvatar email={m.fromAddress} name={m.fromName} size={30} />
           <span
             title={`${m.accountEmail} · ${PROVIDER_DOT[m.accountProvider]?.label ?? m.accountProvider}`}
@@ -363,8 +363,8 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             }`}
           />
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
+        <div className="row-body min-w-0 flex-1">
+          <div className="row-top flex items-baseline gap-2">
             {!m.isRead && (
               <span
                 className="h-2 w-2 shrink-0 self-center rounded-full bg-indigo-500"
@@ -372,7 +372,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
               />
             )}
             <span
-              className={`row-primary truncate text-[13px] ${
+              className={`row-primary row-name truncate text-[13px] ${
                 m.isRead
                   ? "text-zinc-400 dark:text-zinc-500"
                   : "font-bold text-zinc-900 dark:text-zinc-50"
@@ -396,15 +396,9 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
                 ✦ {m.score.toFixed(2)}
               </span>
             )}
-            <span className="ml-auto shrink-0 text-[11px] text-zinc-400">
-              {new Date(m.receivedAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
           </div>
           <p
-            className={`row-primary truncate text-[13px] ${
+            className={`row-primary row-subject truncate text-[13px] ${
               m.isRead
                 ? "text-zinc-400 dark:text-zinc-500"
                 : "font-semibold text-zinc-800 dark:text-zinc-100"
@@ -416,7 +410,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             {m.snippet}
           </p>
           {(m.aiLabels.length > 0 || m.labels.length > 0) && (
-            <div className="mt-1 flex flex-wrap gap-1">
+            <div className="row-labels mt-1 flex flex-wrap gap-1">
               {m.aiLabels.map((l) => (
                 <span
                   key={l}
@@ -436,6 +430,12 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
             </div>
           )}
         </div>
+        <span className="row-date mt-1 ml-auto shrink-0 self-start text-[11px] text-zinc-400">
+          {new Date(m.receivedAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })}
+        </span>
         {/* row-actions: hidden until hover on fine pointers; globals.css
             shows it always on touch (hover:none) so the actions stay
             reachable without a hover state. */}

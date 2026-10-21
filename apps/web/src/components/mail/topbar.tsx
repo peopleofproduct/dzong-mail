@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BarChart3, Keyboard, Menu, PenSquare, Search } from "lucide-react";
+import { DensityToggle } from "./density-toggle";
 import { NotificationBell } from "./notification-bell";
 import { SyncStatus } from "./sync-status";
 import { ThemeToggle } from "./theme-toggle";
@@ -113,6 +114,7 @@ export function Topbar() {
       </form>
       <SyncStatus />
       <NotificationBell />
+      <DensityToggle />
       <button
         onClick={() => router.push("/analytics")}
         title="Analytics"
