@@ -10,6 +10,7 @@ export interface Insights {
   heatmap: number[][];
   categories: { label: string; count: number; pct: number; tone: string }[];
   topSenders: { name: string; address: string; count: number; pct: number }[];
+  topRecipients: { name: string; address: string; count: number; pct: number }[];
   flow: { received: number; handled: number; sent: number; periodDays: number };
   replyDebt: { bucket: string; count: number }[];
   replyDebtOldestDays: number;
@@ -66,6 +67,7 @@ export async function getInsights(): Promise<Insights> {
     received30,
     handled30,
     sent30,
+    sentRecipientRows,
     needsReplyThreads,
     awaitingThreads,
     achievements,
@@ -92,6 +94,11 @@ export async function getInsights(): Promise<Insights> {
     prisma.message.count({ where: { isDraft: false, receivedAt: { gte: d30 } } }),
     prisma.message.count({ where: { isArchived: true, isDraft: false } }),
     prisma.message.count({ where: { folder: "Sent", isDraft: false, receivedAt: { gte: d30 } } }),
+    prisma.message.findMany({
+      where: { folder: "Sent", isDraft: false },
+      select: { toAddresses: true },
+      take: 2000,
+    }),
     getFollowUpThreads("needs-reply"),
     getFollowUpThreads("awaiting"),
     getAchievementStats(),
@@ -153,6 +160,37 @@ export async function getInsights(): Promise<Insights> {
     address: s.fromAddress,
     count: s._count._all,
     pct: Math.round((s._count._all / senderTotal) * 100),
+  }));
+
+  // Who the user writes TO — grouped recipients, display names borrowed
+  // from their incoming mail when a bare address is all the Sent copy has.
+  const recipCounts = new Map<string, number>();
+  for (const m of sentRecipientRows) {
+    for (const addr of m.toAddresses) {
+      const a = addr.trim().toLowerCase();
+      if (a.includes("@")) recipCounts.set(a, (recipCounts.get(a) ?? 0) + 1);
+    }
+  }
+  const topRecipAddrs = [...recipCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 7)
+    .map(([a]) => a);
+  const recipNameRows =
+    topRecipAddrs.length > 0
+      ? await prisma.message.findMany({
+          where: { fromAddress: { in: topRecipAddrs }, fromName: { not: null } },
+          select: { fromAddress: true, fromName: true },
+          distinct: ["fromAddress"],
+          take: 20,
+        })
+      : [];
+  const recipNames = new Map(recipNameRows.map((r) => [r.fromAddress.toLowerCase(), r.fromName!]));
+  const sentTotal = Math.max(1, sentRecipientRows.length);
+  const topRecipients = topRecipAddrs.map((address) => ({
+    name: recipNames.get(address) ?? address,
+    address,
+    count: recipCounts.get(address) ?? 0,
+    pct: Math.round(((recipCounts.get(address) ?? 0) / sentTotal) * 100),
   }));
 
   // Reply debt aging.
@@ -278,6 +316,7 @@ export async function getInsights(): Promise<Insights> {
     heatmap,
     categories,
     topSenders,
+    topRecipients,
     flow: { received: received30, handled: handled30, sent: sent30, periodDays: 30 },
     replyDebt,
     replyDebtOldestDays,

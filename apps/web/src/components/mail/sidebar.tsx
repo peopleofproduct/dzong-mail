@@ -6,6 +6,7 @@ import {
   Folder,
   Inbox,
   LayoutList,
+  MailX,
   Newspaper,
   Pencil,
   ReplyAll,
@@ -104,6 +105,14 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
       <nav className="flex flex-col gap-0.5">
         <SidebarMore defaultOpen={moreOpen}>
           {MORE_VIEWS.map(viewItem)}
+
+          <Link
+            href="/subscriptions"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+          >
+            <MailX size={14} className="shrink-0" />
+            <span className="truncate">Subscriptions</span>
+          </Link>
 
           {data.folders.length > 0 && (
             <>

@@ -14,6 +14,7 @@ import {
   parseView,
   searchMessagesSemantic,
   splitInboxGroups,
+  viewWhere,
 } from "@/lib/queries";
 import { AiSetupBanner } from "@/components/ai-setup-banner";
 import { AskPanel } from "@/components/mail/ask-panel";
@@ -89,6 +90,9 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   };
 
   const semantic = str(params, "sm") === "1";
+  const filterParam = str(params, "filter");
+  const filter =
+    filterParam === "unread" || filterParam === "attachments" ? filterParam : undefined;
   let semanticNote: string | undefined;
   let items: MailItem[];
   if (label) {
@@ -112,7 +116,7 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
       semanticNote =
         "No AI matches yet - your inbox is still being indexed (it happens during sync)";
   } else {
-    items = (await getMessagesForView(view, q, 100, accountId)).map(serializeMessage);
+    items = (await getMessagesForView(view, q, 100, accountId, filter)).map(serializeMessage);
   }
 
   // Superhuman-style split inbox: only on the plain inbox view, not
@@ -121,6 +125,43 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     view === "inbox" && !q && !label && !folder
       ? splitInboxGroups(items, await getSplitLabels())
       : undefined;
+
+  // Quick-filter chip strip: in-list filters (unread/attachments) alongside
+  // nav chips to the reply queue and newsletters — the glanceable "what
+  // needs me" row. Counts are scoped to the active account chip.
+  const showChips = view === "inbox" && !label && !folder && !q;
+  let chipCounts: { unread: number; attachments: number; needsReply: number; newsletters: number } | undefined;
+  if (showChips) {
+    const scoped = accountId ? { emailAccountId: accountId } : {};
+    const [unread, attachments, needsReply, newsletters] = await Promise.all([
+      prisma.message.count({ where: { AND: [viewWhere("inbox"), scoped, { isRead: false }] } }),
+      prisma.message.count({ where: { AND: [viewWhere("inbox"), scoped, { hasAttachment: true }] } }),
+      getReplyQueue().then((q) => q.length),
+      prisma.message.count({ where: { AND: [viewWhere("newsletters"), scoped] } }),
+    ]);
+    chipCounts = { unread, attachments, needsReply, newsletters };
+  }
+  const chipHref = (overrides: Record<string, string>) => {
+    const p = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => typeof v === "string")) as Record<
+        string,
+        string
+      >,
+    );
+    p.set("view", "inbox");
+    p.delete("filter");
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v) p.set(k, v);
+      else p.delete(k);
+    }
+    return `/?${p.toString()}`;
+  };
+  const chipCls = (active: boolean) =>
+    `shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+      active
+        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+        : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+    }`;
 
   return (
     <>
@@ -149,6 +190,47 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
               {a.displayName ?? a.emailAddress}
             </Link>
           ))}
+        </div>
+      )}
+      {showChips && chipCounts && (
+        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+          <Link href={chipHref({})} className={chipCls(!filter)}>
+            All
+          </Link>
+          <Link href={chipHref({ filter: "unread" })} className={chipCls(filter === "unread")}>
+            Unread
+            {chipCounts.unread > 0 && (
+              <span className="ml-1 text-[10px] opacity-70">{chipCounts.unread}</span>
+            )}
+          </Link>
+          <Link
+            href={chipHref({ filter: "attachments" })}
+            className={chipCls(filter === "attachments")}
+          >
+            Attachments
+            {chipCounts.attachments > 0 && (
+              <span className="ml-1 text-[10px] opacity-70">{chipCounts.attachments}</span>
+            )}
+          </Link>
+          <span className="mx-1 h-4 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700" />
+          <Link
+            href="/?view=needs-reply"
+            className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-950"
+          >
+            Needs reply
+            {chipCounts.needsReply > 0 && (
+              <span className="ml-1 text-[10px] opacity-70">{chipCounts.needsReply}</span>
+            )}
+          </Link>
+          <Link
+            href="/?view=newsletters"
+            className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Newsletters
+            {chipCounts.newsletters > 0 && (
+              <span className="ml-1 text-[10px] opacity-70">{chipCounts.newsletters}</span>
+            )}
+          </Link>
         </div>
       )}
       {semanticNote && (

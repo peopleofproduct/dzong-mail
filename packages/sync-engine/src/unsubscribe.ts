@@ -92,12 +92,15 @@ export interface SenderUnsubscribeResult extends UnsubscribeResult {
 
 /**
  * Bulk-unsubscribe: find the most recent message from `fromAddress` carrying
- * List-Unsubscribe headers, attempt the unsubscribe, then archive every
- * message from that sender and tag them UNSUBSCRIBED.
+ * List-Unsubscribe headers, attempt the unsubscribe, then (optionally)
+ * archive every message from that sender and tag them UNSUBSCRIBED.
+ * `archive` maps the UI's "archive on unsubscribe" toggle — off keeps the
+ * history readable while still opting out of future mail.
  */
 export async function unsubscribeSender(
   fromAddress: string,
   db: PrismaClient = prisma,
+  opts: { archive?: boolean } = {},
 ): Promise<SenderUnsubscribeResult> {
   const candidates = await db.message.findMany({
     where: { fromAddress, isDraft: false },
@@ -113,10 +116,13 @@ export async function unsubscribeSender(
     ? await attemptUnsubscribe((withHeader.headers ?? {}) as Record<string, string>)
     : ({ ok: false, method: "none", note: "No List-Unsubscribe header" } as UnsubscribeResult);
 
-  const { count } = await db.message.updateMany({
-    where: { fromAddress, isDraft: false },
-    data: { isArchived: true },
-  });
+  const archive = opts.archive ?? true;
+  const { count } = archive
+    ? await db.message.updateMany({
+        where: { fromAddress, isDraft: false },
+        data: { isArchived: true },
+      })
+    : { count: 0 };
 
   if (result.ok || result.method === "https-link" || result.method === "mailto") {
     // Tag every message from this sender so the subscription shows as handled.

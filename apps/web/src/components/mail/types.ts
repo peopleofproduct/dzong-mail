@@ -17,6 +17,7 @@ export interface MailItem {
   aiLabels: string[];
   labels: string[];
   accountEmail: string;
+  accountProvider: string;
   hasUnsubscribe: boolean;
   hasAttachment: boolean;
   /** Semantic-search relevance score, present on `?sm=1` results. */
@@ -43,7 +44,7 @@ export function serializeMessage(m: {
   labels: string[];
   headers: unknown;
   hasAttachment: boolean;
-  emailAccount: { emailAddress: string };
+  emailAccount: { emailAddress: string; provider?: string };
 }): MailItem {
   const headers = (m.headers ?? {}) as Record<string, string>;
   return {
@@ -65,6 +66,7 @@ export function serializeMessage(m: {
     aiLabels: m.aiLabels,
     labels: m.labels,
     accountEmail: m.emailAccount.emailAddress,
+    accountProvider: m.emailAccount.provider ?? "IMAP",
     hasUnsubscribe: Boolean(headers["List-Unsubscribe"] ?? headers["list-unsubscribe"]),
     hasAttachment: m.hasAttachment,
   };

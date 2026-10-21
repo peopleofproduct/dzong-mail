@@ -61,3 +61,8 @@ export const getNoReplySenders = () => getSetting<string[]>("noReplySenders", []
  *  learning signal behind the "you've cleared N threads, always?" nudge. */
 export const getNoReplyDismissals = () =>
   getSetting<Record<string, number>>("noReplyDismissals", {});
+
+/** Bulk senders the user marked "keep" on the subscriptions page — they
+ *  stay out of the suggested-to-cut ranking and sort to the bottom. */
+export const getKeptSubscriptions = () =>
+  getSetting<string[]>("keptSubscriptionSenders", []);

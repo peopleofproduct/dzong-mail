@@ -57,8 +57,54 @@ async function AnalyticsBody() {
   const achievements = await getAchievementStats();
 
   const t = insights.totals;
+  const openedPct = t.total > 0 ? Math.round(((t.total - t.unread) / t.total) * 100) : 0;
+  const hero = [
+    {
+      label: "Received",
+      value: insights.flow.received,
+      caption: `last ${insights.flow.periodDays} days`,
+      dot: "bg-indigo-500",
+    },
+    {
+      label: "Sent",
+      value: insights.flow.sent,
+      caption: `last ${insights.flow.periodDays} days`,
+      dot: "bg-violet-500",
+    },
+    {
+      label: "Opened",
+      value: `${openedPct}%`,
+      caption: `${t.total - t.unread} of ${t.total} messages`,
+      dot: "bg-emerald-500",
+    },
+    {
+      label: "Processed",
+      value: insights.flow.handled,
+      caption: "archived out of the inbox",
+      dot: "bg-amber-500",
+    },
+  ];
   return (
     <div className="flex flex-col gap-6">
+      {/* Hero: the four numbers a person actually asks about. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {hero.map((s) => (
+          <div
+            key={s.label}
+            className="rounded-xl border border-zinc-200/80 bg-white px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900/60"
+          >
+            <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-zinc-400 uppercase">
+              <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+              {s.label}
+            </p>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50">
+              {s.value}
+            </p>
+            <p className="mt-0.5 text-[11px] text-zinc-400">{s.caption}</p>
+          </div>
+        ))}
+      </div>
+
       <AchievementCard stats={achievements} name={name} />
 
       {/* Insights strip - the auto-generated story of the data. */}
@@ -141,24 +187,34 @@ async function AnalyticsBody() {
         </Card>
       </div>
 
+      {/* The people in the mailbox — heard from vs written to. */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Top senders" subtitle="Who fills your mailbox">
+        <Card title="You hear from" subtitle="Who fills your mailbox">
           <SenderBars senders={insights.topSenders} />
         </Card>
-        <Card title="In vs out" subtitle={`Last ${insights.flow.periodDays} days`}>
-          <FlowBalance flow={insights.flow} />
+        <Card title="You write to" subtitle="Where your replies actually go">
+          {insights.topRecipients.length > 0 ? (
+            <SenderBars senders={insights.topRecipients} />
+          ) : (
+            <p className="text-xs text-zinc-400">
+              Nothing sent yet — once you send mail, your top correspondents show up here.
+            </p>
+          )}
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card
           title="Reply debt"
           subtitle="Threads waiting on you, by age - old items fade from memory"
         >
           <DebtAging buckets={insights.replyDebt} />
         </Card>
+        <Card title="In vs out" subtitle={`Last ${insights.flow.periodDays} days`}>
+          <FlowBalance flow={insights.flow} />
+        </Card>
         <Card title="Right now" subtitle="Live counts">
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2.5">
             <MiniStat label="Total messages" value={t.total} />
             <MiniStat label="Unread" value={t.unread} />
             <MiniStat label="Needs reply" value={t.needsReply} />

@@ -40,6 +40,7 @@ import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@dzo
 import { cleanEmailHtml } from "@/lib/email-html";
 import { snapshotInboxZero } from "@/lib/achievements";
 import {
+  getKeptSubscriptions,
   getNoReplyDismissals,
   getNoReplySenders,
   getRequestReadReceipts,
@@ -797,6 +798,74 @@ export async function unsubscribeSenderNow(fromAddress: string) {
       ? { notice: `Unsubscribed — archived ${result.archived} message(s)` }
       : { error: `Unsubscribe failed: ${result.note ?? "no target"}` },
   );
+}
+
+/** Subscriptions page: cut several senders in one pass — each through its
+ *  own List-Unsubscribe mechanism. Per-sender failures are collected, not
+ *  fatal; link/mailto targets come back so the client can surface them. */
+export async function bulkUnsubscribeSenders(
+  addresses: string[],
+  archive = true,
+): Promise<{ done: string[]; failed: { address: string; note: string }[]; links: string[] }> {
+  const done: string[] = [];
+  const failed: { address: string; note: string }[] = [];
+  const links: string[] = [];
+  for (const raw of addresses) {
+    const address = raw.trim();
+    if (!address) continue;
+    try {
+      const r = await unsubscribeSender(address, prisma, { archive });
+      if (r.ok || r.method === "https-link" || r.method === "mailto") {
+        done.push(address);
+        if ((r.method === "https-link" || r.method === "mailto") && r.target)
+          links.push(r.target);
+      } else {
+        failed.push({ address, note: r.note ?? "no target" });
+      }
+    } catch (err) {
+      failed.push({ address, note: String(err) });
+    }
+  }
+  if (done.length) await audit("bulk-unsubscribe", done[0], { senders: done, archive });
+  await snapshotInboxZero();
+  revalidatePath("/");
+  revalidatePath("/subscriptions");
+  return { done, failed, links };
+}
+
+/** Pin bulk senders out of the suggested-cut ranking — "keep this one". */
+export async function keepSubscriptionSenders(addresses: string[]) {
+  const kept = await getKeptSubscriptions();
+  const next = new Set(kept);
+  for (const a of addresses) next.add(a.trim().toLowerCase());
+  await setSetting("keptSubscriptionSenders", [...next]);
+  revalidatePath("/subscriptions");
+  revalidatePath("/settings");
+}
+
+/** Undo a "keep" — the sender rejoins the normal suggestion ranking. */
+export async function unkeepSubscriptionSender(address: string) {
+  const kept = await getKeptSubscriptions();
+  await setSetting(
+    "keptSubscriptionSenders",
+    kept.filter((s) => s !== address.trim().toLowerCase()),
+  );
+  revalidatePath("/subscriptions");
+  revalidatePath("/settings");
+}
+
+/** Schedule a ready draft for tomorrow 9am — the worker dispatches it like
+ *  any scheduled send; review still possible until then via the draft. */
+export async function sendDraftLater(messageId: string) {
+  const at = new Date();
+  at.setDate(at.getDate() + 1);
+  at.setHours(9, 0, 0, 0);
+  await prisma.message.update({ where: { id: messageId }, data: { scheduledAt: at } });
+  await audit("schedule-send", messageId, {
+    at: at.toISOString(),
+    inverse: "clear scheduledAt",
+  });
+  revalidatePath("/");
 }
 
 export async function createColdEmailPreset() {

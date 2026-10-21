@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { CheckCheck, ExternalLink, Pencil, Send, Sparkles } from "lucide-react";
+import { BellOff, CheckCheck, Clock, ExternalLink, Pencil, Send, Sparkles } from "lucide-react";
+import { getRecipientStyle } from "@dzong/sync-engine";
 import { getReplyQueue } from "@/lib/queries";
 import { getNoReplyDismissals } from "@/lib/settings";
-import { sendDraftNow } from "@/lib/actions";
+import { sendDraftLater, sendDraftNow, snoozeMessage } from "@/lib/actions";
 import { AiDraftButton } from "./ai-draft-button";
 import { NoReplyButton } from "./no-reply-button";
 import { SenderAvatar } from "./sender-avatar";
+import { VoiceBadge } from "./voice-badge";
 
 const cardBtn =
   "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium";
@@ -20,6 +22,25 @@ export async function ReplyQueuePanel() {
     getReplyQueue(),
     getNoReplyDismissals(),
   ]);
+
+  // Voice profiles for the threads that already have a draft — the badge
+  // explains *why* the AI draft sounds like the user. Bounded to ≤25 pairs
+  // of small queries; skipped entirely when no drafts exist.
+  const styleEntries = await Promise.all(
+    items
+      .filter((i) => i.draft)
+      .map(
+        async ({ thread }) =>
+          [
+            thread.latest.fromAddress.toLowerCase(),
+            await getRecipientStyle(
+              thread.latest.fromAddress,
+              thread.latest.emailAccountId,
+            ),
+          ] as const,
+      ),
+  );
+  const styleBySender = new Map(styleEntries);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -73,6 +94,9 @@ export async function ReplyQueuePanel() {
                     <Sparkles size={10} />
                     {draft.providerLabels.includes("AI_DRAFT") ? "AI draft ready" : "Draft ready"}
                   </p>
+                  <VoiceBadge
+                    style={styleBySender.get(m.fromAddress.toLowerCase()) ?? null}
+                  />
                   <p className="mt-1.5 line-clamp-4 text-sm leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                     {draft.bodyText ?? draft.snippet}
                   </p>
@@ -83,6 +107,15 @@ export async function ReplyQueuePanel() {
                         className={`${cardBtn} border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-500`}
                       >
                         <Send size={11} /> Send
+                      </button>
+                    </form>
+                    <form action={sendDraftLater.bind(null, draft.id)}>
+                      <button
+                        type="submit"
+                        title="Send tomorrow at 9am"
+                        className={`${cardBtn} border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}
+                      >
+                        <Clock size={11} /> Send later
                       </button>
                     </form>
                     <Link
@@ -109,6 +142,15 @@ export async function ReplyQueuePanel() {
                 >
                   <ExternalLink size={11} /> Open thread
                 </Link>
+                <form action={snoozeMessage.bind(null, m.id, 24)}>
+                  <button
+                    type="submit"
+                    title="Remind me tomorrow — snooze this thread 24h"
+                    className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  >
+                    <BellOff size={11} /> Remind me
+                  </button>
+                </form>
                 <span className="ml-auto">
                   <NoReplyButton
                     threadId={thread.threadId}

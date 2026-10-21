@@ -1,11 +1,15 @@
+import Link from "next/link";
 import { connection } from "next/server";
+import { ArrowRight } from "lucide-react";
 import { getSubscriptions } from "@/lib/queries";
-import { unsubscribeSenderNow } from "@/lib/actions";
-import { ConfirmSubmitButton } from "@/components/confirm-submit";
 
+/** Settings preview — the real manager lives at /subscriptions (bulk select,
+ *  read-rate ranking, keep list). This surfaces the count and the worst
+ *  offenders so the feature stays discoverable. */
 export async function SubscriptionsSection() {
   await connection();
   const subs = await getSubscriptions();
+  const suggested = subs.filter((s) => s.suggested);
 
   return (
     <section className="flex flex-col gap-3">
@@ -13,8 +17,7 @@ export async function SubscriptionsSection() {
         Subscriptions
       </h2>
       <p className="text-xs text-zinc-400">
-        Bulk senders detected via List-Unsubscribe headers and AI/promotion labels. Unsubscribing
-        uses the sender&apos;s own mechanism and archives their mail.
+        Bulk senders detected via List-Unsubscribe headers and AI/promotion labels.
       </p>
 
       {subs.length === 0 ? (
@@ -22,41 +25,39 @@ export async function SubscriptionsSection() {
           No subscription mail detected yet.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {subs.map((s) => (
-            <li
-              key={s.fromAddress}
-              className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-black dark:text-zinc-100">
-                  {s.fromName ?? s.fromAddress}
-                </p>
-                <p className="truncate text-xs text-zinc-400">{s.fromAddress}</p>
-              </div>
-              <span className="text-xs text-zinc-400">
-                {s.count} msg{s.count === 1 ? "" : "s"}
-                {s.unread > 0 && ` · ${s.unread} unread`}
-              </span>
-              {s.unsubscribed ? (
-                <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  unsubscribed
+        <>
+          <ul className="flex flex-col gap-2">
+            {subs.slice(0, 5).map((s) => (
+              <li
+                key={s.fromAddress}
+                className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-black dark:text-zinc-100">
+                    {s.fromName ?? s.fromAddress}
+                  </p>
+                  <p className="truncate text-xs text-zinc-400">{s.fromAddress}</p>
+                </div>
+                <span className="text-xs text-zinc-400">
+                  {s.count} msg{s.count === 1 ? "" : "s"} · {s.readPct}% read
                 </span>
-              ) : s.canUnsubscribe ? (
-                <form action={unsubscribeSenderNow.bind(null, s.fromAddress)}>
-                  <ConfirmSubmitButton
-                    message={`Unsubscribe from ${s.fromAddress} and archive their ${s.count} message(s)?`}
-                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    Unsubscribe &amp; archive
-                  </ConfirmSubmitButton>
-                </form>
-              ) : (
-                <span className="text-[10px] text-zinc-400">no opt-out link</span>
-              )}
-            </li>
-          ))}
-        </ul>
+                {s.unsubscribed && (
+                  <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    unsubscribed
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <Link
+            href="/subscriptions"
+            className="inline-flex items-center gap-1.5 self-start rounded-md border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+          >
+            Manage all {subs.length} senders
+            {suggested.length > 0 && ` — ${suggested.length} suggested to cut`}
+            <ArrowRight size={12} />
+          </Link>
+        </>
       )}
     </section>
   );

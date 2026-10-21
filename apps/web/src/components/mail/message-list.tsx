@@ -33,6 +33,16 @@ export interface ListSection {
   ids: string[];
 }
 
+/** Which account/provider a row arrived through — the colored corner dot
+ *  makes the unified inbox legible at a glance (Gmail red, Microsoft blue…). */
+const PROVIDER_DOT: Record<string, { cls: string; label: string }> = {
+  GOOGLE: { cls: "bg-red-500", label: "Gmail" },
+  MICROSOFT: { cls: "bg-sky-500", label: "Outlook" },
+  IMAP_SMTP: { cls: "bg-zinc-400", label: "IMAP" },
+  IMPORTED: { cls: "bg-amber-400", label: "imported" },
+  MOCK: { cls: "bg-violet-400", label: "demo" },
+};
+
 interface MessageListProps {
   messages: MailItem[];
   selectedId?: string;
@@ -344,8 +354,14 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
         >
           <Star size={14} fill={m.isStarred ? "currentColor" : "none"} />
         </button>
-        <span className="mt-0.5 hidden sm:block">
+        <span className="relative mt-0.5 hidden sm:block">
           <SenderAvatar email={m.fromAddress} name={m.fromName} size={30} />
+          <span
+            title={`${m.accountEmail} · ${PROVIDER_DOT[m.accountProvider]?.label ?? m.accountProvider}`}
+            className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-zinc-950 ${
+              PROVIDER_DOT[m.accountProvider]?.cls ?? "bg-zinc-400"
+            }`}
+          />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">

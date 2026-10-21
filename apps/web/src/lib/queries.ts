@@ -2,7 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { semanticSearchMessages } from "@dzong/sync-engine";
 import { serializeMessage } from "@/components/mail/types";
-import { getNoReplySenders } from "@/lib/settings";
+import { getKeptSubscriptions, getNoReplySenders } from "@/lib/settings";
 import type { Message, Prisma } from "@dzong/database";
 
 export type MailView =
@@ -45,7 +45,7 @@ export async function getAccounts() {
   });
 }
 
-function viewWhere(view: MailView): Prisma.MessageWhereInput {
+export function viewWhere(view: MailView): Prisma.MessageWhereInput {
   const base: Prisma.MessageWhereInput = { isDraft: view === "drafts" };
   switch (view) {
     case "inbox":
@@ -139,12 +139,20 @@ export async function getMessagesForView(
   q?: string,
   take = 100,
   accountId?: string,
+  filter?: "unread" | "attachments",
 ) {
+  const filterWhere: Prisma.MessageWhereInput[] =
+    filter === "unread"
+      ? [{ isRead: false }]
+      : filter === "attachments"
+        ? [{ hasAttachment: true }]
+        : [];
   const where = {
     AND: [
       viewWhere(view),
       ...(q ? [searchWhere(q)] : []),
       ...(accountId ? [{ emailAccountId: accountId }] : []),
+      ...filterWhere,
     ],
   };
   return prisma.message.findMany({
@@ -256,7 +264,7 @@ export async function getDigestSenders(days = 7): Promise<DigestSender[]> {
 
 export interface ThreadSummary {
   threadId: string;
-  latest: Message & { emailAccount: { emailAddress: string } };
+  latest: Message & { emailAccount: { emailAddress: string; provider: string } };
   count: number;
 }
 
@@ -276,7 +284,7 @@ export async function getFollowUpThreads(kind: "awaiting" | "needs-reply", accou
     },
     orderBy: { receivedAt: "desc" },
     take: 500,
-    include: { emailAccount: { select: { emailAddress: true } } },
+    include: { emailAccount: { select: { emailAddress: true, provider: true } } },
   });
 
   const threads = new Map<string, (typeof messages)[number][]>();
@@ -375,29 +383,47 @@ export interface SubscriptionSummary {
   fromName: string | null;
   count: number;
   unread: number;
+  /** 0-100 — share of their mail the user actually opened. */
+  readPct: number;
+  lastReceivedAt: string; // ISO
   canUnsubscribe: boolean;
   unsubscribed: boolean;
+  /** Marked "keep" — pinned out of the suggestion ranking. */
+  kept: boolean;
+  /** High-volume, low read-rate — the one-click-cut candidate set. */
+  suggested: boolean;
 }
 
 /** Group bulk senders (newsletters/promotions/List-Unsubscribe mail) for the
- *  subscriptions manager — the bulk-unsubscribe surface. */
+ *  subscriptions manager — the bulk-unsubscribe surface. Suggested cuts are
+ *  senders whose mail mostly goes unread; kept senders sort to the bottom. */
 export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
-  const messages = await prisma.message.findMany({
-    where: { isDraft: false },
-    orderBy: { receivedAt: "desc" },
-    take: 1000,
-    select: {
-      fromAddress: true,
-      fromName: true,
-      isRead: true,
-      headers: true,
-      labels: true,
-      aiLabels: true,
-      providerLabels: true,
-    },
-  });
+  const [messages, kept] = await Promise.all([
+    prisma.message.findMany({
+      where: { isDraft: false },
+      orderBy: { receivedAt: "desc" },
+      take: 1000,
+      select: {
+        fromAddress: true,
+        fromName: true,
+        isRead: true,
+        receivedAt: true,
+        headers: true,
+        labels: true,
+        aiLabels: true,
+        providerLabels: true,
+      },
+    }),
+    getKeptSubscriptions(),
+  ]);
+  const keptSet = new Set(kept.map((s) => s.toLowerCase()));
 
-  const senders = new Map<string, SubscriptionSummary>();
+  const senders = new Map<
+    string,
+    Omit<SubscriptionSummary, "readPct" | "lastReceivedAt" | "kept" | "suggested"> & {
+      lastReceivedAt: Date;
+    }
+  >();
   for (const m of messages) {
     const h = (m.headers ?? {}) as Record<string, string>;
     const hasUnsubHeader = Boolean(h["List-Unsubscribe"] ?? h["list-unsubscribe"]);
@@ -412,6 +438,7 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
       fromName: m.fromName,
       count: 0,
       unread: 0,
+      lastReceivedAt: m.receivedAt,
       canUnsubscribe: false,
       unsubscribed: false,
     };
@@ -421,7 +448,29 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
     if (m.labels.includes("UNSUBSCRIBED")) s.unsubscribed = true;
     senders.set(m.fromAddress, s);
   }
-  return [...senders.values()].sort((a, b) => b.count - a.count);
+  return [...senders.values()]
+    .map((s) => {
+      const readPct = s.count > 0 ? Math.round(((s.count - s.unread) / s.count) * 100) : 0;
+      const isKept = keptSet.has(s.fromAddress.toLowerCase());
+      return {
+        ...s,
+        readPct,
+        lastReceivedAt: s.lastReceivedAt.toISOString(),
+        kept: isKept,
+        suggested: !isKept && !s.unsubscribed && s.count >= 3 && readPct < 35,
+      };
+    })
+    .sort((a, b) =>
+      a.kept !== b.kept
+        ? a.kept
+          ? 1
+          : -1
+        : a.suggested !== b.suggested
+          ? a.suggested
+            ? -1
+            : 1
+          : b.count - a.count,
+    );
 }
 
 const BULK_LABELS = new Set(["NEWSLETTER", "MARKETING", "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL"]);
