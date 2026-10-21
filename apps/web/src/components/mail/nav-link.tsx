@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLinkStatus } from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 /** Renders inside a Link and reads its pending state — shows a tiny pulse
@@ -35,11 +36,15 @@ export function NavLink({
   title?: string;
   prefetch?: boolean;
 }) {
+  const router = useRouter();
   return (
     <Link
       href={href}
       title={title}
       prefetch={prefetch}
+      // Intent warm: hovering a chip starts the destination's render so the
+      // click feels instant.
+      onMouseEnter={() => router.prefetch(href)}
       className={`${className} transition-all duration-100 active:scale-[0.97] active:brightness-95`}
     >
       {children}
