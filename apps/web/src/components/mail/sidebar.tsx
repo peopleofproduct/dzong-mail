@@ -85,9 +85,11 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
 
   return (
     <aside className="flex h-full w-full shrink-0 flex-col gap-1 overflow-y-auto border-r border-zinc-200 bg-zinc-50/50 px-3 py-4 dark:border-zinc-800 dark:bg-zinc-950">
+      {/* Pinned brand: stays put while the nav scrolls underneath. Negative
+          margins bleed the glass edge-to-edge over the aside's padding. */}
       <Link
         href="/"
-        className="mb-2 flex items-center gap-2 px-2 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
+        className="sticky top-0 z-10 -mx-3 -mt-4 mb-2 flex items-center gap-2 border-b border-zinc-200/50 bg-zinc-50/75 px-5 pt-4 pb-3 text-sm font-semibold tracking-tight text-zinc-900 backdrop-blur-md dark:border-zinc-800/50 dark:bg-zinc-950/75 dark:text-zinc-50"
       >
         <BrandMark size={18} />
         Dzong Mail
