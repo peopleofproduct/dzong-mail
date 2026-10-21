@@ -265,8 +265,15 @@ function ComposerInner({
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Title bar - Gmail's dark strip with window controls. */}
-        <div className="flex items-center gap-1 bg-zinc-100 px-4 py-2 dark:bg-zinc-900">
+        {/* Title bar - Gmail's dark strip with window controls. While
+            minimized the whole bar is the restore affordance. */}
+        <div
+          className={`flex items-center gap-1 bg-zinc-100 px-4 py-2 dark:bg-zinc-900 ${
+            minimized ? "cursor-pointer" : ""
+          }`}
+          onClick={minimized ? () => setMinimized(false) : undefined}
+          title={minimized ? "Expand draft" : undefined}
+        >
           <h3 className="flex-1 truncate text-sm font-medium text-zinc-700 dark:text-zinc-200">
             {title}
             {saving === "saving" && <span className="ml-2 text-xs text-zinc-400">Saving…</span>}
@@ -274,7 +281,10 @@ function ComposerInner({
           </h3>
           <button
             type="button"
-            onClick={() => setMinimized((v) => !v)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMinimized((v) => !v);
+            }}
             title={minimized ? "Restore" : "Minimize"}
             aria-label={minimized ? "Restore" : "Minimize"}
             className={iconBtn}
@@ -283,7 +293,10 @@ function ComposerInner({
           </button>
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
             title={expanded ? "Exit full screen" : "Full screen"}
             aria-label={expanded ? "Exit full screen" : "Full screen"}
             className={iconBtn}
@@ -292,7 +305,10 @@ function ComposerInner({
           </button>
           <button
             type="button"
-            onClick={close}
+            onClick={(e) => {
+              e.stopPropagation();
+              close();
+            }}
             title="Save & close"
             aria-label="Save and close"
             className={iconBtn}
