@@ -5,7 +5,12 @@
 //   npm run setup             full setup incl. Ollama models
 //   npm run setup -- --no-ai  skip Ollama entirely
 import { spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -31,9 +36,25 @@ const run = (cmd: string, args: string[]) =>
 const runQuiet = (cmd: string, args: string[]) =>
   spawnSync(cmd, args, { cwd: ROOT, encoding: "utf8", shell: IS_WIN });
 
+// Probe wherever DATABASE_URL points (default localhost:5432) — an
+// existing .env can name another host, and we don't want to docker-provision
+// in front of a remote database.
+const pgTarget = () => {
+  try {
+    const raw = readFileSync(
+      join(ROOT, "packages/database/.env"),
+      "utf8",
+    );
+    const m = raw.match(/postgresql:\/\/[^@/]+@([a-zA-Z0-9._-]+):(\d+)/);
+    if (m) return { host: m[1], port: Number(m[2]) };
+  } catch {}
+  return { host: "localhost", port: 5432 };
+};
+
 const pgReachable = () =>
   new Promise<boolean>((resolve) => {
-    const s = connect({ host: "localhost", port: 5432 });
+    const { host, port } = pgTarget();
+    const s = connect({ host, port });
     s.once("connect", () => (s.destroy(), resolve(true)));
     s.once("error", () => resolve(false));
     s.setTimeout(2000, () => (s.destroy(), resolve(false)));
@@ -66,6 +87,11 @@ const dockerPsql =
     return r.status === 0 ? r.stdout : null;
   };
 
+// docker CLI exists even when the daemon is down — check separately so we
+// can say "start Docker Desktop" instead of dying on a failed run.
+const dockerRunning = () =>
+  have("docker") && runQuiet("docker", ["info"]).status === 0;
+
 async function main() {
   const WITH_AI = !process.argv.includes("--no-ai");
 
@@ -78,9 +104,18 @@ async function main() {
   // ─── 2. PostgreSQL ──────────────────────────────────────────────────────
   say("Checking PostgreSQL…");
 
+  const { host: pgHost, port: pgPort } = pgTarget();
   if (!(await pgReachable())) {
+    if (pgHost !== "localhost" && pgHost !== "127.0.0.1")
+      die(
+        `DATABASE_URL points at ${pgHost}:${pgPort}, which isn't reachable.\n` +
+          "  Check the host/credentials in packages/database/.env, or remove\n" +
+          "  it to let setup provision a local Postgres.",
+      );
     // Nothing listening — provision via whatever's available.
-    if (have("docker")) {
+    if (have("docker") && !dockerRunning())
+      die("Docker is installed but not running — start Docker Desktop and re-run npm run setup");
+    if (dockerRunning()) {
       say("Starting Postgres via Docker (pgvector image)…");
       const r = run("docker", [
         "run", "-d", "--name", "dzong-pg",
@@ -109,7 +144,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 1000));
     if (!(await pgReachable()))
       die(
-        "PostgreSQL not reachable on localhost:5432. Install it:\n" +
+        `PostgreSQL not reachable on ${pgHost}:${pgPort}. Install it:\n` +
           "  docker run -d --name dzong-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=dzong_mail -p 5432:5432 pgvector/pgvector:pg17\n" +
           (IS_WIN
             ? "  or the EDB installer: https://postgresql.org/download/windows\n"
@@ -117,7 +152,7 @@ async function main() {
           "  then re-run npm run setup",
       );
   }
-  ok("postgres reachable on :5432");
+  ok(`postgres reachable on ${pgHost}:${pgPort}`);
 
   // Resolve a psql channel for DB/role/extension setup.
   let psql: Psql | null = null;
@@ -129,7 +164,7 @@ async function main() {
         return runQuiet("psql", ["-d", db, "-tc", sql]).stdout ?? null;
       return r.stdout;
     };
-  } else if (have("docker")) {
+  } else if (dockerRunning()) {
     const names = runQuiet("docker", [
       "ps", "--format", "{{.Names}}",
     ]).stdout ?? "";
@@ -158,7 +193,11 @@ async function main() {
     if (ext !== null) ok("pgvector extension enabled (fast semantic index)");
     else warn("pgvector not available — semantic search uses the JS fallback (fine)");
   } else {
-    warn("no psql channel — assuming database exists; setup continues");
+    warn(
+      "no psql or docker found — can't verify the database exists.\n" +
+        "   If migrations fail below, create it: CREATE DATABASE dzong_mail;\n" +
+        "   (docs/SETUP.md §1 has per-OS steps)",
+    );
   }
 
   // ─── 3. Environment files ───────────────────────────────────────────────
