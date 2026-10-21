@@ -38,9 +38,13 @@ const INSIGHT_STYLES = {
 
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900/60">
-      <p className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{value}</p>
-      <p className="text-[11px] text-zinc-400">{label}</p>
+    <div className="group rounded-xl bg-zinc-50 px-3.5 py-3 ring-1 ring-zinc-100 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm hover:ring-zinc-200 dark:bg-zinc-800/50 dark:ring-zinc-800 dark:hover:bg-zinc-800 dark:hover:ring-zinc-700">
+      <p className="text-xl font-bold tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50">
+        {value}
+      </p>
+      <p className="text-[11px] text-zinc-400 transition-colors group-hover:text-zinc-500 dark:group-hover:text-zinc-300">
+        {label}
+      </p>
     </div>
   );
 }
@@ -91,13 +95,16 @@ async function AnalyticsBody() {
         {hero.map((s) => (
           <div
             key={s.label}
-            className="rounded-xl border border-zinc-200/80 bg-white px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900/60"
+            className="group relative overflow-hidden rounded-2xl bg-white px-4 py-4 ring-1 ring-zinc-200/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-zinc-900/70 dark:ring-zinc-800"
           >
+            <span
+              className={`absolute inset-x-0 top-0 h-0.5 ${s.dot} opacity-70 transition-opacity group-hover:opacity-100`}
+            />
             <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-zinc-400 uppercase">
               <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
               {s.label}
             </p>
-            <p className="mt-1 text-3xl font-bold tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50">
+            <p className="mt-1.5 text-3xl font-bold tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50">
               {s.value}
             </p>
             <p className="mt-0.5 text-[11px] text-zinc-400">{s.caption}</p>
@@ -115,7 +122,7 @@ async function AnalyticsBody() {
           return (
             <div
               key={i}
-              className={`flex items-start justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed ${s.cls}`}
+              className={`flex items-start justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${s.cls}`}
             >
               <p className="flex items-start gap-2">
                 <Icon size={14} className="mt-0.5 shrink-0" />
@@ -147,22 +154,35 @@ async function AnalyticsBody() {
         <Card title="What drives the score" className="lg:col-span-3">
           <ul className="space-y-4">
             {insights.healthParts.map((p) => (
-              <li key={p.label}>
+              <li
+                key={p.label}
+                className="group cursor-default rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+              >
                 <div className="flex items-baseline justify-between text-xs">
                   <span className="font-medium text-zinc-700 dark:text-zinc-300">
                     {p.label}
                     <span className="ml-1.5 font-normal text-zinc-400">· {p.detail}</span>
                   </span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">{p.score}</span>
+                  <span
+                    className={`font-semibold tabular-nums ${
+                      p.score >= 75
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : p.score >= 45
+                          ? "text-indigo-600 dark:text-indigo-400"
+                          : "text-amber-600 dark:text-amber-400"
+                    }`}
+                  >
+                    {p.score}
+                  </span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                   <div
-                    className={`h-full rounded-full ${
+                    className={`h-full rounded-full transition-all duration-300 ${
                       p.score >= 75
-                        ? "bg-emerald-500"
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-400"
                         : p.score >= 45
-                          ? "bg-indigo-500"
-                          : "bg-amber-500"
+                          ? "bg-gradient-to-r from-indigo-500 to-violet-400"
+                          : "bg-gradient-to-r from-amber-500 to-orange-400"
                     }`}
                     style={{ width: `${Math.max(2, p.score)}%` }}
                   />

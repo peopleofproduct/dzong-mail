@@ -465,15 +465,18 @@ async function EnergySection() {
   // The "subset that matters": the reply debt only - triage the rest later.
   const subset = replyMin + Math.ceil(unread * 0.15);
   return (
-    <div className="border-b border-zinc-200 bg-white px-4 py-1.5 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+    <div className="flex items-center gap-2 border-b border-zinc-200/80 bg-gradient-to-r from-white via-zinc-50/60 to-white px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:from-zinc-950 dark:via-zinc-900/50 dark:to-zinc-950 dark:text-zinc-400">
       <span>
         Inbox work today:{" "}
-        <span className="font-medium text-zinc-700 dark:text-zinc-300">~{total} min</span> ({unread}{" "}
-        unread, {needsReply} waiting replies).
-      </span>{" "}
+        <span className="font-semibold text-zinc-800 dark:text-zinc-200">~{total} min</span>
+        <span className="text-zinc-400">
+          {" "}
+          · {unread} unread · {needsReply} waiting replies
+        </span>
+      </span>
       <Link
         href="/?view=needs-reply"
-        className="text-indigo-600 hover:underline dark:text-indigo-400"
+        className="ml-auto shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
       >
         Do the ~{subset}-min subset that matters →
       </Link>

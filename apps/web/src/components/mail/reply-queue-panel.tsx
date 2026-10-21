@@ -10,7 +10,7 @@ import { SenderAvatar } from "./sender-avatar";
 import { VoiceBadge } from "./voice-badge";
 
 const cardBtn =
-  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium";
+  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97]";
 
 /**
  * Reply queue — every thread waiting on you, newest first, each paired with
@@ -67,30 +67,37 @@ export async function ReplyQueuePanel() {
           return (
             <article
               key={thread.threadId}
-              className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60"
+              className="rounded-2xl bg-white p-5 ring-1 ring-zinc-200/80 transition-shadow hover:shadow-lg hover:shadow-zinc-200/50 dark:bg-zinc-900/70 dark:ring-zinc-800 dark:hover:shadow-black/40"
             >
-              <header className="flex items-center gap-2">
-                <SenderAvatar email={m.fromAddress} name={m.fromName} size={30} />
-                <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  {m.fromName ?? m.fromAddress}
-                </span>
-                <span className="truncate text-xs text-zinc-400">
-                  &lt;{m.fromAddress}&gt; · {m.emailAccount.emailAddress}
-                </span>
-                <span className="ml-auto shrink-0 text-xs text-zinc-400">
-                  {m.receivedAt.toLocaleString()}
+              <header className="flex items-center gap-2.5">
+                <SenderAvatar email={m.fromAddress} name={m.fromName} size={34} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+                    {m.fromName ?? m.fromAddress}
+                  </p>
+                  <p className="truncate text-[11px] text-zinc-400">
+                    &lt;{m.fromAddress}&gt; · {m.emailAccount.emailAddress}
+                  </p>
+                </div>
+                <span className="ml-auto shrink-0 self-start rounded-full bg-zinc-50 px-2 py-0.5 text-[11px] tabular-nums text-zinc-400 ring-1 ring-zinc-100 dark:bg-zinc-800/60 dark:ring-zinc-800">
+                  {m.receivedAt.toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
                 </span>
               </header>
-              <p className="mt-1 truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
+              <p className="mt-2.5 truncate text-[15px] font-medium tracking-tight text-zinc-800 dark:text-zinc-100">
                 {m.subject ?? "(no subject)"}
               </p>
-              <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-zinc-500 dark:text-zinc-400">
                 {m.snippet}
               </p>
 
               {draft ? (
-                <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-                  <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-indigo-600 uppercase dark:text-indigo-400">
+                <div className="mt-4 rounded-xl bg-gradient-to-br from-indigo-50/80 to-violet-50/50 p-4 ring-1 ring-indigo-100/80 dark:from-indigo-950/40 dark:to-violet-950/20 dark:ring-indigo-900/40">
+                  <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-widest text-indigo-500 uppercase dark:text-indigo-400">
                     <Sparkles size={10} />
                     {draft.providerLabels.includes("AI_DRAFT") ? "AI draft ready" : "Draft ready"}
                   </p>
@@ -135,7 +142,7 @@ export async function ReplyQueuePanel() {
                 </div>
               )}
 
-              <div className="mt-3 flex items-center gap-3 border-t border-zinc-100 pt-2.5 dark:border-zinc-800">
+              <div className="mt-4 flex items-center gap-3.5 border-t border-zinc-100 pt-3 dark:border-zinc-800/80">
                 <Link
                   href={openHref}
                   className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"

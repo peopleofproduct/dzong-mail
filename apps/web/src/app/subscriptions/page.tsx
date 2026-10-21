@@ -27,10 +27,10 @@ async function SubscriptionsBody() {
         ].map((s) => (
           <div
             key={s.label}
-            className="rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-zinc-800 dark:bg-zinc-900/60"
+            className="rounded-xl bg-white px-4 py-3.5 ring-1 ring-zinc-200/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-zinc-900/70 dark:ring-zinc-800"
           >
             <p
-              className={`text-xl font-bold tracking-tight ${
+              className={`text-xl font-bold tracking-tight tabular-nums ${
                 s.accent ? "text-amber-600 dark:text-amber-400" : "text-zinc-900 dark:text-zinc-50"
               }`}
             >
