@@ -49,6 +49,27 @@ sudo -u postgres createdb dzong_mail
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
 ```
 
+**Windows:**
+
+Easiest is Docker Desktop — run this in PowerShell. Prefer the
+`pgvector/pgvector` image so semantic search gets the fast index without
+extra steps:
+
+```powershell
+docker run -d --name dzong-pg `
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=dzong_mail `
+  -p 5432:5432 pgvector/pgvector:pg17
+```
+
+Or install Postgres natively with the EDB installer
+(https://postgresql.org/download/windows). During install, set the
+`postgres` superuser password to `postgres` (or edit `DATABASE_URL` to
+match yours), then create the database:
+
+```powershell
+"C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -c "CREATE DATABASE dzong_mail"
+```
+
 **Docker (any OS):**
 
 ```bash
@@ -83,6 +104,13 @@ your models.
 ---
 
 ## 2. Install & first run
+
+> **Windows note:** `npm run setup` is a cross-platform Node script — it
+> works in PowerShell, Git Bash, and everything else; it can even
+> provision Postgres via Docker for you. The `.env` snippets below assume
+> a shell, so on PowerShell use `copy` instead of `cp` — or just run
+> `npm run setup`, which writes both env files for you. App data lands in
+> `C:\Users\<you>\.dzong-mail` automatically.
 
 ```bash
 git clone <repo-url> && cd dzong-mail
