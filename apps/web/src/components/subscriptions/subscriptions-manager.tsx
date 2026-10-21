@@ -26,8 +26,8 @@ function ReadBar({ pct }: { pct: number }) {
   const color =
     pct < 20 ? "bg-rose-400" : pct < 50 ? "bg-amber-400" : "bg-emerald-400";
   return (
-    <span className="flex w-24 items-center justify-end gap-1.5" title={`${pct}% of their mail read`}>
-      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+    <span className="flex w-24 items-center justify-end gap-2" title={`${pct}% of their mail read`}>
+      <span className="h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
         <span className={`block h-full rounded-full ${color}`} style={{ width: `${Math.max(2, pct)}%` }} />
       </span>
       <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-zinc-400">
