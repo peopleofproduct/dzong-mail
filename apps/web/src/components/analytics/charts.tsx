@@ -37,7 +37,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200/70 transition-shadow hover:shadow-md sm:p-6 dark:bg-zinc-900/70 dark:ring-zinc-800 ${className}`}
+      className={`min-w-0 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200/70 transition-shadow hover:shadow-md sm:p-6 dark:bg-zinc-900/70 dark:ring-zinc-800 ${className}`}
     >
       <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
         {title}
@@ -183,7 +183,12 @@ export function ArrivalHeatmap({ heatmap }: { heatmap: number[][] }) {
     <div>
       {/* p-1.5 buffer: hover-scaled edge cells grow into the padding instead
           of painting past the card boundary. */}
-      <div className="grid gap-[3px] p-1.5" style={{ gridTemplateColumns: "2rem repeat(24, 1fr)" }}>
+      {/* minmax(0,1fr): bare 1fr keeps each column at max-content minimum,
+          which makes the 24-col grid wider than the card and overflow it. */}
+      <div
+        className="grid gap-[3px] p-1.5"
+        style={{ gridTemplateColumns: "2rem repeat(24, minmax(0px, 1fr))" }}
+      >
         <div />
         {hours.map((h) => (
           <span key={h} className="text-[9px] text-zinc-400" style={{ gridColumn: `${h + 2}` }}>
