@@ -388,6 +388,8 @@ export interface SubscriptionSummary {
   lastReceivedAt: string; // ISO
   canUnsubscribe: boolean;
   unsubscribed: boolean;
+  /** No opt-out mechanism — silenced via an auto-archive rule instead. */
+  muted: boolean;
   /** Marked "keep" — pinned out of the suggestion ranking. */
   kept: boolean;
   /** High-volume, low read-rate — the one-click-cut candidate set. */
@@ -417,10 +419,11 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
     getKeptSubscriptions(),
   ]);
   const keptSet = new Set(kept.map((s) => s.toLowerCase()));
+  const mutedSenders = new Set<string>();
 
   const senders = new Map<
     string,
-    Omit<SubscriptionSummary, "readPct" | "lastReceivedAt" | "kept" | "suggested"> & {
+    Omit<SubscriptionSummary, "readPct" | "lastReceivedAt" | "kept" | "muted" | "suggested"> & {
       lastReceivedAt: Date;
     }
   >();
@@ -446,6 +449,7 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
     if (!m.isRead) s.unread++;
     if (hasUnsubHeader) s.canUnsubscribe = true;
     if (m.labels.includes("UNSUBSCRIBED")) s.unsubscribed = true;
+    if (m.labels.includes("MUTED")) mutedSenders.add(m.fromAddress);
     senders.set(m.fromAddress, s);
   }
   return [...senders.values()]
@@ -456,8 +460,10 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
         ...s,
         readPct,
         lastReceivedAt: s.lastReceivedAt.toISOString(),
+        muted: mutedSenders.has(s.fromAddress),
         kept: isKept,
-        suggested: !isKept && !s.unsubscribed && s.count >= 3 && readPct < 35,
+        suggested:
+          !isKept && !s.unsubscribed && !mutedSenders.has(s.fromAddress) && s.count >= 3 && readPct < 35,
       };
     })
     .sort((a, b) =>

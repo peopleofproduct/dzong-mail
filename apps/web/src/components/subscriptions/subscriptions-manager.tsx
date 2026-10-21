@@ -2,10 +2,20 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCheck, ExternalLink, MailX, RotateCcw, Search, ThumbsUp, X } from "lucide-react";
+import {
+  BellOff,
+  CheckCheck,
+  ExternalLink,
+  MailX,
+  RotateCcw,
+  Search,
+  ThumbsUp,
+  X,
+} from "lucide-react";
 import {
   bulkUnsubscribeSenders,
   keepSubscriptionSenders,
+  muteSubscriptionSenders,
   unkeepSubscriptionSender,
 } from "@/lib/actions";
 import { SenderAvatar } from "@/components/mail/sender-avatar";
@@ -16,7 +26,7 @@ function ReadBar({ pct }: { pct: number }) {
   const color =
     pct < 20 ? "bg-rose-400" : pct < 50 ? "bg-amber-400" : "bg-emerald-400";
   return (
-    <span className="flex w-20 items-center gap-1.5" title={`${pct}% of their mail read`}>
+    <span className="flex w-24 items-center justify-end gap-1.5" title={`${pct}% of their mail read`}>
       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
         <span className={`block h-full rounded-full ${color}`} style={{ width: `${Math.max(2, pct)}%` }} />
       </span>
@@ -52,7 +62,9 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
   }, [subs, query]);
 
   const suggestedCount = subs.filter((s) => s.suggested).length;
-  const selectable = visible.filter((s) => !s.unsubscribed && s.canUnsubscribe);
+  // Anything not yet handled is selectable — unsubscribe needs a header,
+  // mute/keep work on every sender.
+  const selectable = visible.filter((s) => !s.unsubscribed && !s.muted);
   const allChecked =
     selectable.length > 0 && selectable.every((s) => checked.has(s.fromAddress));
 
@@ -100,8 +112,20 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
     });
   };
 
+  const mute = (addresses: string[]) => {
+    if (addresses.length === 0) return;
+    startTransition(async () => {
+      await muteSubscriptionSenders(addresses);
+      setChecked(new Set());
+      setResult(
+        `Muted ${addresses.length} sender${addresses.length === 1 ? "" : "s"} — a rule now auto-archives their mail (manage rules in Settings)`,
+      );
+      router.refresh();
+    });
+  };
+
   const rowBtn =
-    "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40";
+    "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-40";
 
   return (
     <div className="flex flex-col gap-3">
@@ -189,9 +213,9 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
           />
           <span className="flex-1">Sender</span>
           <span className="hidden w-16 text-right sm:block">Msgs</span>
-          <span className="hidden w-24 sm:block">You read</span>
+          <span className="hidden w-24 text-right sm:block">You read</span>
           <span className="hidden w-24 text-right md:block">Last mail</span>
-          <span className="w-36 text-right">Actions</span>
+          <span className="w-48 text-right">Actions</span>
         </div>
 
         {visible.length === 0 ? (
@@ -204,7 +228,7 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
         ) : (
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
             {visible.map((s) => {
-              const dimmed = s.unsubscribed || s.kept;
+              const dimmed = s.unsubscribed || s.kept || s.muted;
               return (
                 <li
                   key={s.fromAddress}
@@ -216,7 +240,7 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
                     type="checkbox"
                     checked={checked.has(s.fromAddress)}
                     onChange={() => toggle(s.fromAddress)}
-                    disabled={s.unsubscribed}
+                    disabled={s.unsubscribed || s.muted}
                     className="h-3.5 w-3.5 shrink-0 accent-indigo-600"
                     aria-label={`Select ${s.fromAddress}`}
                   />
@@ -239,6 +263,11 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
                           unsubscribed
                         </span>
                       )}
+                      {s.muted && (
+                        <span className="shrink-0 rounded bg-zinc-200 px-1.5 py-px text-[10px] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                          muted
+                        </span>
+                      )}
                     </p>
                     <p className="truncate text-xs text-zinc-400">{s.fromAddress}</p>
                   </div>
@@ -254,9 +283,9 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
                       day: "numeric",
                     })}
                   </span>
-                  <span className="flex w-36 shrink-0 items-center justify-end gap-1.5">
-                    {s.unsubscribed ? (
-                      <span className="text-[11px] text-zinc-400">done</span>
+                  <span className="flex w-48 shrink-0 items-center justify-end gap-1.5">
+                    {s.unsubscribed || s.muted ? (
+                      <span className="text-[11px] text-zinc-400">handled</span>
                     ) : s.kept ? (
                       <button
                         type="button"
@@ -289,10 +318,18 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
                             onClick={() => unsubscribe([s.fromAddress])}
                             className={`${rowBtn} border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-500`}
                           >
-                            Unsubscribe
+                            <MailX size={11} /> Unsubscribe
                           </button>
                         ) : (
-                          <span className="text-[10px] text-zinc-400">no opt-out</span>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => mute([s.fromAddress])}
+                            title="No unsubscribe link — auto-archive their future mail instead"
+                            className={`${rowBtn} border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}
+                          >
+                            <BellOff size={11} /> Mute
+                          </button>
                         )}
                       </>
                     )}
@@ -318,11 +355,38 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
           </span>
           <button
             type="button"
-            disabled={pending}
-            onClick={() => unsubscribe([...checked])}
-            className="flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            disabled={
+              pending ||
+              !subs.some((s) => checked.has(s.fromAddress) && s.canUnsubscribe)
+            }
+            onClick={() =>
+              unsubscribe(
+                [...checked].filter(
+                  (a) => subs.find((s) => s.fromAddress === a)?.canUnsubscribe,
+                ),
+              )
+            }
+            className="flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
           >
             <MailX size={12} /> Unsubscribe
+          </button>
+          <button
+            type="button"
+            disabled={
+              pending ||
+              !subs.some((s) => checked.has(s.fromAddress) && !s.canUnsubscribe)
+            }
+            onClick={() =>
+              mute(
+                [...checked].filter(
+                  (a) => !subs.find((s) => s.fromAddress === a)?.canUnsubscribe,
+                ),
+              )
+            }
+            title="No unsubscribe link — auto-archive their future mail instead"
+            className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-3.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            <BellOff size={12} /> Mute
           </button>
           <button
             type="button"

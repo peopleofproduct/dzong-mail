@@ -833,6 +833,44 @@ export async function bulkUnsubscribeSenders(
   return { done, failed, links };
 }
 
+/** For senders with no List-Unsubscribe mechanism: silence them via an
+ *  ON_MESSAGE_SYNC archive rule, archive what they've already sent, and
+ *  tag it MUTED so the subscriptions list shows the sender as handled. */
+export async function muteSubscriptionSenders(addresses: string[]) {
+  const user = await getOrCreateLocalUser();
+  for (const raw of addresses) {
+    const address = raw.trim().toLowerCase();
+    if (!address) continue;
+    await prisma.automationRule.create({
+      data: {
+        userId: user.id,
+        name: `Mute ${address}`,
+        description:
+          "Auto-archives mail from a bulk sender with no opt-out mechanism (created from the subscriptions manager — delete here or in Settings).",
+        trigger: "ON_MESSAGE_SYNC",
+        matchMode: "ALL",
+        conditions: [{ field: "from", operator: "contains", value: address }],
+        actions: [{ type: "ARCHIVE" }],
+      },
+    });
+    const theirs = await prisma.message.findMany({
+      where: { fromAddress: { equals: address, mode: "insensitive" }, isDraft: false },
+      select: { id: true },
+    });
+    for (const m of theirs) {
+      await prisma.message.update({
+        where: { id: m.id },
+        data: { isArchived: true, labels: { push: "MUTED" } },
+      });
+    }
+    await audit("mute-sender", address, { inverse: "delete the mute rule in Settings" });
+  }
+  await snapshotInboxZero();
+  revalidatePath("/subscriptions");
+  revalidatePath("/settings");
+  revalidatePath("/");
+}
+
 /** Pin bulk senders out of the suggested-cut ranking — "keep this one". */
 export async function keepSubscriptionSenders(addresses: string[]) {
   const kept = await getKeptSubscriptions();
