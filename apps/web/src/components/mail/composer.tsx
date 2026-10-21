@@ -557,6 +557,7 @@ function ComposerInner({
         <VariantPicker
           variants={variants}
           busy={pending}
+          generating={pending}
           pickLabel="Insert into reply"
           onPick={(b) => {
             bodyRef.current?.set(escapeHtml(b));

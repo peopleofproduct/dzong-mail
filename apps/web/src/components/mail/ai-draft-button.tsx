@@ -58,6 +58,7 @@ export function AiDraftButton({
         <VariantPicker
           variants={variants}
           busy={busy !== null}
+          generating={busy === "gen"}
           pickLabel={busy === "save" ? "Saving…" : "Use this draft"}
           onPick={pick}
           onRegenerate={generate}
