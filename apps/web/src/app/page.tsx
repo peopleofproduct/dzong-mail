@@ -128,8 +128,10 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
 
   // Quick-filter chip strip: in-list filters (unread/attachments) alongside
   // nav chips to the reply queue and newsletters — the glanceable "what
-  // needs me" row. Counts are scoped to the active account chip.
-  const showChips = view === "inbox" && !label && !folder && !q;
+  // needs me" row. Shown on every list view (not labels/folders/search) so
+  // it behaves like a persistent filter rail. Counts are scoped to the
+  // active account chip.
+  const showChips = !label && !folder && !q;
   let chipCounts: { unread: number; attachments: number; needsReply: number; newsletters: number } | undefined;
   if (showChips) {
     const scoped = accountId ? { emailAccountId: accountId } : {};
@@ -194,10 +196,13 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
       )}
       {showChips && chipCounts && (
         <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-          <Link href={chipHref({})} className={chipCls(!filter)}>
+          <Link href={chipHref({})} className={chipCls(view === "inbox" && !filter)}>
             All
           </Link>
-          <Link href={chipHref({ filter: "unread" })} className={chipCls(filter === "unread")}>
+          <Link
+            href={chipHref({ filter: "unread" })}
+            className={chipCls(view === "inbox" && filter === "unread")}
+          >
             Unread
             {chipCounts.unread > 0 && (
               <span className="ml-1 text-[10px] opacity-70">{chipCounts.unread}</span>
@@ -205,7 +210,7 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
           </Link>
           <Link
             href={chipHref({ filter: "attachments" })}
-            className={chipCls(filter === "attachments")}
+            className={chipCls(view === "inbox" && filter === "attachments")}
           >
             Attachments
             {chipCounts.attachments > 0 && (
@@ -215,7 +220,7 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
           <span className="mx-1 h-4 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700" />
           <Link
             href="/?view=needs-reply"
-            className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-950"
+            className={chipCls(view === "needs-reply" || view === "reply-queue")}
           >
             Needs reply
             {chipCounts.needsReply > 0 && (
@@ -224,7 +229,7 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
           </Link>
           <Link
             href="/?view=newsletters"
-            className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className={chipCls(view === "newsletters")}
           >
             Newsletters
             {chipCounts.newsletters > 0 && (

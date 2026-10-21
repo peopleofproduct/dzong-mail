@@ -313,10 +313,7 @@ export function MessageList({ messages, selectedId, threadId, sections }: Messag
     return (
       <li
         key={m.id}
-        onClick={() => {
-          select(m.id);
-          openThread(m);
-        }}
+        onClick={() => openThread(m)}
         className={`mail-row group flex cursor-pointer items-start gap-2 px-3 py-2.5 ${
           isSelected || isOpen
             ? "bg-indigo-50/60 dark:bg-indigo-950/30"
