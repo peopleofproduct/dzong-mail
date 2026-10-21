@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { Check, RefreshCw, Sparkles, X } from "lucide-react";
 
 export interface DraftVariant {
@@ -46,11 +48,21 @@ export function VariantPicker({
   onRegenerate,
   onClose,
 }: VariantPickerProps) {
-  return (
+  // Portal to <body>: inside the composer this dialog would otherwise be
+  // trapped in the composer's stacking context, letting sticky list headers
+  // paint over it. getServerSnapshot=false keeps SSR/hydration consistent.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  if (!mounted) return null;
+
+  return createPortal(
     // stopPropagation on the backdrop too: when rendered inside the composer
     // (which closes on backdrop click) a stray click must not close both.
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Pick a draft"
@@ -154,6 +166,7 @@ export function VariantPicker({
           <span className="text-[11px] text-zinc-400">Generated locally on your model</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

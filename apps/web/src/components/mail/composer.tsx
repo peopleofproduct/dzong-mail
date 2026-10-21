@@ -71,16 +71,7 @@ export function Composer({
   // Key by the compose-relevant params so each compose session mounts fresh
   // state (prefilled body, draft id) without losing a half-typed email when
   // unrelated params change.
-  const sessionKey = [
-    "compose",
-    "draftId",
-    "fwd",
-    "to",
-    "subject",
-    "body",
-    "threadId",
-    "accountId",
-  ]
+  const sessionKey = ["compose", "draftId", "fwd", "to", "subject", "body", "threadId", "accountId"]
     .map((k) => `${k}=${searchParams.get(k) ?? ""}`)
     .join("&");
   return (
@@ -268,7 +259,9 @@ function ComposerInner({
         className={`anim-rise flex w-full flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-zinc-200 sm:rounded-t-xl dark:bg-zinc-950 dark:ring-zinc-800 ${
           expanded
             ? "h-full max-h-[calc(100vh-4rem)] max-w-3xl sm:rounded-xl"
-            : "max-h-[70vh] sm:h-[32rem]"
+            : minimized
+              ? ""
+              : "max-h-[70vh] sm:h-[32rem]"
         }`}
         onClick={(e) => e.stopPropagation()}
       >

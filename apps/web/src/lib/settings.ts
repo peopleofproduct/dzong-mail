@@ -44,8 +44,7 @@ export const getLoadRemoteContent = () => getSetting<boolean>("loadRemoteContent
 
 /** Sender addresses trusted for remote content — images in their mail load
  *  automatically even when the global toggle is off. */
-export const getTrustedRemoteSenders = () =>
-  getSetting<string[]>("remoteContentSenders", []);
+export const getTrustedRemoteSenders = () => getSetting<string[]>("remoteContentSenders", []);
 
 /** Off (default) = only important mail raises a notification — AI labels
  *  and bulk-mail heuristics filter newsletters/marketing out. On = every
@@ -64,5 +63,4 @@ export const getNoReplyDismissals = () =>
 
 /** Bulk senders the user marked "keep" on the subscriptions page — they
  *  stay out of the suggested-to-cut ranking and sort to the bottom. */
-export const getKeptSubscriptions = () =>
-  getSetting<string[]>("keptSubscriptionSenders", []);
+export const getKeptSubscriptions = () => getSetting<string[]>("keptSubscriptionSenders", []);

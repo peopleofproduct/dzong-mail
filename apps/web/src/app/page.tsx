@@ -365,9 +365,7 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
   // HTML, so forwarded newsletters keep their formatting instead of arriving
   // as a raw text dump.
   let initialBodyText = draftBody?.bodyText ?? undefined;
-  let initialBodyHtml = draftBody?.bodyHtml
-    ? cleanEmailHtml(draftBody.bodyHtml).html
-    : undefined;
+  let initialBodyHtml = draftBody?.bodyHtml ? cleanEmailHtml(draftBody.bodyHtml).html : undefined;
   if (fwdSource) {
     const headerText =
       `\n\n---------- Forwarded message ---------\n` +
@@ -376,12 +374,10 @@ async function ComposerSection({ searchParams }: { searchParams: SearchParams })
       `Subject: ${fwdSource.subject ?? ""}\n\n`;
     const sourceText = fwdSource.bodyText ?? fwdSource.snippet ?? "";
     const sourceTextIsMarkup = looksLikeHtml(sourceText);
-    initialBodyText =
-      headerText + (sourceTextIsMarkup ? htmlToText(sourceText) : sourceText);
+    initialBodyText = headerText + (sourceTextIsMarkup ? htmlToText(sourceText) : sourceText);
     const sourceHtml =
       fwdSource.bodyHtml ?? (sourceTextIsMarkup ? sourceText : textToHtml(sourceText));
-    const esc = (s: string) =>
-      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const headerHtml =
       "<p>---------- Forwarded message ---------<br>" +
       `From: ${esc(fwdSource.fromName ?? "")} &lt;${esc(fwdSource.fromAddress)}&gt;<br>` +

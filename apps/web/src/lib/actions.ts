@@ -30,12 +30,7 @@ import {
   importMailFiles,
   verifyAccount,
 } from "@dzong/sync-engine";
-import type {
-  GeneratedRule,
-  RuleAction,
-  RuleCondition,
-  SendAttachment,
-} from "@dzong/sync-engine";
+import type { GeneratedRule, RuleAction, RuleCondition, SendAttachment } from "@dzong/sync-engine";
 import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@dzong/sync-engine";
 import { cleanEmailHtml } from "@/lib/email-html";
 import { snapshotInboxZero } from "@/lib/achievements";
@@ -315,8 +310,7 @@ export async function dismissReplyThread(
   });
   if (scope === "always" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     const current = await getNoReplySenders();
-    if (!current.includes(email))
-      await setSetting("noReplySenders", [...current, email]);
+    if (!current.includes(email)) await setSetting("noReplySenders", [...current, email]);
   } else {
     const dismissals = await getNoReplyDismissals();
     await setSetting("noReplyDismissals", {
@@ -336,9 +330,14 @@ export async function dismissReplyThread(
 /** Remove a sender from the permanent no-reply suppression list — their
  *  threads go back to surfacing in needs-reply (Settings row). */
 export async function allowReplySender(formData: FormData) {
-  const email = String(formData.get("sender") ?? "").trim().toLowerCase();
+  const email = String(formData.get("sender") ?? "")
+    .trim()
+    .toLowerCase();
   const current = await getNoReplySenders();
-  await setSetting("noReplySenders", current.filter((s) => s !== email));
+  await setSetting(
+    "noReplySenders",
+    current.filter((s) => s !== email),
+  );
   revalidatePath("/settings");
   revalidatePath("/");
   safeRedirect("/settings", { notice: `${email} can appear in the reply queue again` });
@@ -817,8 +816,7 @@ export async function bulkUnsubscribeSenders(
       const r = await unsubscribeSender(address, prisma, { archive });
       if (r.ok || r.method === "https-link" || r.method === "mailto") {
         done.push(address);
-        if ((r.method === "https-link" || r.method === "mailto") && r.target)
-          links.push(r.target);
+        if ((r.method === "https-link" || r.method === "mailto") && r.target) links.push(r.target);
       } else {
         failed.push({ address, note: r.note ?? "no target" });
       }

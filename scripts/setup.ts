@@ -5,12 +5,7 @@
 //   npm run setup             full setup incl. Ollama models
 //   npm run setup -- --no-ai  skip Ollama entirely
 import { spawn, spawnSync } from "node:child_process";
-import {
-  copyFileSync,
-  existsSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -27,8 +22,7 @@ const die = (m: string): never => {
 };
 
 // Cross-platform command check — spawnSync resolves PATHEXT on Windows.
-const have = (cmd: string) =>
-  spawnSync(cmd, ["--version"], { stdio: "ignore" }).status === 0;
+const have = (cmd: string) => spawnSync(cmd, ["--version"], { stdio: "ignore" }).status === 0;
 
 const run = (cmd: string, args: string[]) =>
   spawnSync(cmd, args, { cwd: ROOT, stdio: "inherit", shell: IS_WIN });
@@ -41,10 +35,7 @@ const runQuiet = (cmd: string, args: string[]) =>
 // in front of a remote database.
 const pgTarget = () => {
   try {
-    const raw = readFileSync(
-      join(ROOT, "packages/database/.env"),
-      "utf8",
-    );
+    const raw = readFileSync(join(ROOT, "packages/database/.env"), "utf8");
     const m = raw.match(/postgresql:\/\/[^@/]+@([a-zA-Z0-9._-]+):(\d+)/);
     if (m) return { host: m[1], port: Number(m[2]) };
   } catch {}
@@ -81,16 +72,13 @@ type Psql = (sql: string, db?: string) => string | null;
 const dockerPsql =
   (name: string): Psql =>
   (sql, db = "postgres") => {
-    const r = runQuiet("docker", [
-      "exec", name, "psql", "-U", "postgres", "-d", db, "-tc", sql,
-    ]);
+    const r = runQuiet("docker", ["exec", name, "psql", "-U", "postgres", "-d", db, "-tc", sql]);
     return r.status === 0 ? r.stdout : null;
   };
 
 // docker CLI exists even when the daemon is down — check separately so we
 // can say "start Docker Desktop" instead of dying on a failed run.
-const dockerRunning = () =>
-  have("docker") && runQuiet("docker", ["info"]).status === 0;
+const dockerRunning = () => have("docker") && runQuiet("docker", ["info"]).status === 0;
 
 async function main() {
   const WITH_AI = !process.argv.includes("--no-ai");
@@ -118,10 +106,17 @@ async function main() {
     if (dockerRunning()) {
       say("Starting Postgres via Docker (pgvector image)…");
       const r = run("docker", [
-        "run", "-d", "--name", "dzong-pg",
-        "-e", "POSTGRES_PASSWORD=postgres",
-        "-e", "POSTGRES_DB=dzong_mail",
-        "-p", "5432:5432", "pgvector/pgvector:pg17",
+        "run",
+        "-d",
+        "--name",
+        "dzong-pg",
+        "-e",
+        "POSTGRES_PASSWORD=postgres",
+        "-e",
+        "POSTGRES_DB=dzong_mail",
+        "-p",
+        "5432:5432",
+        "pgvector/pgvector:pg17",
       ]);
       if (r.status !== 0) die("docker run failed — see docs/SETUP.md §1");
     } else if (have("brew")) {
@@ -135,9 +130,7 @@ async function main() {
     } else if (have("apt-get")) {
       say("Installing postgresql via apt…");
       run("sudo", ["apt-get", "update", "-qq"]);
-      run("sudo", [
-        "apt-get", "install", "-y", "postgresql", "postgresql-contrib",
-      ]);
+      run("sudo", ["apt-get", "install", "-y", "postgresql", "postgresql-contrib"]);
       run("sudo", ["systemctl", "enable", "--now", "postgresql"]);
     }
     for (let i = 0; i < 15 && !(await pgReachable()); i++)
@@ -146,9 +139,7 @@ async function main() {
       die(
         `PostgreSQL not reachable on ${pgHost}:${pgPort}. Install it:\n` +
           "  docker run -d --name dzong-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=dzong_mail -p 5432:5432 pgvector/pgvector:pg17\n" +
-          (IS_WIN
-            ? "  or the EDB installer: https://postgresql.org/download/windows\n"
-            : "") +
+          (IS_WIN ? "  or the EDB installer: https://postgresql.org/download/windows\n" : "") +
           "  then re-run npm run setup",
       );
   }
@@ -165,9 +156,7 @@ async function main() {
       return r.stdout;
     };
   } else if (dockerRunning()) {
-    const names = runQuiet("docker", [
-      "ps", "--format", "{{.Names}}",
-    ]).stdout ?? "";
+    const names = runQuiet("docker", ["ps", "--format", "{{.Names}}"]).stdout ?? "";
     const name =
       names.split("\n").find((n) => n.trim() === "dzong-pg") ??
       names.split("\n").find((n) => n.includes("postgres"));
@@ -175,16 +164,12 @@ async function main() {
   }
 
   if (psql) {
-    const dbExists = psql(
-      "SELECT 1 FROM pg_database WHERE datname='dzong_mail'",
-    )?.includes("1");
+    const dbExists = psql("SELECT 1 FROM pg_database WHERE datname='dzong_mail'")?.includes("1");
     if (!dbExists) {
       psql("CREATE DATABASE dzong_mail");
       ok("created database dzong_mail");
     }
-    const roleExists = psql(
-      "SELECT 1 FROM pg_roles WHERE rolname='postgres'",
-    )?.includes("1");
+    const roleExists = psql("SELECT 1 FROM pg_roles WHERE rolname='postgres'")?.includes("1");
     if (!roleExists) {
       psql("CREATE ROLE postgres LOGIN SUPERUSER PASSWORD 'postgres'");
       ok("created postgres role");
@@ -209,18 +194,14 @@ async function main() {
   }
   const webEnv = join(ROOT, "apps/web/.env.local");
   if (!existsSync(webEnv)) {
-    writeFileSync(
-      webEnv,
-      `DZONG_SECRET_KEY=${randomBytes(32).toString("hex")}\n`,
-    );
+    writeFileSync(webEnv, `DZONG_SECRET_KEY=${randomBytes(32).toString("hex")}\n`);
     ok("generated DZONG_SECRET_KEY in apps/web/.env.local");
   }
 
   // ─── 4. Dependencies, migrate, seed ─────────────────────────────────────
   const npm = IS_WIN ? "npm.cmd" : "npm";
   say("Installing dependencies…");
-  if (run(npm, ["install", "--no-audit", "--no-fund"]).status !== 0)
-    die("npm install failed");
+  if (run(npm, ["install", "--no-audit", "--no-fund"]).status !== 0) die("npm install failed");
 
   say("Applying database migrations…");
   if (run(npm, ["run", "db:migrate"]).status !== 0)

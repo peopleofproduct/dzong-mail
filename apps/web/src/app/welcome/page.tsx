@@ -54,9 +54,7 @@ export default function WelcomePage() {
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 dark:border-zinc-800 dark:bg-zinc-950/95">
         <div className="flex items-center gap-2">
           <BrandMark size={20} />
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-            Dzong Mail
-          </span>
+          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Dzong Mail</span>
         </div>
         <ThemeToggle />
       </header>

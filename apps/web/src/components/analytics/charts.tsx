@@ -183,10 +183,7 @@ export function ArrivalHeatmap({ heatmap }: { heatmap: number[][] }) {
     <div>
       {/* p-1.5 buffer: hover-scaled edge cells grow into the padding instead
           of painting past the card boundary. */}
-      <div
-        className="grid gap-[3px] p-1.5"
-        style={{ gridTemplateColumns: "2rem repeat(24, 1fr)" }}
-      >
+      <div className="grid gap-[3px] p-1.5" style={{ gridTemplateColumns: "2rem repeat(24, 1fr)" }}>
         <div />
         {hours.map((h) => (
           <span key={h} className="text-[9px] text-zinc-400" style={{ gridColumn: `${h + 2}` }}>
@@ -280,7 +277,7 @@ export function CategoryDonut({
         {categories.map((c) => (
           <li
             key={c.label}
-            className="group relative flex cursor-default items-center gap-2 rounded-md px-1.5 py-1 -mx-1.5 text-xs transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+            className="group relative -mx-1.5 flex cursor-default items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
           >
             <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_BG[c.tone]}`} />
             <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-300">{c.label}</span>
@@ -309,7 +306,7 @@ export function SenderBars({
       {senders.map((s) => (
         <li
           key={s.name}
-          className="group relative cursor-default rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+          className="group relative -mx-2 cursor-default rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
         >
           <div className="flex items-baseline justify-between text-xs">
             <span className="min-w-0 truncate font-medium text-zinc-700 dark:text-zinc-300">
@@ -366,7 +363,7 @@ export function FlowBalance({
       {rows.map((r) => (
         <div
           key={r.label}
-          className="group relative cursor-default rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+          className="group relative -mx-2 cursor-default rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
         >
           <div className="flex items-baseline justify-between text-xs">
             <span className="font-medium text-zinc-700 dark:text-zinc-300">{r.label}</span>

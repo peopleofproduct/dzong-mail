@@ -96,9 +96,7 @@ export class GraphSyncProvider implements MailSyncProvider {
     // parentFolderId alone would leak raw Graph ids into the UI.
     const folderNames = await this.fetchFolderNames(headers);
 
-    let url =
-      account.syncToken ??
-      `${GRAPH_API}/me/messages/delta?$select=${SELECT}&$top=50`;
+    let url = account.syncToken ?? `${GRAPH_API}/me/messages/delta?$select=${SELECT}&$top=50`;
 
     const messages: RawMessage[] = [];
     const deletedIds: string[] = [];
@@ -120,7 +118,9 @@ export class GraphSyncProvider implements MailSyncProvider {
         messages.push({
           providerMessageId: msg.id,
           threadId: msg.conversationId,
-          folder: msg.parentFolderId ? (folderNames.get(msg.parentFolderId) ?? msg.parentFolderId) : undefined,
+          folder: msg.parentFolderId
+            ? (folderNames.get(msg.parentFolderId) ?? msg.parentFolderId)
+            : undefined,
           subject: msg.subject,
           snippet: msg.bodyPreview,
           fromAddress: msg.from?.emailAddress?.address ?? "unknown",

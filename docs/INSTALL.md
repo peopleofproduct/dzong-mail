@@ -9,10 +9,11 @@ downloads.
 runs there too.
 
 **What the installer needs:** three free things —
+
 - **Node.js** — the engine that runs the app
 - **PostgreSQL** — a small database on your machine that stores your
   mail index (nothing is sent anywhere)
-- **Ollama** *(optional)* — free local AI that drafts and sorts mail
+- **Ollama** _(optional)_ — free local AI that drafts and sorts mail
   offline
 
 > Good news: `npm run setup` checks and installs most of this for you.
@@ -23,6 +24,7 @@ runs there too.
 ## 🍎 macOS
 
 ### Step 1 — Install Homebrew (the Mac app store for tools)
+
 Open **Terminal** (Applications → Utilities → Terminal) and paste:
 
 ```bash
@@ -71,25 +73,29 @@ Open **http://localhost:3000** — you're in. 🎉
 ## 🪟 Windows
 
 ### Step 1 — Install Node.js
+
 Go to **https://nodejs.org** → click the big **LTS** button → run the
 downloaded installer → Next, Next, Finish.
 
 ### Step 2 — Install Git
+
 Go to **https://git-scm.com/download/win** → run the installer → accept
 all defaults (Next through everything).
 
 ### Step 3 — Install Docker Desktop (this gives you the database)
+
 Go to **https://docker.com/products/docker-desktop** → download for
 Windows → install → **open Docker Desktop** once and wait for it to say
 it's running (it may ask to enable a Windows feature — say yes and
 restart if asked).
 
-*Prefer no Docker?* Install PostgreSQL from
+_Prefer no Docker?_ Install PostgreSQL from
 https://postgresql.org/download/windows instead — set the password to
 `postgres` during install, then create a database named `dzong_mail`
 using pgAdmin (comes with it). Skip to Step 4 after that.
 
 ### Step 4 — Get and set up Dzong Mail
+
 Open **PowerShell** (Start → type "PowerShell") and paste:
 
 ```powershell
@@ -102,6 +108,7 @@ The setup starts your database container, creates everything, and seeds
 a demo inbox. (Add `-- --no-ai` to skip the AI part.)
 
 ### Step 5 — Optional: free local AI
+
 Install **Ollama** from https://ollama.com/download/windows — it sits in
 your system tray. Then in PowerShell:
 
@@ -129,7 +136,7 @@ sudo apt update
 sudo apt install -y nodejs npm git curl
 ```
 
-*If your distro's Node is older than 20* (`node --version` to check),
+_If your distro's Node is older than 20_ (`node --version` to check),
 get the current one:
 
 ```bash
@@ -208,16 +215,16 @@ rm -rf ~/.dzong-mail                 # attachments + cached files
 
 ## Something went wrong?
 
-| Symptom | Fix |
-|---|---|
-| `command not found: npm` | Node isn't installed or the terminal needs reopening after install |
-| `PostgreSQL not reachable` | Docker Desktop isn't running — open it and retry |
-| `port 3000 already in use` | Something else is on 3000 — stop it, or run `PORT=3001 npm run dev` |
-| Setup dies on `npm install` | Check your internet/VPN, then re-run `npm run setup` — it's safe to re-run |
+| Symptom                            | Fix                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `command not found: npm`           | Node isn't installed or the terminal needs reopening after install           |
+| `PostgreSQL not reachable`         | Docker Desktop isn't running — open it and retry                             |
+| `port 3000 already in use`         | Something else is on 3000 — stop it, or run `PORT=3001 npm run dev`          |
+| Setup dies on `npm install`        | Check your internet/VPN, then re-run `npm run setup` — it's safe to re-run   |
 | AI features say "provider offline" | Ollama isn't running — open the app/tray icon, or check Settings → AI engine |
 
 Still stuck? Open an issue at
 github.com/peopleofproduct/dzong-mail/issues with the exact error text.
 
-*For OAuth app setup, BYOK keys, and power-user configuration, see
-[docs/SETUP.md](SETUP.md).*
+_For OAuth app setup, BYOK keys, and power-user configuration, see
+[docs/SETUP.md](SETUP.md)._

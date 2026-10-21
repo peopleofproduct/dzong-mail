@@ -13,12 +13,7 @@ const SCREEN_PARAMS = ["view", "account", "label", "folder", "filter", "sm"];
 
 /** Canonical routes every mail user ends up needing — merged with observed
  *  favourites so first-run users still get warm screens. */
-const DEFAULT_ROUTES = [
-  "/?view=inbox",
-  "/?view=needs-reply",
-  "/?view=sent",
-  "/analytics",
-];
+const DEFAULT_ROUTES = ["/?view=inbox", "/?view=needs-reply", "/?view=sent", "/analytics"];
 
 type FreqMap = Record<string, number>;
 
@@ -87,9 +82,7 @@ export function Prefetcher() {
     // keep only the most-visited entries.
     const entries = Object.entries(freq);
     if (entries.length > MAX_ENTRIES) {
-      const trimmed = Object.fromEntries(
-        entries.sort((a, b) => b[1] - a[1]).slice(0, MAX_ENTRIES),
-      );
+      const trimmed = Object.fromEntries(entries.sort((a, b) => b[1] - a[1]).slice(0, MAX_ENTRIES));
       writeFreq(trimmed);
     } else {
       writeFreq(freq);

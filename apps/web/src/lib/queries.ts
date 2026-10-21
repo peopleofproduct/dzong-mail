@@ -463,7 +463,11 @@ export async function getSubscriptions(): Promise<SubscriptionSummary[]> {
         muted: mutedSenders.has(s.fromAddress),
         kept: isKept,
         suggested:
-          !isKept && !s.unsubscribed && !mutedSenders.has(s.fromAddress) && s.count >= 3 && readPct < 35,
+          !isKept &&
+          !s.unsubscribed &&
+          !mutedSenders.has(s.fromAddress) &&
+          s.count >= 3 &&
+          readPct < 35,
       };
     })
     .sort((a, b) =>

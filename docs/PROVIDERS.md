@@ -6,17 +6,17 @@ list below is what we preset and test, not a hard boundary.
 
 ## Verified paths
 
-| Provider | Path | Notes |
-|---|---|---|
-| Gmail | Gmail API (OAuth) **or** IMAP/SMTP | OAuth needs your own Google Cloud client ID/secret (see SETUP.md). IMAP needs an app password when 2FA is on. |
-| Google Workspace | Same as Gmail | Custom domains work identically. |
-| Outlook.com / Microsoft 365 | Graph API (OAuth) **or** IMAP/SMTP | OAuth needs an Entra app registration. IMAP needs SMTP AUTH enabled in the tenant. |
-| iCloud Mail | IMAP/SMTP preset | Requires an app-specific password (appleid.apple.com). |
-| Fastmail | IMAP/SMTP preset | App password from Settings > Privacy & Security. Full push via IMAP IDLE. |
-| Yahoo Mail | IMAP/SMTP preset | App password required. |
-| Zoho Mail | IMAP/SMTP preset | Enable IMAP in Mail Settings first. |
-| Proton Mail | IMAP/SMTP preset | Works through Proton Mail Bridge running locally - the preset points at `127.0.0.1`. End-to-end encryption stays intact because Bridge decrypts locally anyway. |
-| Self-hosted (Dovecot, Mailcow, Stalwart, etc.) | Custom IMAP/SMTP | Any standards-compliant server; supports SSL/TLS, STARTTLS and plaintext for LAN setups. |
+| Provider                                       | Path                               | Notes                                                                                                                                                           |
+| ---------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gmail                                          | Gmail API (OAuth) **or** IMAP/SMTP | OAuth needs your own Google Cloud client ID/secret (see SETUP.md). IMAP needs an app password when 2FA is on.                                                   |
+| Google Workspace                               | Same as Gmail                      | Custom domains work identically.                                                                                                                                |
+| Outlook.com / Microsoft 365                    | Graph API (OAuth) **or** IMAP/SMTP | OAuth needs an Entra app registration. IMAP needs SMTP AUTH enabled in the tenant.                                                                              |
+| iCloud Mail                                    | IMAP/SMTP preset                   | Requires an app-specific password (appleid.apple.com).                                                                                                          |
+| Fastmail                                       | IMAP/SMTP preset                   | App password from Settings > Privacy & Security. Full push via IMAP IDLE.                                                                                       |
+| Yahoo Mail                                     | IMAP/SMTP preset                   | App password required.                                                                                                                                          |
+| Zoho Mail                                      | IMAP/SMTP preset                   | Enable IMAP in Mail Settings first.                                                                                                                             |
+| Proton Mail                                    | IMAP/SMTP preset                   | Works through Proton Mail Bridge running locally - the preset points at `127.0.0.1`. End-to-end encryption stays intact because Bridge decrypts locally anyway. |
+| Self-hosted (Dovecot, Mailcow, Stalwart, etc.) | Custom IMAP/SMTP                   | Any standards-compliant server; supports SSL/TLS, STARTTLS and plaintext for LAN setups.                                                                        |
 
 ## The verification harness
 

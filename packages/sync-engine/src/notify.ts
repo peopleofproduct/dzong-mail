@@ -62,13 +62,7 @@ export async function notifyNewMail(
 }
 
 /** Labels that mark a message as bulk/noise — never worth an OS toast. */
-const NOISE_LABELS = new Set([
-  "NEWSLETTER",
-  "MARKETING",
-  "COLD_PITCH",
-  "SOCIAL",
-  "NOTIFICATION",
-]);
+const NOISE_LABELS = new Set(["NEWSLETTER", "MARKETING", "COLD_PITCH", "SOCIAL", "NOTIFICATION"]);
 
 /** Fallback for unclassified mail (AI off): obvious bulk senders by
  *  address convention. */

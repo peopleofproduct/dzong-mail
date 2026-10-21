@@ -18,10 +18,7 @@ const cardBtn =
  * Clearing the queue is the daily "inbox fully attended" ritual.
  */
 export async function ReplyQueuePanel() {
-  const [items, dismissals] = await Promise.all([
-    getReplyQueue(),
-    getNoReplyDismissals(),
-  ]);
+  const [items, dismissals] = await Promise.all([getReplyQueue(), getNoReplyDismissals()]);
 
   // Voice profiles for the threads that already have a draft — the badge
   // explains *why* the AI draft sounds like the user. Bounded to ≤25 pairs
@@ -33,10 +30,7 @@ export async function ReplyQueuePanel() {
         async ({ thread }) =>
           [
             thread.latest.fromAddress.toLowerCase(),
-            await getRecipientStyle(
-              thread.latest.fromAddress,
-              thread.latest.emailAccountId,
-            ),
+            await getRecipientStyle(thread.latest.fromAddress, thread.latest.emailAccountId),
           ] as const,
       ),
   );
@@ -79,7 +73,7 @@ export async function ReplyQueuePanel() {
                     &lt;{m.fromAddress}&gt; · {m.emailAccount.emailAddress}
                   </p>
                 </div>
-                <span className="ml-auto shrink-0 self-start rounded-full bg-zinc-50 px-2 py-0.5 text-[11px] tabular-nums text-zinc-400 ring-1 ring-zinc-100 dark:bg-zinc-800/60 dark:ring-zinc-800">
+                <span className="ml-auto shrink-0 self-start rounded-full bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-400 tabular-nums ring-1 ring-zinc-100 dark:bg-zinc-800/60 dark:ring-zinc-800">
                   {m.receivedAt.toLocaleString("en-US", {
                     month: "short",
                     day: "numeric",
@@ -101,9 +95,7 @@ export async function ReplyQueuePanel() {
                     <Sparkles size={10} />
                     {draft.providerLabels.includes("AI_DRAFT") ? "AI draft ready" : "Draft ready"}
                   </p>
-                  <VoiceBadge
-                    style={styleBySender.get(m.fromAddress.toLowerCase()) ?? null}
-                  />
+                  <VoiceBadge style={styleBySender.get(m.fromAddress.toLowerCase()) ?? null} />
                   <p className="mt-1.5 line-clamp-4 text-sm leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                     {draft.bodyText ?? draft.snippet}
                   </p>

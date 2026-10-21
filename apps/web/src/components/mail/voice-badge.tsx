@@ -31,8 +31,8 @@ export function VoiceBadge({ style }: { style: RecipientStyle | null }) {
         </span>
       </summary>
       <p className="mt-1 leading-relaxed text-violet-600/80 dark:text-violet-400/80">
-        Learned from {style.exchanged} exchange{style.exchanged === 1 ? "" : "s"} with this
-        person{style.confident ? "" : " — still learning"}: {hints.join(" · ")}.
+        Learned from {style.exchanged} exchange{style.exchanged === 1 ? "" : "s"} with this person
+        {style.confident ? "" : " — still learning"}: {hints.join(" · ")}.
       </p>
     </details>
   );

@@ -6,9 +6,9 @@
 
 **Your messages, your models, your machine — no paywalls, ever.**
 
-*dzong (རྫོང) — pronounced "jong" — the fortress-monasteries of Bhutan,
+_dzong (རྫོང) — pronounced "jong" — the fortress-monasteries of Bhutan,
 where a district's correspondence and governance were kept behind walls
-the community itself owned.*
+the community itself owned._
 
 Dzong Mail is an open-source, local-first AI email client. It gives you
 the features people pay $30/month for — AI labels, pre-drafted replies,
@@ -28,14 +28,14 @@ Free. Open source. MIT. Yours.
 
 ## Why "Dzong"?
 
-Every mail platform wants you inside *their* walls — their servers, their
+Every mail platform wants you inside _their_ walls — their servers, their
 terms, their business model. A dzong is different: it's a fortress its own
 community builds and governs. Dzongs weren't just defenses — they housed
 the district's administration, its records, its correspondence. The word
 for Bhutan's national language, Dzongkha, literally means "the language
 spoken in the dzong."
 
-That's the thesis: walls aren't the problem — *whose* walls is the
+That's the thesis: walls aren't the problem — _whose_ walls is the
 question. Dzong Mail is a fortress for your mail that belongs to you.
 
 ---
@@ -265,7 +265,7 @@ Everything runs via `npm run dev` (Turborepo). Checks:
 - `DZONG_SECRET_KEY` — encrypts stored credentials; when unset a random
   machine-local key is generated and persisted at
   `~/.dzong-mail/secret.key` (mode 0600). Set a real one — `openssl rand
-  -hex 32` in `apps/web/.env.local` — to share the key across machines.
+-hex 32` in `apps/web/.env.local` — to share the key across machines.
   `UNWALLED_SECRET_KEY`/`UNWALLED_DATA_DIR` from pre-rename installs are
   still honored.
 - `DZONG_DATA_DIR` — where attachments, avatars, and the generated key

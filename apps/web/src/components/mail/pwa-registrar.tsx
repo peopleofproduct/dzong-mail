@@ -72,9 +72,7 @@ export function PwaRegistrar() {
   return (
     <div className="anim-rise fixed bottom-4 left-4 z-40 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-3.5 py-2.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
       <Download size={15} className="text-indigo-500" />
-      <span className="text-xs text-zinc-600 dark:text-zinc-300">
-        Install Dzong Mail as an app
-      </span>
+      <span className="text-xs text-zinc-600 dark:text-zinc-300">Install Dzong Mail as an app</span>
       <button
         type="button"
         className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500"

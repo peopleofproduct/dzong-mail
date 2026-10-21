@@ -268,7 +268,7 @@ npx tsx scripts/enable-ai.ts   # enables AI for the local user and
 | OAuth callback error                  | Redirect URI in the Google/Azure app doesn't match `http://localhost:3000/api/oauth/<provider>/callback` exactly                             |
 | IMAP auth failure                     | Using your login password instead of an app-specific password (nearly every provider requires this now)                                      |
 | `Unknown argument isArchived` etc.    | Stale Prisma client in a running dev server — `npm run db:generate` and restart `npm run dev`                                                |
-| `DZONG_SECRET_KEY` warnings        | Set a real key in `apps/web/.env.local` (see §2)                                                                                             |
+| `DZONG_SECRET_KEY` warnings           | Set a real key in `apps/web/.env.local` (see §2)                                                                                             |
 
 ## 6. Useful scripts
 

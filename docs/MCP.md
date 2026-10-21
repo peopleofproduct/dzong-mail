@@ -10,8 +10,8 @@ It speaks stdio and wraps the same `/api/v1` HTTP API documented in
 
 ## Tools exposed
 
-| Tool                      | What it does                                                     |
-| ------------------------- | ---------------------------------------------------------------- |
+| Tool                   | What it does                                                     |
+| ---------------------- | ---------------------------------------------------------------- |
 | `dzong_list_accounts`  | Connected accounts + sync status + message counts                |
 | `dzong_list_messages`  | List/filter mail — views, keyword search, semantic search, label |
 | `dzong_get_message`    | Full body + attachment metadata/download URLs                    |

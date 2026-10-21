@@ -82,7 +82,10 @@ export function MorningBriefingCard({ stats, dateKey }: { stats: BriefingStats; 
                 {p.text}
                 <span className="inline-flex items-center gap-0.5 text-indigo-400 dark:text-indigo-500">
                   {p.cta}{" "}
-                  <ArrowRight size={10} className="transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight
+                    size={10}
+                    className="transition-transform group-hover:translate-x-0.5"
+                  />
                 </span>
               </Link>
             ))}

@@ -172,8 +172,8 @@ export function AchievementCard({ stats, name }: { stats: AchievementStats; name
             Local-first mail - data never leaves the machine.
           </p>
           <p className="mt-1 text-[10px] text-zinc-600">
-            Streaks count forward from when you started using Dzong - there is no historical
-            record of past clear-inbox days to backfill, so early numbers are honest ones.
+            Streaks count forward from when you started using Dzong - there is no historical record
+            of past clear-inbox days to backfill, so early numbers are honest ones.
           </p>
         </div>
       </div>

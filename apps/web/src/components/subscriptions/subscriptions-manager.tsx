@@ -23,16 +23,16 @@ import type { SubscriptionSummary } from "@/lib/queries";
 
 /** Read-rate bar — the glanceable "do I even open this?" signal. */
 function ReadBar({ pct }: { pct: number }) {
-  const color =
-    pct < 20 ? "bg-rose-400" : pct < 50 ? "bg-amber-400" : "bg-emerald-400";
+  const color = pct < 20 ? "bg-rose-400" : pct < 50 ? "bg-amber-400" : "bg-emerald-400";
   return (
     <span className="flex w-24 items-center justify-end gap-2" title={`${pct}% of their mail read`}>
       <span className="h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <span className={`block h-full rounded-full ${color}`} style={{ width: `${Math.max(2, pct)}%` }} />
+        <span
+          className={`block h-full rounded-full ${color}`}
+          style={{ width: `${Math.max(2, pct)}%` }}
+        />
       </span>
-      <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-zinc-400">
-        {pct}%
-      </span>
+      <span className="w-8 shrink-0 text-right text-[11px] text-zinc-400 tabular-nums">{pct}%</span>
     </span>
   );
 }
@@ -56,8 +56,7 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
     if (!q) return subs;
     return subs.filter(
       (s) =>
-        s.fromAddress.toLowerCase().includes(q) ||
-        (s.fromName ?? "").toLowerCase().includes(q),
+        s.fromAddress.toLowerCase().includes(q) || (s.fromName ?? "").toLowerCase().includes(q),
     );
   }, [subs, query]);
 
@@ -65,13 +64,10 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
   // Anything not yet handled is selectable — unsubscribe needs a header,
   // mute/keep work on every sender.
   const selectable = visible.filter((s) => !s.unsubscribed && !s.muted);
-  const allChecked =
-    selectable.length > 0 && selectable.every((s) => checked.has(s.fromAddress));
+  const allChecked = selectable.length > 0 && selectable.every((s) => checked.has(s.fromAddress));
 
   const toggleAll = () => {
-    setChecked(
-      allChecked ? new Set() : new Set(selectable.map((s) => s.fromAddress)),
-    );
+    setChecked(allChecked ? new Set() : new Set(selectable.map((s) => s.fromAddress)));
   };
 
   const toggle = (addr: string) =>
@@ -92,8 +88,7 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
         [
           r.done.length > 0 &&
             `Unsubscribed ${r.done.length} sender${r.done.length === 1 ? "" : "s"}${archiveOnUnsub ? " and archived their mail" : ""}`,
-          r.failed.length > 0 &&
-            `${r.failed.length} had no opt-out link — archived only`,
+          r.failed.length > 0 && `${r.failed.length} had no opt-out link — archived only`,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -107,7 +102,9 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
     startTransition(async () => {
       await keepSubscriptionSenders(addresses);
       setChecked(new Set());
-      setResult(`Kept ${addresses.length} sender${addresses.length === 1 ? "" : "s"} — out of suggestions`);
+      setResult(
+        `Kept ${addresses.length} sender${addresses.length === 1 ? "" : "s"} — out of suggestions`,
+      );
       router.refresh();
     });
   };
@@ -137,9 +134,7 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
             onClick={() =>
               setChecked(
                 new Set(
-                  subs
-                    .filter((s) => s.suggested && s.canUnsubscribe)
-                    .map((s) => s.fromAddress),
+                  subs.filter((s) => s.suggested && s.canUnsubscribe).map((s) => s.fromAddress),
                 ),
               )
             }
@@ -271,7 +266,7 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
                     </p>
                     <p className="truncate text-xs text-zinc-400">{s.fromAddress}</p>
                   </div>
-                  <span className="hidden w-16 shrink-0 text-right text-xs tabular-nums text-zinc-500 sm:block">
+                  <span className="hidden w-16 shrink-0 text-right text-xs text-zinc-500 tabular-nums sm:block">
                     {s.count}
                   </span>
                   <span className="hidden shrink-0 sm:block">
@@ -343,8 +338,8 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
 
       <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-400">
         <ExternalLink size={11} className="mt-0.5 shrink-0" />
-        Unsubscribing uses each sender&apos;s own mechanism (RFC 8058 one-click,
-        HTTPS link, or mailto) — nothing is blocked locally, the opt-out is real.
+        Unsubscribing uses each sender&apos;s own mechanism (RFC 8058 one-click, HTTPS link, or
+        mailto) — nothing is blocked locally, the opt-out is real.
       </p>
 
       {/* Sticky bulk-action bar — appears once anything is checked. */}
@@ -355,15 +350,10 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
           </span>
           <button
             type="button"
-            disabled={
-              pending ||
-              !subs.some((s) => checked.has(s.fromAddress) && s.canUnsubscribe)
-            }
+            disabled={pending || !subs.some((s) => checked.has(s.fromAddress) && s.canUnsubscribe)}
             onClick={() =>
               unsubscribe(
-                [...checked].filter(
-                  (a) => subs.find((s) => s.fromAddress === a)?.canUnsubscribe,
-                ),
+                [...checked].filter((a) => subs.find((s) => s.fromAddress === a)?.canUnsubscribe),
               )
             }
             className="flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
@@ -372,15 +362,10 @@ export function SubscriptionsManager({ subs }: { subs: SubscriptionSummary[] }) 
           </button>
           <button
             type="button"
-            disabled={
-              pending ||
-              !subs.some((s) => checked.has(s.fromAddress) && !s.canUnsubscribe)
-            }
+            disabled={pending || !subs.some((s) => checked.has(s.fromAddress) && !s.canUnsubscribe)}
             onClick={() =>
               mute(
-                [...checked].filter(
-                  (a) => !subs.find((s) => s.fromAddress === a)?.canUnsubscribe,
-                ),
+                [...checked].filter((a) => !subs.find((s) => s.fromAddress === a)?.canUnsubscribe),
               )
             }
             title="No unsubscribe link — auto-archive their future mail instead"

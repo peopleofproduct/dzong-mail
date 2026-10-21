@@ -45,7 +45,11 @@ function addressList(value: { address?: string; name?: string }[] | undefined): 
 /** Friendly display name for a mailbox: SPECIAL-USE flag first, then the
  *  last path segment ("[Gmail]/All Mail" → "All Mail", "Archive.2024" →
  *  "Archive.2024" when the delimiter is "."). */
-function folderDisplayName(specialUse: string | undefined, path: string, delimiter: string): string {
+function folderDisplayName(
+  specialUse: string | undefined,
+  path: string,
+  delimiter: string,
+): string {
   const special: Record<string, string> = {
     "\\Sent": "Sent",
     "\\Drafts": "Drafts",
@@ -147,8 +151,7 @@ function toRawMessage(
       // mailparser marks every non-text part an attachment, so inline
       // text/calendar invites arrive here too. Cap stored blobs at 15 MB
       // to match the Gmail/Graph providers.
-      filename:
-        a.filename ?? (a.contentType === "text/calendar" ? "invite.ics" : "attachment"),
+      filename: a.filename ?? (a.contentType === "text/calendar" ? "invite.ics" : "attachment"),
       mimeType: a.contentType,
       sizeBytes: a.size,
       contentId: a.cid,
@@ -233,8 +236,7 @@ export class ImapSyncProvider implements MailSyncProvider {
             if (!mailbox) continue;
 
             const { uidValidity, lastUid } = parseSyncToken(storedTokens[box.path]);
-            const resync =
-              uidValidity !== undefined && uidValidity !== Number(mailbox.uidValidity);
+            const resync = uidValidity !== undefined && uidValidity !== Number(mailbox.uidValidity);
             const sinceUid = resync ? 0 : lastUid;
 
             const found = mailbox.exists
@@ -288,9 +290,7 @@ export class ImapSyncProvider implements MailSyncProvider {
                   { uid: true },
                 )) {
                   const providerMessageId =
-                    box.path === "INBOX"
-                      ? `uid-${msg.uid}`
-                      : `uid-${box.path}-${msg.uid}`;
+                    box.path === "INBOX" ? `uid-${msg.uid}` : `uid-${box.path}-${msg.uid}`;
                   messages.push(envelopeToRawMessage(msg, providerMessageId, folder));
                 }
               }

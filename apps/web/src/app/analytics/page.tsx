@@ -156,7 +156,7 @@ async function AnalyticsBody() {
             {insights.healthParts.map((p) => (
               <li
                 key={p.label}
-                className="group cursor-default rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+                className="group -mx-2 cursor-default rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
               >
                 <div className="flex items-baseline justify-between text-xs">
                   <span className="font-medium text-zinc-700 dark:text-zinc-300">
