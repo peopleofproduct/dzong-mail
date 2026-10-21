@@ -2,6 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { semanticSearchMessages } from "@dzong/sync-engine";
 import { serializeMessage } from "@/components/mail/types";
+import { getNoReplySenders } from "@/lib/settings";
 import type { Message, Prisma } from "@dzong/database";
 
 export type MailView =
@@ -260,7 +261,10 @@ export interface ThreadSummary {
 }
 
 /** Group recent messages into threads and return those whose latest message
- *  is (awaiting) or isn't (needs-reply) sent by the account owner. */
+ *  is (awaiting) or isn't (needs-reply) sent by the account owner. For
+ *  needs-reply, senders the user permanently dismissed ("no reply needed,
+ *  always") are filtered out — so the view, the queue and the sidebar
+ *  counts all recalculate from one place. */
 export async function getFollowUpThreads(kind: "awaiting" | "needs-reply", accountId?: string) {
   const messages = await prisma.message.findMany({
     where: {
@@ -283,11 +287,16 @@ export async function getFollowUpThreads(kind: "awaiting" | "needs-reply", accou
   }
 
   const own = new Set(messages.map((m) => m.emailAccount.emailAddress.toLowerCase()));
+  const suppressed =
+    kind === "needs-reply" ? new Set(await getNoReplySenders()) : new Set<string>();
   const out: ThreadSummary[] = [];
   for (const [threadId, list] of threads) {
     const latest = list[0]; // already desc
     const fromMe = own.has(latest.fromAddress.toLowerCase());
-    if ((kind === "awaiting" && fromMe) || (kind === "needs-reply" && !fromMe)) {
+    if (
+      (kind === "awaiting" && fromMe) ||
+      (kind === "needs-reply" && !fromMe && !suppressed.has(latest.fromAddress.toLowerCase()))
+    ) {
       out.push({ threadId, latest, count: list.length });
     }
   }

@@ -6,6 +6,7 @@ import {
   getAvatarsEnabled,
   getFollowUpDays,
   getLoadRemoteContent,
+  getNoReplySenders,
   getNotifyAllMail,
   getRequestReadReceipts,
   getSetting,
@@ -14,6 +15,7 @@ import {
   getUndoSendSeconds,
 } from "@/lib/settings";
 import {
+  allowReplySender,
   deleteSnippet,
   importMailAction,
   savePrefs,
@@ -43,6 +45,7 @@ export async function WorkspaceSection() {
     avatarsEnabled,
     loadRemoteContent,
     trustedRemoteSenders,
+    noReplySenders,
     notifyAllMail,
     vipSenders,
     confidenceThreshold,
@@ -57,6 +60,7 @@ export async function WorkspaceSection() {
     getAvatarsEnabled(),
     getLoadRemoteContent(),
     getTrustedRemoteSenders(),
+    getNoReplySenders(),
     getNotifyAllMail(),
     getSetting<string[]>("vipSenders", []),
     getSetting<number>("aiConfidenceThreshold", 0.65),
@@ -215,6 +219,32 @@ export async function WorkspaceSection() {
               >
                 <span className="truncate text-xs text-zinc-700 dark:text-zinc-300">{sender}</span>
                 <form action={untrustRemoteSender}>
+                  <input type="hidden" name="sender" value={sender} />
+                  <button className="text-xs text-red-500 hover:text-red-400">Remove</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Permanent "no reply needed" senders */}
+      {noReplySenders.length > 0 && (
+        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <h3 className={h3}>Reply queue - always skipped</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Threads from these senders never surface in needs-reply — added with
+            &quot;Always for this sender&quot; when dismissing a thread. Remove one
+            and their threads can ask for replies again.
+          </p>
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {noReplySenders.map((sender) => (
+              <li
+                key={sender}
+                className="flex items-center justify-between gap-3 rounded-md border border-zinc-100 px-3 py-1.5 dark:border-zinc-800"
+              >
+                <span className="truncate text-xs text-zinc-700 dark:text-zinc-300">{sender}</span>
+                <form action={allowReplySender}>
                   <input type="hidden" name="sender" value={sender} />
                   <button className="text-xs text-red-500 hover:text-red-400">Remove</button>
                 </form>

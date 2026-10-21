@@ -40,6 +40,8 @@ import { attachmentFilePath, attachmentsDir, storeAttachmentContent } from "@dzo
 import { cleanEmailHtml } from "@/lib/email-html";
 import { snapshotInboxZero } from "@/lib/achievements";
 import {
+  getNoReplyDismissals,
+  getNoReplySenders,
   getRequestReadReceipts,
   getTrustedRemoteSenders,
   getUndoSendSeconds,
@@ -296,15 +298,49 @@ export async function archiveMessages(ids: string[]) {
   revalidatePath("/");
 }
 
-/** Dismiss a whole thread from the reply queue — archives every synced
- *  message in it (drafts survive so nothing written is lost). */
-export async function archiveThreadNow(threadId: string) {
+/** Dismiss a thread from the reply queue with a scope the user picked in
+ *  the confirm dialog: "once" archives just this thread (and counts toward
+ *  the always-nudge); "always" also suppresses the sender permanently so
+ *  their threads stop surfacing as needs-reply at all. */
+export async function dismissReplyThread(
+  threadId: string,
+  senderAddress: string,
+  scope: "once" | "always",
+) {
+  const email = senderAddress.trim().toLowerCase();
   await prisma.message.updateMany({
     where: { threadId, isDraft: false },
     data: { isArchived: true },
   });
+  if (scope === "always" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const current = await getNoReplySenders();
+    if (!current.includes(email))
+      await setSetting("noReplySenders", [...current, email]);
+  } else {
+    const dismissals = await getNoReplyDismissals();
+    await setSetting("noReplyDismissals", {
+      ...dismissals,
+      [email]: (dismissals[email] ?? 0) + 1,
+    });
+  }
+  await audit("dismiss-reply-thread", threadId, {
+    sender: email,
+    scope,
+    inverse: "unarchive",
+  });
   await snapshotInboxZero();
   revalidatePath("/");
+}
+
+/** Remove a sender from the permanent no-reply suppression list — their
+ *  threads go back to surfacing in needs-reply (Settings row). */
+export async function allowReplySender(formData: FormData) {
+  const email = String(formData.get("sender") ?? "").trim().toLowerCase();
+  const current = await getNoReplySenders();
+  await setSetting("noReplySenders", current.filter((s) => s !== email));
+  revalidatePath("/settings");
+  revalidatePath("/");
+  safeRedirect("/settings", { notice: `${email} can appear in the reply queue again` });
 }
 
 export async function unarchiveMessage(id: string) {

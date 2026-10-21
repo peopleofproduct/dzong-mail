@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { CheckCheck, ExternalLink, Pencil, Send, Sparkles, X } from "lucide-react";
+import { CheckCheck, ExternalLink, Pencil, Send, Sparkles } from "lucide-react";
 import { getReplyQueue } from "@/lib/queries";
-import { archiveThreadNow, sendDraftNow } from "@/lib/actions";
+import { getNoReplyDismissals } from "@/lib/settings";
+import { sendDraftNow } from "@/lib/actions";
 import { AiDraftButton } from "./ai-draft-button";
+import { NoReplyButton } from "./no-reply-button";
 import { SenderAvatar } from "./sender-avatar";
 
 const cardBtn =
@@ -14,7 +16,10 @@ const cardBtn =
  * Clearing the queue is the daily "inbox fully attended" ritual.
  */
 export async function ReplyQueuePanel() {
-  const items = await getReplyQueue();
+  const [items, dismissals] = await Promise.all([
+    getReplyQueue(),
+    getNoReplyDismissals(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -104,15 +109,13 @@ export async function ReplyQueuePanel() {
                 >
                   <ExternalLink size={11} /> Open thread
                 </Link>
-                <form action={archiveThreadNow.bind(null, thread.threadId)} className="ml-auto">
-                  <button
-                    type="submit"
-                    title="No reply needed — archive this thread"
-                    className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                  >
-                    <X size={11} /> No reply needed
-                  </button>
-                </form>
+                <span className="ml-auto">
+                  <NoReplyButton
+                    threadId={thread.threadId}
+                    senderAddress={m.fromAddress}
+                    dismissals={dismissals[m.fromAddress.toLowerCase()] ?? 0}
+                  />
+                </span>
               </div>
             </article>
           );

@@ -51,3 +51,13 @@ export const getTrustedRemoteSenders = () =>
  *  and bulk-mail heuristics filter newsletters/marketing out. On = every
  *  sync batch toasts, like the old behaviour. */
 export const getNotifyAllMail = () => getSetting<boolean>("notifyAllMail", false);
+
+/** Senders permanently dismissed from the reply queue — "no reply needed,
+ *  always". Their threads never surface as needs-reply again until the
+ *  user removes them in Settings. */
+export const getNoReplySenders = () => getSetting<string[]>("noReplySenders", []);
+
+/** Per-sender count of "just this once" reply-queue dismissals — the
+ *  learning signal behind the "you've cleared N threads, always?" nudge. */
+export const getNoReplyDismissals = () =>
+  getSetting<Record<string, number>>("noReplyDismissals", {});
