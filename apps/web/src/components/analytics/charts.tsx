@@ -49,12 +49,25 @@ export function Card({
 }
 
 /** In-app hover tooltip — styled, instant, no browser title delay. Wrap the
- *  trigger in `group relative` and drop <Tip>text</Tip> inside it. */
-const TIP_CLS =
-  "pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] leading-snug font-medium whitespace-nowrap text-white shadow-xl group-hover:block dark:bg-zinc-100 dark:text-zinc-900";
+ *  trigger in `group relative` and drop <Tip>text</Tip> inside it. On
+ *  edge-anchored triggers pass align so the bubble can't spill past the
+ *  card edge. */
+const TIP_BASE =
+  "pointer-events-none absolute bottom-full z-30 mb-2 hidden rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] leading-snug font-medium whitespace-nowrap text-white shadow-xl group-hover:block dark:bg-zinc-100 dark:text-zinc-900";
+const TIP_ALIGN = {
+  center: "left-1/2 -translate-x-1/2",
+  start: "left-0",
+  end: "right-0",
+} as const;
 
-function Tip({ children }: { children: React.ReactNode }) {
-  return <span className={TIP_CLS}>{children}</span>;
+function Tip({
+  children,
+  align = "center",
+}: {
+  children: React.ReactNode;
+  align?: keyof typeof TIP_ALIGN;
+}) {
+  return <span className={`${TIP_BASE} ${TIP_ALIGN[align]}`}>{children}</span>;
 }
 
 /** Big ring score - the page hero. Gradient stroke + soft glow. */
@@ -168,7 +181,12 @@ export function ArrivalHeatmap({ heatmap }: { heatmap: number[][] }) {
   const hours = [0, 6, 12, 18];
   return (
     <div>
-      <div className="grid gap-[3px]" style={{ gridTemplateColumns: "2rem repeat(24, 1fr)" }}>
+      {/* p-1.5 buffer: hover-scaled edge cells grow into the padding instead
+          of painting past the card boundary. */}
+      <div
+        className="grid gap-[3px] p-1.5"
+        style={{ gridTemplateColumns: "2rem repeat(24, 1fr)" }}
+      >
         <div />
         {hours.map((h) => (
           <span key={h} className="text-[9px] text-zinc-400" style={{ gridColumn: `${h + 2}` }}>
@@ -192,7 +210,7 @@ export function ArrivalHeatmap({ heatmap }: { heatmap: number[][] }) {
                     : { backgroundColor: `rgba(99,102,241,${0.15 + 0.85 * (count / max)})` }
                 }
               >
-                <Tip>
+                <Tip align={h <= 2 ? "start" : h >= 21 ? "end" : "center"}>
                   {DAY_NAMES[d]} {h}:00 — {count} mail{count === 1 ? "" : "s"}
                 </Tip>
               </div>
