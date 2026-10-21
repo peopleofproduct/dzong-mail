@@ -21,6 +21,7 @@ import { BrandMark } from "@/components/brand-mark";
 import type { SidebarData } from "@/lib/queries";
 import { VIEW_LABELS } from "@/lib/queries";
 import type { MailView } from "@/lib/queries";
+import { NavLink } from "./nav-link";
 import { SidebarMore } from "./sidebar-more";
 
 const VIEW_ICONS: Record<MailView, typeof Inbox> = {
@@ -70,13 +71,13 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
     const Icon = VIEW_ICONS[view];
     const active = view === activeView && !activeLabel && !activeFolder;
     return (
-      <Link key={view} href={viewHref(view, query)} className={itemClass(active)}>
+      <NavLink key={view} href={viewHref(view, query)} className={itemClass(active)}>
         <Icon size={14} className="shrink-0" />
         <span className="truncate">{VIEW_LABELS[view]}</span>
         {data.counts[view] > 0 && (
           <span className="ml-auto text-[11px] text-zinc-400">{data.counts[view]}</span>
         )}
-      </Link>
+      </NavLink>
     );
   };
 
@@ -106,13 +107,13 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
         <SidebarMore defaultOpen={moreOpen}>
           {MORE_VIEWS.map(viewItem)}
 
-          <Link
+          <NavLink
             href="/subscriptions"
             className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
           >
             <MailX size={14} className="shrink-0" />
             <span className="truncate">Subscriptions</span>
-          </Link>
+          </NavLink>
 
           {data.folders.length > 0 && (
             <>
@@ -120,14 +121,14 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
                 Folders
               </p>
               {data.folders.map((folder) => (
-                <Link
+                <NavLink
                   key={folder}
                   href={`/?folder=${encodeURIComponent(folder)}`}
                   className={itemClass(folder === activeFolder)}
                 >
                   <Folder size={14} className="shrink-0" />
                   <span className="truncate">{folder}</span>
-                </Link>
+                </NavLink>
               ))}
             </>
           )}
@@ -141,7 +142,7 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
           </p>
           <nav className="flex flex-col gap-0.5">
             {data.labels.map((label) => (
-              <Link
+              <NavLink
                 key={label}
                 href={`/?label=${encodeURIComponent(label)}`}
                 className={`rounded-md px-2 py-1.5 text-[13px] ${
@@ -151,7 +152,7 @@ export function Sidebar({ data, activeView, activeLabel, activeFolder, query }: 
                 }`}
               >
                 # {label}
-              </Link>
+              </NavLink>
             ))}
           </nav>
         </>

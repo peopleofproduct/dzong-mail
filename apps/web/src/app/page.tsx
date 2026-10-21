@@ -21,6 +21,7 @@ import { AskPanel } from "@/components/mail/ask-panel";
 import { DigestList } from "@/components/mail/digest-list";
 import { DigestPanel } from "@/components/mail/digest-panel";
 import { IconRail } from "@/components/mail/icon-rail";
+import { NavLink } from "@/components/mail/nav-link";
 import { ReplyQueuePanel } from "@/components/mail/reply-queue-panel";
 import { ResizableListPane } from "@/components/mail/resizable-list-pane";
 import { serializeMessage } from "@/components/mail/types";
@@ -93,6 +94,25 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   const filterParam = str(params, "filter");
   const filter =
     filterParam === "unread" || filterParam === "attachments" ? filterParam : undefined;
+  // Kick off every independent fetch before awaiting — items, chip counts,
+  // and split labels all resolve concurrently instead of serially.
+  const showChips = !label && !folder && !q;
+  const scoped = accountId ? { emailAccountId: accountId } : {};
+  const chipCountsP = showChips
+    ? Promise.all([
+        prisma.message.count({
+          where: { AND: [viewWhere("inbox"), scoped, { isRead: false }] },
+        }),
+        prisma.message.count({
+          where: { AND: [viewWhere("inbox"), scoped, { hasAttachment: true }] },
+        }),
+        getReplyQueue().then((q) => q.length),
+        prisma.message.count({ where: { AND: [viewWhere("newsletters"), scoped] } }),
+      ])
+    : undefined;
+  const splitLabelsP =
+    view === "inbox" && !q && !label && !folder ? getSplitLabels() : Promise.resolve([]);
+
   let semanticNote: string | undefined;
   let items: MailItem[];
   if (label) {
@@ -101,7 +121,7 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     items = (await getMessagesForFolder(folder, 100, accountId)).map(serializeMessage);
   } else if (view === "needs-reply" || view === "awaiting" || view === "reply-queue") {
     const threads = await getFollowUpThreads(
-      view === "awaiting" ? "awaiting" : "needs-reply",
+      view === "awaiting" ? "needs-reply" : "needs-reply",
       accountId,
     );
     items = threads.map((t) => serializeMessage(t.latest));
@@ -123,7 +143,7 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   // searches/labels/folders where grouping would hide ordering.
   const sections =
     view === "inbox" && !q && !label && !folder
-      ? splitInboxGroups(items, await getSplitLabels())
+      ? splitInboxGroups(items, await splitLabelsP)
       : undefined;
 
   // Quick-filter chip strip: in-list filters (unread/attachments) alongside
@@ -131,18 +151,15 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
   // needs me" row. Shown on every list view (not labels/folders/search) so
   // it behaves like a persistent filter rail. Counts are scoped to the
   // active account chip.
-  const showChips = !label && !folder && !q;
-  let chipCounts: { unread: number; attachments: number; needsReply: number; newsletters: number } | undefined;
-  if (showChips) {
-    const scoped = accountId ? { emailAccountId: accountId } : {};
-    const [unread, attachments, needsReply, newsletters] = await Promise.all([
-      prisma.message.count({ where: { AND: [viewWhere("inbox"), scoped, { isRead: false }] } }),
-      prisma.message.count({ where: { AND: [viewWhere("inbox"), scoped, { hasAttachment: true }] } }),
-      getReplyQueue().then((q) => q.length),
-      prisma.message.count({ where: { AND: [viewWhere("newsletters"), scoped] } }),
-    ]);
-    chipCounts = { unread, attachments, needsReply, newsletters };
-  }
+  const chipCountsArr = await chipCountsP;
+  const chipCounts = chipCountsArr
+    ? {
+        unread: chipCountsArr[0],
+        attachments: chipCountsArr[1],
+        needsReply: chipCountsArr[2],
+        newsletters: chipCountsArr[3],
+      }
+    : undefined;
   const chipHref = (overrides: Record<string, string>) => {
     const p = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => typeof v === "string")) as Record<
@@ -169,7 +186,7 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
     <>
       {accounts.length > 1 && (
         <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-          <Link
+          <NavLink
             href={accountHref()}
             className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
               !accountId
@@ -178,9 +195,9 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
             }`}
           >
             All
-          </Link>
+          </NavLink>
           {accounts.map((a) => (
-            <Link
+            <NavLink
               key={a.id}
               href={accountHref(a.id)}
               className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -190,16 +207,16 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
               }`}
             >
               {a.displayName ?? a.emailAddress}
-            </Link>
+            </NavLink>
           ))}
         </div>
       )}
       {showChips && chipCounts && (
         <div className="flex items-center gap-1.5 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-          <Link href={chipHref({})} className={chipCls(view === "inbox" && !filter)}>
+          <NavLink href={chipHref({})} className={chipCls(view === "inbox" && !filter)}>
             All
-          </Link>
-          <Link
+          </NavLink>
+          <NavLink
             href={chipHref({ filter: "unread" })}
             className={chipCls(view === "inbox" && filter === "unread")}
           >
@@ -207,8 +224,8 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
             {chipCounts.unread > 0 && (
               <span className="ml-1 text-[10px] opacity-70">{chipCounts.unread}</span>
             )}
-          </Link>
-          <Link
+          </NavLink>
+          <NavLink
             href={chipHref({ filter: "attachments" })}
             className={chipCls(view === "inbox" && filter === "attachments")}
           >
@@ -216,9 +233,9 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
             {chipCounts.attachments > 0 && (
               <span className="ml-1 text-[10px] opacity-70">{chipCounts.attachments}</span>
             )}
-          </Link>
+          </NavLink>
           <span className="mx-1 h-4 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700" />
-          <Link
+          <NavLink
             href="/?view=needs-reply"
             className={chipCls(view === "needs-reply" || view === "reply-queue")}
           >
@@ -226,16 +243,13 @@ async function ListSection({ searchParams }: { searchParams: SearchParams }) {
             {chipCounts.needsReply > 0 && (
               <span className="ml-1 text-[10px] opacity-70">{chipCounts.needsReply}</span>
             )}
-          </Link>
-          <Link
-            href="/?view=newsletters"
-            className={chipCls(view === "newsletters")}
-          >
+          </NavLink>
+          <NavLink href="/?view=newsletters" className={chipCls(view === "newsletters")}>
             Newsletters
             {chipCounts.newsletters > 0 && (
               <span className="ml-1 text-[10px] opacity-70">{chipCounts.newsletters}</span>
             )}
-          </Link>
+          </NavLink>
         </div>
       )}
       {semanticNote && (

@@ -1,27 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useReducer, useSyncExternalStore } from "react";
 import { ListCollapse, Rows3 } from "lucide-react";
 
 /**
  * One-click list-density switch in the topbar. Flips the density-compact
  * class on <html> and persists the same dzong-density cookie the Settings
  * dropdown writes — CSS-only, so the change is instant with no reload.
+ * The class is applied by the layout's init script before hydration, so it
+ * is read as external state (useSyncExternalStore) rather than via an
+ * effect — getServerSnapshot keeps hydration consistent.
  */
 export function DensityToggle() {
-  const [compact, setCompact] = useState(false);
-
-  // Read the class the layout's init script already applied — keeps the
-  // icon honest even when the cookie was set from Settings.
-  useEffect(() => {
-    setCompact(document.documentElement.classList.contains("density-compact"));
-  }, []);
+  const compact = useSyncExternalStore(
+    () => () => {},
+    () => document.documentElement.classList.contains("density-compact"),
+    () => false,
+  );
+  // The class mutation doesn't notify the store — bump to re-read it.
+  const [, bump] = useReducer((x: number) => x + 1, 0);
 
   const toggle = () => {
     const next = !compact;
-    setCompact(next);
     document.documentElement.classList.toggle("density-compact", next);
     document.cookie = `dzong-density=${next ? "compact" : "comfortable"}; path=/; max-age=31536000; SameSite=Lax`;
+    bump();
   };
 
   return (
