@@ -132,12 +132,17 @@ and why it stays that way.
 - **PostgreSQL 14+** running locally (14 is the floor; 17 is what we test)
 - **Ollama** (optional but recommended) for the local AI — or an
   OpenAI/Anthropic API key
-- macOS, Linux, or Windows/WSL — anywhere the above run
+- macOS, Linux, or Windows — anywhere the above run
 
 ## Quick start — five minutes to a working inbox
 
-**One command** (macOS / Debian — installs Postgres + Ollama if missing,
-creates the DB, migrates, seeds a demo inbox, pulls models):
+> **New to this?** See **[docs/INSTALL.md](docs/INSTALL.md)** — plain
+> step-by-step instructions for macOS, Windows, and Linux, no developer
+> experience needed.
+
+**One command** (all platforms — provisions Postgres via Docker or your
+package manager, creates the DB, migrates, seeds a demo inbox, pulls
+models):
 
 ```bash
 git clone https://github.com/peopleofproduct/dzong-mail.git

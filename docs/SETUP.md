@@ -4,8 +4,9 @@ Everything you need to go from `git clone` to a working, AI-powered local
 inbox — including the fiddly bits (OAuth apps, app passwords, Postgres
 quirks) spelled out step by step.
 
-If you just want the fast path, the README's quick start has it. This doc
-is the "why is this not working" companion.
+If you just want the fast path, the README's quick start has it — and
+[INSTALL.md](INSTALL.md) is the friendly step-by-step for non-developers.
+This doc is the "why is this not working" companion.
 
 ---
 
