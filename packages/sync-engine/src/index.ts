@@ -14,6 +14,7 @@ export type { SendAttachment, SendInput, SendResult } from "./send";
 export { dispatchDueDrafts, returnDueSnoozes, runSyncCycle } from "./worker";
 export { startIdleWatchers } from "./idle";
 export { runPostSync } from "./post-sync";
+export { MOCK_SENDERS } from "./providers/mock";
 export type { PostSyncStats } from "./post-sync";
 export {
   askInbox,

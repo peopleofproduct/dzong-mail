@@ -36,6 +36,12 @@ export interface RawMessage {
    *  label removal, etc.). Undefined = leave the local flag untouched. */
   isArchived?: boolean;
   providerLabels: string[];
+  /** Provider-supplied user tags — most providers don't model these; the
+   *  mock/demo provider uses them to ship a pre-tagged inbox. */
+  labels?: string[];
+  /** Provider-supplied AI label suggestions (demo data ships the spread the
+   *  classifier would produce so the list teaches the tagging system). */
+  aiLabels?: string[];
 }
 
 /** Decrypted secrets for the account being synced. Populated by the engine. */

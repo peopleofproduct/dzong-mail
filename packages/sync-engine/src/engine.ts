@@ -113,6 +113,8 @@ function toCreateInput(accountId: string, msg: RawMessage) {
     isDraft: msg.isDraft,
     isArchived: msg.isArchived ?? false,
     providerLabels: msg.providerLabels,
+    ...(msg.labels !== undefined ? { labels: msg.labels } : {}),
+    ...(msg.aiLabels !== undefined ? { aiLabels: msg.aiLabels } : {}),
   };
 }
 

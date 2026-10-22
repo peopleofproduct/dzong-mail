@@ -2,13 +2,104 @@ import type { MailSyncProvider, ProviderSyncResult, RawMessage, SyncContext } fr
 
 const BATCH_SIZE = 5;
 
-const SENDERS: Array<{ address: string; name: string }> = [
-  { address: "newsletter@changelog.com", name: "Changelog" },
-  { address: "billing@vercel.com", name: "Vercel Billing" },
-  { address: "noreply@github.com", name: "GitHub" },
-  { address: "alice@example.com", name: "Alice Hart" },
-  { address: "team@linear.app", name: "Linear" },
-  { address: "digest@hackernews.com", name: "HN Digest" },
+/** Demo taxonomy per sender — the label spread a real inbox shows after
+ *  sync + classification: provider category (Gmail-style), AI labels
+ *  (violet chips), and user labels (emerald chips). Makes the demo list
+ *  teach the tagging system instead of showing three flavors of bulk. */
+export const MOCK_SENDERS: Array<{
+  address: string;
+  name: string;
+  /** providerLabels — the provider's own category. */
+  provider: string[];
+  /** aiLabels — what the local classifier would decide. */
+  ai: string[];
+  /** labels — user/organization tags. */
+  user: string[];
+}> = [
+  {
+    address: "newsletter@changelog.com",
+    name: "Changelog",
+    provider: ["NEWSLETTER", "CATEGORY_UPDATES"],
+    ai: ["NEWSLETTER"],
+    user: ["Dev reads"],
+  },
+  {
+    address: "billing@vercel.com",
+    name: "Vercel Billing",
+    provider: ["CATEGORY_UPDATES"],
+    ai: ["RECEIPT", "ACTION_REQUIRED"],
+    user: ["Billing"],
+  },
+  {
+    address: "noreply@github.com",
+    name: "GitHub",
+    provider: ["CATEGORY_UPDATES"],
+    ai: ["NOTIFICATION"],
+    user: ["GitHub"],
+  },
+  {
+    address: "alice@example.com",
+    name: "Alice Hart",
+    provider: ["INBOX"],
+    ai: ["ACTION_REQUIRED"],
+    user: ["VIP"],
+  },
+  {
+    address: "team@linear.app",
+    name: "Linear",
+    provider: ["CATEGORY_UPDATES"],
+    ai: ["NOTIFICATION", "ACTION_REQUIRED"],
+    user: ["Team"],
+  },
+  {
+    address: "digest@hackernews.com",
+    name: "HN Digest",
+    provider: ["NEWSLETTER"],
+    ai: ["NEWSLETTER"],
+    user: ["Dev reads"],
+  },
+  {
+    address: "promos@wanderair.example.com",
+    name: "Wander Air Deals",
+    provider: ["CATEGORY_PROMOTIONS"],
+    ai: ["MARKETING"],
+    user: [],
+  },
+  {
+    address: "updates@linkedin.example.com",
+    name: "LinkedIn",
+    provider: ["CATEGORY_SOCIAL"],
+    ai: ["SOCIAL", "NOTIFICATION"],
+    user: [],
+  },
+  {
+    address: "sales@cloudpivot.example.com",
+    name: "CloudPivot Sales",
+    provider: ["CATEGORY_PROMOTIONS"],
+    ai: ["COLD_PITCH", "MARKETING"],
+    user: [],
+  },
+  {
+    address: "receipts@railgo.example.com",
+    name: "RailGo",
+    provider: ["CATEGORY_UPDATES"],
+    ai: ["RECEIPT"],
+    user: ["Travel"],
+  },
+  {
+    address: "calendar@dzong.local",
+    name: "Calendar",
+    provider: ["CATEGORY_UPDATES"],
+    ai: ["NOTIFICATION", "ACTION_REQUIRED"],
+    user: ["Calendar"],
+  },
+  {
+    address: "mom@example.com",
+    name: "Mom",
+    provider: ["INBOX"],
+    ai: [],
+    user: ["Personal", "VIP"],
+  },
 ];
 
 const SUBJECTS = [
@@ -50,7 +141,7 @@ export class MockSyncProvider implements MailSyncProvider {
     const messages: RawMessage[] = [];
 
     for (let i = generated; i < generated + BATCH_SIZE; i++) {
-      const sender = SENDERS[i % SENDERS.length];
+      const sender = MOCK_SENDERS[i % MOCK_SENDERS.length];
       const subject = SUBJECTS[i % SUBJECTS.length];
       const threadId = `mock-thread-${Math.floor(i / 3)}`;
       messages.push({
@@ -67,13 +158,15 @@ export class MockSyncProvider implements MailSyncProvider {
         headers: {
           "Message-ID": `<mock-${i}@dzong.local>`,
           "X-Mailer": "Dzong Mock Provider",
-          ...(i % 4 === 0
+          ...(sender.ai.includes("NEWSLETTER") || sender.ai.includes("MARKETING")
             ? {
                 "List-Unsubscribe": `<https://dzong.local/unsub/${i}>`,
                 "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
               }
             : {}),
         },
+        aiLabels: sender.ai,
+        labels: sender.user,
         bodyText: BODIES[i % BODIES.length],
         attachments:
           i % 5 === 0
@@ -92,7 +185,7 @@ export class MockSyncProvider implements MailSyncProvider {
         isRead: i % 3 === 0,
         isStarred: i % 8 === 0,
         isDraft: false,
-        providerLabels: i % 4 === 0 ? ["NEWSLETTER"] : ["INBOX"],
+        providerLabels: sender.provider,
       });
     }
 
