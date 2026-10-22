@@ -39,16 +39,16 @@ Free. Open source. MIT. Yours.
   <img src="docs/screenshots/smart-labels.png" width="760" alt="Dzong Mail — every email labeled overnight by a model on your machine" />
 </p>
 
-| Wake up to a plan, not a pile | Three drafts — pick your voice |
-| ----------------------------- | ------------------------------ |
+| POV: your inbox did the homework overnight | pick your fighter |
+| ------------------------------------------ | ----------------- |
 | ![Morning briefing](docs/screenshots/morning-briefing.png) | ![AI draft variants](docs/screenshots/ai-drafts.png) |
 
-| An inbox score that doesn't flatter | The email tax, cancelled |
-| ----------------------------------- | ------------------------ |
+| your inbox's credit score | it's giving clingy — break up in one click |
+| ------------------------- | ------------------------------------------ |
 | ![Analytics](docs/screenshots/analytics-score.png) | ![Bulk unsubscribe](docs/screenshots/bulk-unsubscribe.png) |
 
-| Your AI, your rules — $0 forever | Every inbox you own, one place |
-| -------------------------------- | ------------------------------ |
+| $0. no, really. | all your inboxes in one trench coat |
+| --------------- | ----------------------------------- |
 | ![AI engine settings](docs/screenshots/ai-engine.png) | ![Connect providers](docs/screenshots/connect-providers.png) |
 
 ---
