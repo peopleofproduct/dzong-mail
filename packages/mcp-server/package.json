@@ -15,7 +15,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "start": "tsx src/index.ts"
+    "start": "node init && tsx src/index.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
