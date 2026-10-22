@@ -35,18 +35,21 @@ Free. Open source. MIT. Yours.
 
 ## Screenshots
 
-<!-- TODO(launch): replace placeholders with real captures from the
-     seeded demo inbox — same assets serve the Product Hunt gallery.
-     Suggested: three-pane inbox, AI variant picker, analytics heatmap,
-     composer, AI settings. -->
+<p align="center">
+  <img src="docs/screenshots/smart-labels.png" width="760" alt="Dzong Mail — every email labeled overnight by a model on your machine" />
+</p>
 
-| Inbox — three panes, zero cloud | AI drafts — pick your variant |
-| ------------------------------- | ----------------------------- |
-| <!-- screenshot: inbox -->      | <!-- screenshot: variants --> |
+| Wake up to a plan, not a pile | Three drafts — pick your voice |
+| ----------------------------- | ------------------------------ |
+| ![Morning briefing](docs/screenshots/morning-briefing.png) | ![AI draft variants](docs/screenshots/ai-drafts.png) |
 
-| Analytics — meet your inbox     | Settings — your AI, your keys |
-| ------------------------------- | ----------------------------- |
-| <!-- screenshot: analytics -->  | <!-- screenshot: settings --> |
+| An inbox score that doesn't flatter | The email tax, cancelled |
+| ----------------------------------- | ------------------------ |
+| ![Analytics](docs/screenshots/analytics-score.png) | ![Bulk unsubscribe](docs/screenshots/bulk-unsubscribe.png) |
+
+| Your AI, your rules — $0 forever | Every inbox you own, one place |
+| -------------------------------- | ------------------------------ |
+| ![AI engine settings](docs/screenshots/ai-engine.png) | ![Connect providers](docs/screenshots/connect-providers.png) |
 
 ---
 
