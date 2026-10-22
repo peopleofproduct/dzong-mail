@@ -4,6 +4,13 @@
 
 # Dzong Mail
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](./tsconfig.json)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](./apps/web/package.json)
+[![AI: local-first](https://img.shields.io/badge/AI-local--first%20(Ollama)-brightgreen)](#turn-on-the-ai-optional-recommended)
+[![Telemetry: none](https://img.shields.io/badge/telemetry-none-brightgreen)](./SECURITY.md)
+[![Maintained by People of Product™](https://img.shields.io/badge/maintained%20by-People%20of%20Product%E2%84%A2-orange)](./CONTRIBUTING.md)
+
 **Your messages, your models, your machine — no paywalls, ever.**
 
 _dzong (རྫོང) — pronounced "jong" — the fortress-monasteries of Bhutan,
@@ -23,6 +30,23 @@ brain you like: a fully-offline local model via Ollama, or your own
 OpenAI/Anthropic API key.
 
 Free. Open source. MIT. Yours.
+
+---
+
+## Screenshots
+
+<!-- TODO(launch): replace placeholders with real captures from the
+     seeded demo inbox — same assets serve the Product Hunt gallery.
+     Suggested: three-pane inbox, AI variant picker, analytics heatmap,
+     composer, AI settings. -->
+
+| Inbox — three panes, zero cloud | AI drafts — pick your variant |
+| ------------------------------- | ----------------------------- |
+| <!-- screenshot: inbox -->      | <!-- screenshot: variants --> |
+
+| Analytics — meet your inbox     | Settings — your AI, your keys |
+| ------------------------------- | ----------------------------- |
+| <!-- screenshot: analytics -->  | <!-- screenshot: settings --> |
 
 ---
 
@@ -246,6 +270,33 @@ From **Settings → Accounts** (or the connect cards on the home page):
 
 ## How it's built
 
+Everything below the line lives on your machine — there is no Dzong
+server in the picture at all.
+
+```
+            ┌─────────────────── your machine ───────────────────┐
+            │                                                    │
+            │   apps/web (Next.js 16 — 3-pane mail dashboard)     │
+            │   apps/extension (Manifest V3 companion)           │
+            │      │                                             │
+            │      ▼                                             │
+            │   packages/sync-engine ────────────────┐           │
+            │   sync · send · rules · classify ·     │           │
+            │   unsubscribe · digests · follow-ups   │           │
+            │      │            │            │       │           │
+            │      ▼            ▼            ▼       │           │
+            │   packages/    packages/   packages/  ai-engine    │
+            │   database     mcp-server  (Ollama·OpenAI·         │
+            │   (Prisma +    (local API  Anthropic abstraction)  │
+            │   PostgreSQL)   for agents)         │              │
+            └───────┬───────────────────────────────┼────────────┘
+                    │                               │
+                    ▼                               ▼
+      your mail provider (IMAP/SMTP,      your AI endpoint —
+      Gmail API, Microsoft Graph)         Ollama on localhost
+                                          or YOUR API key
+```
+
 ```
 apps/web            Next.js 16 + React 19 + Tailwind — the whole UI, local
 apps/extension      Manifest V3 browser companion — badge, notifications, mailto
@@ -286,11 +337,36 @@ browser extension, and a mobile story via an optional encrypted relay
 (the one thing local-first can't do alone — it'll be self-hostable
 too).
 
+## Honest limits — read before you commit
+
+We'd rather you know these up front than discover them:
+
+- **No mobile app (yet).** Dzong Mail is a desktop web UI on localhost.
+  A mobile story needs an optional encrypted relay — it's on the
+  roadmap and will be self-hostable, but it doesn't exist today.
+- **Setup asks for real things.** A local PostgreSQL and, for AI
+  features, an Ollama install with a pulled model. It takes ~5 minutes
+  but it isn't "sign in with Google."
+- **Local models aren't frontier models.** A 3B-class Ollama model is
+  genuinely good at triage, labels, and summaries — for
+  publication-quality drafts you may want BYOK (your own
+  OpenAI/Anthropic key). Both paths are first-class.
+- **Gmail/Microsoft OAuth needs your own credentials.** BYOK app
+  registration is a one-time provider-console step; the docs walk
+  through it.
+- **The threat model is a lost device, not a compromised host.**
+  Secrets are AES-256-GCM at rest; nothing here protects you from
+  malware on a live, unlocked machine.
+- **BYOK mode sends content to that provider.** Obviously — that's what
+  the key is for. It's opt-in, labeled, and auditable, but it is
+  egress.
+
 ## Contributing
 
 Found a bug, want a feature, fixed something? Issues and PRs are the
-product roadmap. See `docs/SETUP.md` for environment details and
-`AGENTS.md` for the workspace map.
+product roadmap. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and
+conventions, `docs/SETUP.md` for environment details, and `AGENTS.md`
+for the workspace map.
 
 ## License
 
